@@ -2,66 +2,73 @@
 # GAUSSIAN QUANTILE REGRESSION ANALYSIS WITH KOENKER'S QUANTREG PACKAGE
 # ____________________________________________________________________________________________________
 
-rm(list=ls())
+rm(list=ls()) # library(diffr); diffr("3.3 RegQuant BSpline.R","3.1 RegQuant lineaire.R")
 #________________________________________________________________
 # PACKAGES USED ----
-library(readxl) ; library(openxlsx) # Edition d'un fichier Excel
-library(tidyverse)
-library(GGally); library(ggpubr)
-library(RColorBrewer);
+library(readxl) ; library(openxlsx); library(beepr) # Edition d'un fichier Excel
+library(tidyverse); library(reshape2); library(rlist) # the one; melt; list.append
+library(ggpubr); #library(GGally); # stat_compare_means ;
+library(scales); library(RColorBrewer); library(wesanderson); library(grafify); library(colorspace); library(ggsci); library(gplots) # show_col and colors colors colors!
 library(quantreg);# library(visreg)
-library(plotly); library(plot3D);  # graphiques 3D plot 3D for mesh library(pracma) 
-# GIS Packages
+library(plotly); library(plot3D);  # graphiques 3D plot 3D for mesh library(pracma)
+
+# # GIS Packages
 library(sf); library(sfheaders); # st_as_sf ; sf_to_df
-library(tmap) # tmap_mode; for static and interactive maps
 library(htmlwidgets) # library(leaflet) # saveWidget ; for interactive maps
 
 #________________________________________________________________
 # DEFINITION OF THE GRAPHIC CHARTER ----
 theme_set(theme_bw()) # theme_gray() theme_bw() theme_light()
-colorsS <- colorRampPalette(brewer.pal(8, "Spectral")); 
-coldiscS <- function(x) {scale_colour_manual(values=colorsS(x))}
-coldiscFS <- function(x) {scale_fill_manual(values=colorsS(x))}
-colorsD <- colorRampPalette(brewer.pal(8, "Dark2")); coldiscD <- function(x) {scale_colour_manual(values=colorsD(x))}
-collist<-c("#8b6508","#458b74","#9a32cd","#458b00","#cdcd00","#005a7c")
-blank<-alpha("#dae8ed",0.2); colIC<-"#800040" ; prettyred ="#CD2626"
-# ----
+
+pal_cspx <- function(x) {divergingx_hcl(x,palette = "Zissou 1")}; # show_col(pal_cspx(6)) # colorspace
+colRQ<-pal_cspx(4); colBin<-c(pal_cspx(6)[3],pal_cspx(6)[5]); blank<-alpha("#dae8ed",0.1); # show_col(colBin)
+Scalc_rq<- function() {scale_colour_manual(values=colRQ)}
+Scalf_rq2d <- function() {scale_fill_gradientn(colours=colRQ)} # function(x) {scale_fill_material("teal")} # 
+
+pal_ggscc <- pal_material("teal"); # show_col(pal_ggscc(9)) # ggsci
+colSum <- c(pal_ggscc(9)[3],pal_ggscc(9)[7],pal_ggscc(9)[1]) # show_col(colSum)
+colInliers<-pal_material("teal")(10)[5] ; colOutliers = pal_material("deep-orange")(10)[5] # show_col(colOutliers)
+Scalc_misc <- function() {scale_color_discrete_diverging(palette = "Blue-Red 3")}
+Scale_map<- function() {scale_fill_distiller(palette = "Spectral")}
+colIC <- col2hex("gray50")
 
 #________________________________________________________________
 # WORKING ENVIRONMENT AND LOADING OF BASIC DATA ----
-pc <- "E:/" #"C:/Users/lehuen201/Nextcloud/" "E:/" 
+pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" # 
 tsk <- "A_SDM_NEO/"
 wdpath <- paste(pc,"Melting Pot/BDD/",tsk,sep=""); 
 wdwork <- paste(wdpath,"Matrices/",sep="")
 wdgraph <- paste(wdpath,"Graphiques/",sep="")
-wdgraphEx<-paste(pc,"Copie-HD/Melting Potes/",tsk,"Graphiques/",sep="")
+wdgraphEx<-wdgraph #paste(pc,"Copie-HD/Melting Potes/",tsk,"Graphiques/",sep="")
 wdres <- paste(wdpath,"Resultats/",sep="")
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
-setwd(wdpath) 
+setwd(wdpath)
 
 #________________________________________________________________
 # DEFINITION OF BASIC VARIABLES ----
-prgm <- "CSLN" # 1:CSLN 2:Mabes 3:Geco 4:Beaug
-etude <- paste(prgm,"_Mars",sep="")
+etude <- "CSLN_Mars"
 load(paste(wdwork,etude,"_BDD.RData",sep=""))
+analysis <- "RQ Nonlinear"
+# if exists
+# load(paste(wdwork,etude,"_nlRQ_BDD",".RData", sep=""))
 
-choixttt<-123 # treatment choices 1 : simple nlrq; 2 : nlrq 2d coeff; 3 : nlrq 2d graphs or combinaisons
+choixttt <- 1#23 # treatment choices 1: RQ 1 to 2 factors coeff and AICm; 2: RQ graphs on demand; 3 : Mars SDM calculation
 
-# Choix des predicteurs utilises selon etude autocorrelation, taus...
+# Choice of predictors used according to autocorrelation study, taus...
 # Var_choosen<-c("flow_mxd","inunt","flow_m","sal_m","tenfon_m","mudrate_m") #,"bathy"
 Var_choosen<-c("flow_mxd","inunt","sal_dtd","temp_m","tenfon_m","mudrate_m")
 pred_red <- predict  %>% subset(Var %in% Var_choosen) %>% arrange(match(Var,Var_choosen))
-taus <- c(0.5,0.85,0.9,0.95,0.975,0.99) #c(1:19/20,0.975,0.99)
-spe <- 1#:nrow(species) # 1:CERED 2:CORVO 3:HEDDI 4:LIMBA 5:PERUL 6:SCRPL
-# reponse<-reponse[1:3,] # 1:Biomass_gAFDWm2 2:Density_indm2 3:MSRtot 4:Itot  
-answ <- 1#:nrow(reponse)
+taus <- c(0.5,0.9,0.95,0.975) # c(0.5,0.85,0.9,0.95,0.975,0.99) #c(1:19/20,0.975,0.99)
+spe <- 1#:nrow(speciesMP) # 1:CERED 2:CORVO 3:HEDDI 4:LIMBA 5:PERUL 6:SCRPL
+reponse<-reponse %>% filter(rvar %in% c("Biomass_gAFDWm2","Density_indm2"))
+answ <- 1:nrow(reponse)
 sai <- 1#:nrow(saison) # 1:Year 2:Winter 3:Summer
-explo <- 1:nrow(pred_red) # 1 for flow_maxd
+explo <- 1:nrow(pred_red) # Choice of the domain of exploration of the reduced predictors
+graphfine<-50 # graph resolution for 2D and 3D graphs surfaces
 
 # Model equation tested ----
 # Gaussian equation one factor with Initial conditions (CI) vector
 gaussf <- function(x,A,mu,sigma) {A*exp(-((x-mu)^2/(2*sigma^2))/(sigma*sqrt(2*pi)))}
-funcnom = "Gaussian one factors"; 
 FactA_CI <- c(0.99,0.99,0.99,0.99,0.99,0.99) #(0.99, bathy) modif facteur A regarding results of RQ, same length as pred_red
 SDM_tau1<-c(0.99,0.975,0.975,0.975,0.95,0.975);
 
@@ -69,452 +76,590 @@ SDM_tau1<-c(0.99,0.975,0.975,0.975,0.95,0.975);
 # epsilon<-1*10^-6;
 # gauss2d <- function(x1,x2,A,mu1,sigma1,mu2,sigma2,epsilon) {A*exp(-(((x1-mu1)^2/(2*sigma1^2))+((x2-mu2)^2/(2*sigma2^2))))+epsilon}
 gauss2d <- function(x1,x2,A,mu1,sigma1,mu2,sigma2) {A*exp(-(((x1-mu1)^2/(2*sigma1^2))+((x2-mu2)^2/(2*sigma2^2))))}
-funcnom = "Gaussian two factors"; 
 FactA_CI2d <- 0.99
-#----
-
-# Definition des SDM choisis
-name<-c('SDM1','SDM2','SDM3','SDM4','SDM5','SDM6')
-SDM_desc<-c('Gaussian two factors','Gaussian two factors','Gaussian two factors','Gaussian two factors','Gaussian two factors','Gaussian two factors')
-SDM_tau<-c(0.99,0.975,0.975,0.975,0.975,0.975)
-yt<-c('Biomass_gAFDWm2','Biomass_gAFDWm2','Biomass_gAFDWm2','Biomass_gAFDWm2','Biomass_gAFDWm2','Biomass_gAFDWm2')
-x1t<-c('flow_mxd','flow_mxd','flow_mxd','inunt','sal_dtd','tenfon_m')
-x2t<-c('inunt','mudrate_m','tenfon_m','mudrate_m','mudrate_m','mudrate_m')
-sdm_choice<-data.frame(name,SDM_desc,SDM_tau,yt,x1t,x2t)
-sdm<-1:nrow(sdm_choice)
-SDM_tau_all<-c(0.99,0.975,0.975,0.95,0.975,0.975,0.975,0.975,0.99,0.975,0.95,0.95,0.95,0.95,0.9);
-
-# ----
-# if exists
-# load(paste(wdwork,etude,"_NLRQ_BDD",".RData", sep=""))
-# load(paste(wdwork,etude,"_NLRQ2d_BDD",".RData", sep=""))
 
 #________________________________________________________________
-# 1 : Non-linear One factor Gaussian Quantile Regression ----
+# 1 : ONE to TWO FACTOR Cubic BSpline RQ with AICm and Rone calculation ----
 if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
-# Indic, coeff et graphes d'un coup ----
-funcname <- gaussf  ; funcnom = "Gaussian one factor";
-indnlrq_1 <- as.data.frame(matrix(nrow=0,ncol=1));
-smnlrq_1 <- as.data.frame(matrix(nrow=0,ncol=1))
-indic=1 # SDM increment number
-Mars_SDM<-Mars_dat_sf %>% dplyr::select(c(NINJ,Lon,Lat,Zone,Tidal_level,Annee,Period,pred_red$Var))
-for (sp in spe) { #sp=1
-  df <- CSLN_Mars[which(CSLN_Mars$SPCourt == species[sp,1]),]
-  indnlrq_2 <- as.data.frame(matrix(nrow=0,ncol=1));
-  smnlrq_2 <- as.data.frame(matrix(nrow=0,ncol=1))
-  smnlrq_tmp <- array(0, dim=c(3, 4, length(taus)))
-  for (rep in answ){ #rep=1
+  modelq_list <- list()
+  RqMod_list <- list();  smrq_t_list <- list(); rqResid_t_list <- list()
+  rqlim_t_list <- list(); rqinf_t_list <- list(); rqsup_t_list <- list();
+  for (sp in spe) { # sp=1
+    df <- CSLN_Mars[which(CSLN_Mars$SPCourt == speciesMP$SPCourt[sp]),]
     for (sa in sai) {# sa=1
-      for (k in explo) { #k=1 explo
-        yt = reponse[rep,1] ; yl = sprintf("%s (%s)",reponse[rep,2],reponse[rep,3])
-        zt = "Zone"
-        xt = sprintf("%s%s",pred_red[k,1],saison[sa,1]); xl = sprintf("%s%s (%s)",pred_red[k,2],saison[sa,1],pred_red[k,3])
-        dfrq <-df[,c(yt,xt,zt)]; dfrq <-as.data.frame(na.omit(dfrq))
-        y <- jitter(dfrq[,1]); x <- jitter(dfrq[,2]); 
-        z <- dfrq[,3]; nbcol <- length(levels(factor(z)))
-        lci <- list(A=quantile(y,FactA_CI[k]), mu=median(x), sigma=sd(x)); 
-        conditions<- data.frame(name = paste("SDM",indic,sep=""),Sp = species[sp,1],
-                                reponse=yl, predict = xl, Season=saison[sa,2],
-                                yt=yt,x1t=xt,sai=saison[sa,1],
-                                SDM_desc = funcnom, type = paste(deparse(body(funcname)[[2]]), collapse = ''))
-        
-        # tryCatch({ # INDICATORS and COEFFICIENTS EXTRACTION ----
-        indnlrq_3<- vector()
-        for (t in 1:length(taus)){ #t=5
-          tryCatch({
-            # NLRQ PARAMETER CONTROL TO AVOID R ABORT WHEN SUMMARY(MODEL) : InitialStepSize=0 (ex=1) ----
-            cc<-nlrq.control(maxiter=100, k=2, InitialStepSize = 0, big=1e+20, eps=1e-06, beta=0.97)
-            modnlq<-NULL
-            modnlq<-nlrq(y~funcname(x,A,mu,sigma), start = lci, tau=taus[t],control=cc, method="BFGS")
-            indnlrq_3 <- c(AIC(modnlq),indnlrq_3)
-            
-            smnlrq_tmp[,,t]<-summary(modnlq)[["coefficients"]]
-            Var<-rownames(summary(modnlq)[["coefficients"]])
-            colvar<-colnames(summary(modnlq)[["coefficients"]])
-            smnlrq <- summary(modnlq) #, se="boot"
-            tmp <- as.data.frame(smnlrq[["coefficients"]]);
-            tmp$coeff <- row.names(tmp); tmp$tau <- taus[t];
-            tmp<-cbind(tmp,conditions)
-            smnlrq_2 <- rbind(smnlrq_2,tmp)
-
-            },error = function(e) {print(e)})#,finally = {})
-        }
-        tmp <- data.frame(AICm=round(median(indnlrq_3,na.rm=TRUE),1));
-        tmp<-cbind(tmp,conditions)
-        indnlrq_2 <- rbind(indnlrq_2,tmp);
-        # },error = function(e) {print(e)})#,finally = {}) 
-        #----
-      
-        tryCatch({ # ONE FACTOR GAUSSIAN SUMMARY GRAPHS ----
-          # # ONE FACTOR LINEAR SUMMARY GRAPHS ----
-          # titreG <- sprintf("%s for %s in %s - %s",yl,species[sp,2],saison[sa,2],prgm)
-          # png(file=sprintf("%s%s/RQ Lineaire/Summaries/%s_Rq_sm_%s_%s_%s.png",
-          #                  wdgraph,species[sp,1],prgm,species[sp,1],yt,xt),width=600, height=600)
-          # sm<-plot(smrq, main=xxx,cex=.7,pch=19,lcol=colorsS(3)[3],col=c(colorsS(3)[1],colorsS(3)[2]),xlab = "tau", ylab = yt, )
-          # title(main=paste(titreG,"\n\n\n",sep=""))
-          # dev.off()
+      for (rep in answ){ # rep=1
+        for (k in explo) { # k=1 
           
-          mlista<-vector(mode = "list", length = dim(smnlrq_tmp)[1])
-          for (i in 1:dim(smnlrq_tmp)[1]){ #i=1
-            smnlrq_tmp_df <- as.data.frame(cbind(taus,t(smnlrq_tmp[i,,])))
-            colnames(smnlrq_tmp_df)<-c("taus",colvar)
-            smnlrq_tmp_df$lowerbd<- smnlrq_tmp_df$Value-smnlrq_tmp_df$`Std. Error`
-            smnlrq_tmp_df$upperbd<- smnlrq_tmp_df$Value+smnlrq_tmp_df$`Std. Error`
-            sma <- ggplot(smnlrq_tmp_df,aes(x=taus))+
-              geom_ribbon(aes(ymin=lowerbd, ymax=upperbd), fill=colorsS(3)[2], alpha=0.8)+
-              geom_point(aes_string(y="Value"),col=colorsS(3)[1],size=1)+geom_line(aes_string(y="Value"),col=colorsS(3)[1],size=.5, alpha=0.8)+
-              geom_hline(yintercept = 0,col=colorsS(3)[3])+
-              labs(title=Var[i], y=NULL, x=NULL) + theme_bw()+
-              theme(plot.title = element_text(hjust = 0.5,size=9,face="bold"),
-                    axis.text.y = element_text(size=6,face="bold"),axis.text.x = element_text(size=8,face="bold"),
-                    panel.grid.minor = element_blank()) + bgcolor("white")
-            assign(paste('sma', i, sep=''), sma)
-            mlista[[i]] <- eval(parse(text = paste('sma', i, sep='')))
+          # ONE FACTOR RQ ----
+          # var def for interation
+          yt = reponse[rep,1] ; yl = sprintf("%s (%s)",reponse[rep,2],reponse[rep,3])
+          zt = "Zone"
+          x1t = sprintf("%s%s",pred_red[k,1],saison[sa,1]); x1l = sprintf("%s%s (%s)",pred_red[k,2],saison[sa,1],pred_red[k,3])
+          dfrq <-df[,c(yt,x1t,zt)]; dfrq <-as.data.frame(na.omit(dfrq)) %>% rename(x1=!!x1t,y=!!yt,z=!!zt)
+          y <- dfrq$y <- jitter(dfrq$y); x1 <- dfrq$x1 <- jitter(dfrq$x1)
+          z <- dfrq$z
+          lci <- list(A=quantile(y,FactA_CI[k]), mu=median(x1), sigma=sd(x1)); 
+          
+          x1mod <- seq(min(x1),max(x1),length.out=graphfine)
+          x1Mod <- data.frame(x1mod) %>% rename(x1=x1mod)
+          titleG <- sprintf("%s %s in %s",analysis,speciesMP$Taxon_SNa[sp],saison[sa,2])
+          sdmname<-sprintf("nlRQ1_%g%g%g%g0",sp,sa,rep,k)
+          
+          xt<-paste("Gaussian",x1t,sep=' '); 
+          xl<-paste("Gaussian",x1l,sep=' ')
+          subtitleG <- sprintf("%s vs %s",yl,xl)
+          
+          # RQ calculation with error management ----
+          modelq_t <-vector("list", length(taus))
+          RqMod_t <- list(); smrq_t <- list(); rqResid_t <- list()
+          rqlim_t <- list(); rqinf_t <- list(); rqsup_t <- list()
+          for (t in 1:length(taus)){ #t=4
+            tryCatch({
+              # nlRQ PARAMETER CONTROL TO AVOID R ABORT WHEN SUMMARY(MODEL) : InitialStepSize=0 (ex=1) ----
+              cc<-nlrq.control(maxiter=100, k=2, InitialStepSize = 0, big=1e+20, eps=1e-06, beta=0.97)
+              modelq<-nlrq(y~gaussf(x1,A,mu,sigma), start = lci, tau=taus[t],control=cc, method="BFGS")
+              #### modelq<-rq(y~gaussf(x1,A,mu,sigma), start = lci, tau=taus); #!!!!A VOIR !!!!!
+              modelq_t[[t]] <- modelq
+              modelq0<-rq(y ~ 1, tau=taus[t])
+
+              # Summary calculation and pimp
+              smrq <- as.data.frame(summary(modelq)$coefficients) %>%
+                  mutate(Var=rownames(.)) %>% relocate(Var) %>% remove_rownames(.) %>%
+                  mutate(AIC=round(AIC(modelq)[1],1),
+                          Rone=round((1 - modelq$m$rho/modelq0$rho),5)) %>% 
+                  mutate(tau=taus[t], taust=sprintf("tau= %s",tau),
+                          sdmname=sdmname,
+                          mode=paste("RQnl",environment(modelq$m$formula)$form[[3]][[1]],"1var",sep=' '),
+                          formula=format(body(gaussf)[2]),
+                          type="Gaussian 1var",
+                          tau=taus[t],
+                          Sp=speciesMP$SPCourt[sp],Season=saison[sa,2],
+                          reponse=yl,reponset=yt,
+                          Predictor1=pred_red[k,1],Predictor2="None",
+                          predict=xl,predictt=xt)
+              # Out of limits points calculation
+              rqlim <- as.data.frame(fitted(modelq)) %>%
+                mutate(across(everything(), function(x){replace(x, which(x<0), NA)})) %>% 
+                rename_all(~"RqLim") %>% 
+                mutate(tau=taus[t], taust=sprintf("tau= %s",tau),
+                       sdmname=sdmname) %>% 
+                bind_cols(tibble(x1=x1),tibble(y=y))
+              rqsup <- rqlim %>% mutate(across(c(x1,y),~replace(.x, which(y<RqLim), NA))) %>% drop_na()
+              rqinf <- rqlim %>% mutate(across(c(x1,y),~replace(.x, which(y>=RqLim), NA))) %>% drop_na()
+              # Surface model calculation
+              RqMod <- as.data.frame(predict(modelq,newdata=x1Mod)) %>%
+                rename_all(~"RqMod") %>%
+                mutate(across(everything(), function(x){replace(x, which(x<0), NA)})) %>% 
+                mutate(tau=taus[t], taust=sprintf("tau= %s",tau),
+                       sdmname=sdmname) %>% 
+                bind_cols(tibble(x1=x1Mod$x1))
+              # Residuals
+              rqResid <- as.data.frame(residuals(modelq)) %>%
+                rename_all(~"residuals")%>% 
+                mutate(tau=taus[t], taust=sprintf("tau= %s",tau),
+                       sdmname=sdmname) %>% 
+                bind_cols(tibble(x1=x1),tibble(y=y))
+            
+              smrq_t[[t]] <- smrq 
+              rqResid_t[[t]] <- rqResid
+              RqMod_t[[t]] <- RqMod
+              rqlim_t[[t]] <- rqlim
+              rqsup_t[[t]] <- rqsup
+              rqinf_t[[t]] <- rqinf
+              
+              modelq<-NULL; smrq<-NULL;
+            },error = function(e) {print(e)})#,finally = {})
           }
-        nncol = 1; nnrow=ceiling(dim(smnlrq_tmp)[1]/nncol)
-        sm <- ggarrange(plotlist=mlista, ncol=nncol, nrow=nnrow,legend="bottom",common.legend = TRUE)
-        titreG <- sprintf("%s - in %s - %s\n%s of %s vs %s",species[sp,2],saison[sa,2],prgm,funcnom,yl,xl)
-        sm <- annotate_figure(sm,top = text_grob(titreG, face = "bold", size = 10))#; print(sm)
-        ggsave(sprintf("%s%s/RQ Nonlineaire/Summaries/%s_Nlrq_sm_%s_%s_%s.png",
-                                wdgraph,species[sp,1],prgm,species[sp,1],yt,xt),plot = sm, width = 5, height = 5)
-        },error = function(e) {print(e)})#,finally = {})
+          # smrq_t<- smrq_t %>% set_names(taus) %>%
+          #   map(coefficients) %>% map(~data.frame(.)) %>% map(~mutate(.,Var=rownames(.))) %>%
+          #   bind_rows(.id="tau") %>% relocate(Var) %>% remove_rownames(.) %>% 
+          modelq_list[[sdmname]] <- modelq_t
+          RqMod_list[[sdmname]] <- RqMod_t  <- RqMod_t %>% map_dfr(., ~.)
+          rqlim_t_list[[sdmname]] <- rqlim_t <- rqlim_t %>% map_dfr(., ~.)
+          rqsup_t_list[[sdmname]] <- rqsup_t <- rqsup_t %>% map_dfr(., ~.)
+          rqinf_t_list[[sdmname]] <- rqinf_t <- rqinf_t %>% map_dfr(., ~.)
+          smrq_t_list[[sdmname]] <- smrq_t <- smrq_t %>% map_dfr(., ~.)
+          rqResid_t_list[[sdmname]] <- rqResid_t <- rqResid_t %>% map_dfr(., ~.)
 
-        # tryCatch({ # ONE FACTOR GAUSSIAN GRAPHS ----
-        dp <-  ggplot(data=dfrq) +
-                      geom_point(aes(x=x, y=y), shape = 16, size = 1.5, color = prettyred, alpha=0.5) +
-                      labs(x=xl, y=yl) + coldiscS(nbcol)#+ ylim(0, 100) # Limit y
-        dp<-dp + stat_function(fun=funcname,color=colorsS(length(taus))[6],linetype = "dotted",size=1,args=lci); #print(dp)
-        dp1<-dp;
-        for (t in 1:length(taus)){ # t=1
-          tryCatch({
-          modnlq<-nlrq(y~funcname(x,A,mu,sigma), start = lci, tau=taus[t])
-          dp1<-dp1 + stat_function(fun=funcname,color=colorsD(length(taus))[t],size=.7,
-                                   args=list(A=coef(modnlq)[1],mu=coef(modnlq)[2],sigma=coef(modnlq)[3]))+
-          annotate("text",x=max(x,na.rm=TRUE)*0.9,y=max(y)*((t/length(taus))*0.9),colour=colorsD(length(taus))[t],size=4,fontface=2,hjust=0,
-                     label = paste(taus[t]))
-          },error = function(e) {print(e)})#,finally = {})
-        }
-        titreG <- sprintf("%s - in %s - %s",species[sp,2],saison[sa,2],prgm)
-        dp1<-dp1 + labs(title = titreG, caption = "");print(dp1) #subtitle = sstitreG,
-        ggsave(sprintf("%s%s/RQ Nonlineaire/Nlrq Simple/%s_Nlrq_%s_%s_%s.png",
-                       wdgraph,species[sp,1],prgm,species[sp,1],yt,xt),plot = dp1, width = 8, height = 8)
-        # },error = function(e) {print(e)})#,finally = {})
-
-        # MARS3D SDM CALCULATION ----
-        tau <- SDM_tau1[rep]
-        coeff_nlrqt <- smnlrq_2[smnlrq_2$name==paste("SDM",indic,sep="") & smnlrq_2$tau==tau,]
-        x1M <- pull(Mars_dat_sf, xt);
-        Mars_SDM$SDM<-funcname(x=x1M,A=coeff_nlrqt$Value[1],
-                               mu=coeff_nlrqt$Value[2],sigma=coeff_nlrqt$Value[3])
-        Mars_SDM$SDM[which(Mars_SDM$SDM<0)]<-NA
-        Mars_SDM<-Mars_SDM%>%rename(!!paste(species[sp,1],indic,saison[sa,1],sep=""):=SDM) # !!'string': to interpret text as variable
-        # ----
-        
-        indic<-indic+1
-      } # k explo
+          # GRAPHIC PART ----
+          # SUMMARY GRAPHS
+          smrq_t$lowerbd<- smrq_t$Value-smrq_t$`Std. Error`
+          smrq_t$upperbd<- smrq_t$Value+smrq_t$`Std. Error`
+          sma <- ggplot(smrq_t,aes(x=tau,y=Value, group = 1)) +
+            geom_ribbon(aes(ymin=lowerbd, ymax=upperbd), fill=colSum[3], alpha=0.8) +
+            geom_point(col=colSum[2],size=1) +
+            geom_line(col=colSum[2],size=.5, alpha=0.8) +
+            facet_wrap(~Var,scales="free") +
+            labs(title = titleG,subtitle = subtitleG); #sma
+          ggsave(sprintf("%s%s/%s/nlRQ1/%s_%s_nlRQ1_sm_%s_%s_%s.png",
+                         wdgraph,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],saison[sa,2],yt,x1t),
+                 plot = sma, width = 12, height = 6, dpi=600)
+          # QQPLOT RESIDUALS OF RQ MODEL
+          plot_qqres <- ggplot(rqResid_t, aes(sample=residuals, color=factor(tau))) + 
+            stat_qq() + stat_qq_line() + 
+            facet_wrap(~tau) +
+            Scalc_rq() +
+            theme(legend.position="bottom")+
+            labs(title=titleG,subtitle=paste("Residuals for ",subtitleG,sep=""),color="Quantile"); #plot_qqres
+          ggsave(sprintf("%s%s/%s/nlRQ1/%s_%s_nlRQ1Resid_%s_%s_%s.png",
+                         wdgraph,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],saison[sa,2],yt,x1t),
+                 plot = plot_qqres, width = 12, height = 8, dpi=600)
+          
+          # RQ GRAPHS
+          plot_dp <- ggplot(dfrq, aes(x=x1, y=y)) + 
+            geom_point(aes(color=z)) +
+            Scalc_misc() +
+            theme(legend.position="bottom") +
+            stat_function(fun=gaussf,color=colIC,linetype = "dotted",size=1,args=lci) +
+            labs(title=titleG,x=paste(x1l," (",pred_red[k,3],")",sep=""),y=yl,color=zt); #dp
+          for (t in 1:length(taus)){ # required to have diff color for rq lines
+            modelq <- modelq_list[[sdmname]][[t]]
+            plot_dp <- plot_dp + 
+              stat_function(fun=gaussf,color=colRQ[t],size=.7,
+                                       args=list(A=coef(modelq)[1],mu=coef(modelq)[2],sigma=coef(modelq)[3]))+
+              annotate("text",x=max(x1,na.rm=TRUE)*0.9,y=max(y)*((t/length(taus))*0.9),
+                       colour=colRQ[t],size=4,fontface=2,hjust=0, label = paste(taus[t]))
+          }
+          ggsave(sprintf("%s%s/%s/nlRQ1/%s_%s_nlRQ1_%s_%s_%s.png",
+                         wdgraph,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],saison[sa,2],yt,x1t),
+                 plot = plot_dp, width = 8, height = 8, dpi=600)
+          # ----
+ 
+          # TWO FACTORS LOOP ----
+          for (k2 in explo[-c(1:k)]) { #k2=2
+            # var def for interation
+            x2t = sprintf("%s%s",pred_red[k2,1],saison[sa,1]); x2l = sprintf("%s%s (%s)",pred_red[k2,2],saison[sa,1],pred_red[k2,3])
+            dfrq <-df[,c(yt,x1t,x2t)]; dfrq <-as.data.frame(na.omit(dfrq)) %>% rename(x1=!!x1t,x2=!!x2t,y=!!yt)
+            y <- dfrq$y <- jitter(dfrq$y); x1 <- dfrq$x1 <- jitter(dfrq$x1); x2 <- dfrq$x2 <- jitter(dfrq$x2)
+            z <- dfrq$z
+            lci <- list(A=quantile(y,FactA_CI2d),mu1=median(x1),sigma1=sd(x1),mu2=median(x2),sigma2=sd(x2)); #,epsilon=0
+            
+            x2mod <- seq(min(x2),max(x2),length.out=graphfine)
+            x1x2mod <- data.frame(cbind(x1mod,x2mod)) %>% rename(x1=x1mod,x2=x2mod)
+            gridx1x2 <- expand.grid(x1mod,x2mod) %>% rename(x1=Var1,x2=Var2)
+            gridx1x2mat <- mesh(x1mod,x2mod)
+            Zinit<-gauss2d(x1=gridx1x2mat[["x"]],x2=gridx1x2mat[["y"]],
+                           A=lci[[1]],mu1=lci[[2]],sigma1=lci[[3]],mu2=lci[[4]],sigma2=lci[[5]]) #,epsilon=lci[[6]]
+            
+            titleG <- sprintf("%s %s in %s",analysis,speciesMP$Taxon_SNa[sp],saison[sa,2])
+            sdmname<-sprintf("nlRQ2_%g%g%g%g%g",sp,sa,rep,k,k2)
+            
+            xt<-paste("Gaussian",x1t,"&",x2t,sep=' '); 
+            xl<-paste("Gaussian",x1l,"&",x2l,sep=' ')
+            subtitleG <- sprintf("%s vs %s",yl,xl)
+            
+            # RQ calculation with error management
+            modelq_t <-vector("list", length(taus))
+            rqlim_t <- list(); rqinf_t <- list(); rqsup_t <- list()
+            RqMod_t <- list(); smrq_t <- list(); rqResid_t <- list()
+            for (t in 1:length(taus)){ #t=4
+              tryCatch({
+                # nlRQ PARAMETER CONTROL TO AVOID R ABORT WHEN SUMMARY(MODEL) : InitialStepSize=0 (ex=1) ----
+                cc<-nlrq.control(maxiter=100, k=2, InitialStepSize = 0, big=1e+20, eps=1e-06, beta=0.97)
+                modelq<-NULL
+                modelq<-nlrq(y~gauss2d(x1,x2,A,mu1,sigma1,mu2,sigma2), start=lci, tau=taus[t],control=cc, method="BFGS") #,epsilon
+                modelq_t[[t]] <- modelq
+                modelq0<-rq(y ~ 1, tau=taus[t])
+               
+                # Summary calculation and pimp
+                smrq <- as.data.frame(summary(modelq)$coefficients) %>%
+                  mutate(Var=rownames(.)) %>% relocate(Var) %>% remove_rownames(.) %>%
+                  mutate(AIC=round(AIC(modelq)[1],1),
+                         Rone=round((1 - modelq$m$rho/modelq0$rho),5)) %>% 
+                  mutate(tau=taus[t], taust=sprintf("tau= %s",tau),
+                         sdmname=sdmname,
+                         mode=paste("nlRQ",environment(modelq$m$formula)$form[[3]][[1]],"2var",sep=' '),
+                         formula=paste(format(body(gauss2d)[2]),sep="",collapse=""),
+                         type="Gaussian 2var",
+                         tau=taus[t],
+                         AIC=round(AIC(modelq)[1],1),
+                         Rone=round((1 - modelq$m$rho/modelq0$rho),5),
+                         Sp=speciesMP$SPCourt[sp],Season=saison[sa,2],
+                         reponse=yl,reponset=yt,
+                         Predictor1=pred_red[k,1],Predictor2=pred_red[k2,1],
+                         predict=xl,predictt=xt)
+                # Out of limits points calculation
+                rqlim <- as.data.frame(fitted(modelq)) %>%
+                  mutate(across(everything(), function(x){replace(x, which(x<0), NA)})) %>% 
+                  rename_all(~"RqLim") %>% 
+                  mutate(tau=taus[t], taust=sprintf("tau= %s",tau),
+                         sdmname=sdmname) %>% 
+                  bind_cols(tibble(x1=x1),tibble(x2=x2),tibble(y=y))
+                rqsup <- rqlim %>% mutate(across(c(x1,x2,y),~replace(.x, which(y<RqLim), NA))) %>% drop_na()
+                rqinf <- rqlim %>% mutate(across(c(x1,x2,y),~replace(.x, which(y>=RqLim), NA))) %>% drop_na()
+                # Surface model calculation
+                RqMod <- as.data.frame(predict(modelq,newdata=gridx1x2)) %>%
+                  rename_all(~"RqMod") %>%
+                  mutate(across(everything(), function(x){replace(x, which(x<0), NA)})) %>% 
+                  mutate(tau=taus[t], taust=sprintf("tau= %s",tau),
+                         sdmname=sdmname) %>% 
+                  bind_cols(gridx1x2)
+                # Residuals
+                rqResid <- as.data.frame(residuals(modelq)) %>%
+                  rename_all(~"residuals")%>% 
+                  mutate(tau=taus[t], taust=sprintf("tau= %s",tau),
+                         sdmname=sdmname) %>% 
+                  bind_cols(tibble(x1=x1),tibble(x2=x2),tibble(y=y))
+                
+                smrq_t[[t]] <- smrq 
+                rqResid_t[[t]] <- rqResid
+                RqMod_t[[t]] <- RqMod
+                rqlim_t[[t]] <- rqlim
+                rqsup_t[[t]] <- rqsup
+                rqinf_t[[t]] <- rqinf
+                
+                smrq<-NULL; modelq<-NULL        
+              },error = function(e) {print(e)})#,finally = {})
+            }
+            modelq_list[[sdmname]] <- modelq_t
+            RqMod_list[[sdmname]] <- RqMod_t  <- RqMod_t %>% map_dfr(., ~.)
+            rqlim_t_list[[sdmname]] <- rqlim_t <- rqlim_t %>% map_dfr(., ~.)
+            rqsup_t_list[[sdmname]] <- rqsup_t <- rqsup_t %>% map_dfr(., ~.)
+            rqinf_t_list[[sdmname]] <- rqinf_t <- rqinf_t %>% map_dfr(., ~.)
+            smrq_t_list[[sdmname]] <- smrq_t <- smrq_t %>% map_dfr(., ~.)
+            rqResid_t_list[[sdmname]] <- rqResid_t <- rqResid_t %>% map_dfr(., ~.)
+            
+            # GRAPHIC PART ----
+            # SUMMARY GRAPHS
+            smrq_t$lowerbd<- smrq_t$Value-smrq_t$`Std. Error`
+            smrq_t$upperbd<- smrq_t$Value+smrq_t$`Std. Error`
+            sma <- ggplot(smrq_t,aes(x=tau,y=Value, group = 1)) +
+              geom_ribbon(aes(ymin=lowerbd, ymax=upperbd), fill=colSum[3], alpha=0.8) +
+              geom_point(col=colSum[2],size=1) +
+              geom_line(col=colSum[2],size=.5, alpha=0.8) +
+              facet_wrap(~Var,scales="free") +
+              labs(title = titleG,subtitle = subtitleG); #sma
+            ggsave(sprintf("%s%s/%s/nlRQ2/%s_%s_nlRQ2_sm_%s_%s_%s_%s.png",
+                           wdgraph,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],saison[sa,2],yt,x1t,x2t),
+                   plot = sma, width = 12, height = 6, dpi=600)
+            # QQPLOT RESIDUALS OF RQ MODEL
+            plot_qqres <- ggplot(rqResid_t, aes(sample=residuals, color=factor(tau))) + 
+              stat_qq() + stat_qq_line() + 
+              facet_wrap(~tau) +
+              Scalc_rq() +
+              theme(legend.position="bottom")+
+              labs(title=titleG,subtitle=paste("Residuals for ",subtitleG,sep=""),color="Quantile"); #plot_qqres
+            ggsave(sprintf("%s%s/%s/nlRQ2/%s_%s_nlRQ2Resid_%s_%s_%s_%s.png",
+                           wdgraph,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],saison[sa,2],yt,x1t,x2t),
+                   plot = plot_qqres, width = 12, height = 8, dpi=600)
+            
+            # RQ GRAPHS
+            # 2D static graphic : RASTER
+            plot_dp2d <- ggplot(RqMod_t) +
+              geom_raster(aes(x = x1, y = x2, fill = RqMod),alpha=0.7) + 
+              geom_point(data=rqinf,aes(x=x1, y=x2), shape=21, size=1, color=colInliers, fill=colInliers, alpha=.5, na.rm = TRUE) +
+              geom_point(data=rqsup,aes(x=x1, y=x2), shape=23, size=1, color=colOutliers, fill=colOutliers, alpha=.5, na.rm = TRUE) +
+              labs(title=titleG,x=x1l, y=x2l,fill = paste("SDM-NEO\n",reponse[rep,3],sep="")) +
+              guides(alpha = "none") +
+              Scalf_rq2d() +
+              # theme(panel.border = element_blank(),strip.background = element_blank()) +
+              facet_wrap(taust ~ .); plot_dp2d
+            ggsave(sprintf("%s%s/%s/nlRQ2/%s_%s_nlRQ22d_%s_%s_%s_%s.png",
+                           wdgraph,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],saison[sa,2],yt,x1t,x2t),
+                   plot = plot_dp2d, width = 10, height = 7, dpi=600)
+            
+            # Experimental points on 3D graphic
+            # define standard layout scene
+            myscene<-list(camera = list(eye = list(x = -1.5, y = 1.5, z = 0.3)), aspectmode='cube',
+                          xaxis = list(title = x1l), yaxis = list(title = x2l), zaxis = list(title = yl))
+            
+            plot_dp3dS <- plot_ly(showlegend=FALSE) %>% 
+              add_trace(data=dfrq, x = x1, y = x2, z = y,mode = "markers", type = "scatter3d",
+                        marker = list(size = .5, color = "blue", opacity = 0.5, symbol = 104)) %>%
+              layout(title = titleG, scene = myscene); # plot_dp3dS
+            plot_dp3dlist <- list()
+            # Define surfaces for each tau
+            for (t in 1:length(taus)){ # t=4
+              RqMod_mat <- RqMod_t %>% filter(tau==taus[t])
+              RqMod_mat <- array(RqMod_mat$RqMod,dim=c(graphfine,graphfine))
+              rqlim <- rqlim_t %>% filter(tau==taus[t]) %>% select(RqLim)
+              rqsup<-rqsup_t %>% filter(tau==taus[t]); rqinf<-rqinf_t %>% filter(tau==taus[t])
+              plot_dp3d <- plot_ly(showlegend=F, scene=paste("scene",t,sep="")) %>% 
+                add_surface(x = gridx1x2mat[["x"]], y = gridx1x2mat[["y"]], z = RqMod_mat,
+                            opacity = 0.9, colorscale = list(c(0,1),c(blank,colRQ[t])),
+                            colorbar=list(title=list(text=paste("SDM-NEO\n",reponse[rep,3],"\nTau=",taus[t],sep="")))) %>%
+                add_trace(x = rqsup$x1, y = rqsup$x2, z = rqsup$y, mode = "markers", type = "scatter3d",
+                          marker = list(size = 2, color = colOutliers, opacity = 0.5, symbol = "diamond"))%>%
+                add_trace(x = rqinf$x1, y = rqinf$x2, z = rqinf$y, mode = "markers", type = "scatter3d",
+                          marker = list(size = 2, color = colInliers, opacity = 0.5, symbol = "circle")) %>%
+                add_surface(x = ~gridx1x2mat[["x"]], y = ~gridx1x2mat[["y"]],z = ~Zinit,
+                            opacity = 0.4,colorscale = list(c(0,1),c(blank,colIC)),
+                            colorbar=list(title=list(text="Initial conditions"),limits=c(0,max(Zinit)))) %>%
+                layout(title = titleG, scene = myscene); plot_dp3d
+              plot_dp3dlist[[t]] <- plot_dp3d
+              plot_dp3dS <- plot_dp3dS %>% add_surface(x = gridx1x2mat[["x"]], y = gridx1x2mat[["y"]], z = RqMod_mat,
+                                                       opacity = 0.8, colorscale = list(c(0,1),c(blank,colRQ[t])))
+            } # taus
+            scene <- list.append(myscene,domain=list(x=c(0,0.33),y=c(0,0.5)))
+            scene2 <- list.append(myscene,domain=list(x=c(0.34,0.66),y=c(0,0.5)))
+            scene3 <- list.append(myscene,domain=list(x=c(0.67,1),y=c(0,0.5)))
+            scene4 <- list.append(myscene,domain=list(x=c(0,0.33),y=c(0.5,1)))
+            scene5 <- list.append(myscene,domain=list(x=c(0.34,0.66),y=c(0.5,1)))
+            scene6 <- list.append(myscene,domain=list(x=c(0.67,1),y=c(0.5,1)))
+            plot_dp3dF <- subplot(plot_dp3dlist, shareX = TRUE, shareY = TRUE, nrows = 2) %>%
+              layout(scene = scene, scene2 = scene2, scene3 = scene3, 
+                     scene4 = scene4, scene5 = scene5, scene6 = scene6)
+            saveWidget(plot_dp3dF,sprintf("%s%s/%s/nlRQ2/%s_%s_nlRQ23dFacet_%s_%s_%s_%s.html",
+                                          wdgraphEx,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],
+                                          saison[sa,2],yt,x1t,x2t),
+                       selfcontained = F, libdir = "lib")
+            # 3D plot with all taus models surface
+            plot_dp3dS <- plot_dp3dS %>% 
+              add_trace(x = rqsup$x1, y = rqsup$x2, z = rqsup$y, mode = "markers", type = "scatter3d",
+                        marker = list(size = 2, color = colOutliers, opacity = 0.5, symbol = "diamond")) %>%
+              add_trace(x = rqinf$x1, y = rqinf$x2, z = rqinf$y, mode = "markers", type = "scatter3d",
+                        marker = list(size = 2, color = colInliers, opacity = 0.5, symbol = "circle")) %>%
+              add_surface(x = ~gridx1x2mat[["x"]], y = ~gridx1x2mat[["y"]],z = ~Zinit,
+                          opacity = 0.4,colorscale = list(c(0,1),c(blank,colIC)),
+                          colorbar=list(title=list(text="Initial conditions"),limits=c(0,max(Zinit)))) %>%
+              hide_colorbar()
+            saveWidget(plot_dp3dS,sprintf("%s%s/%s/nlRQ2/%s_%s_nlRQ23dStack_%s_%s_%s_%s.html",
+                                          wdgraphEx,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],
+                                          saison[sa,2],yt,x1t,x2t),
+                       selfcontained = F, libdir = "lib")
+            
+          } # two factors loop ----
+        } # explo
+      } # reponse
     } # saison
-   } #reponse
-  indnlrq_1 <- rbind(indnlrq_1,indnlrq_2)
-  # indnlrq_1$AICm<-as.numeric(levels(indnlrq_1$AICm))[indnlrq_1$AICm] # AICm se retrouve en factor, conversion
-  indnlrq_1$AICm<-as.numeric(indnlrq_1$AICm)
-  indnlrq_1 <- indnlrq_1 %>% arrange(reponse,AICm)
-  smnlrq_1 <- rbind(smnlrq_1,smnlrq_2)
-  st_write(Mars_SDM, sprintf("%sLayers made/SDM_NEO_nlrq_%s.shp",wdGIS,species[sp,1]),append=FALSE)
-} #species
-sdmlist<-indnlrq_1[,-sai];sdmlist$SDM_tau<-SDM_tau1;
-
-# Graphic representation of model performance
-dp<-indnlrq_1 %>% group_by(Sp) %>% arrange(AICm,.by_group = TRUE) %>% slice(1:20) %>% #filter(str_detect(mode, "Inter"))%>%
-  group_by(Sp,reponse) %>% arrange(AICm,.by_group = TRUE) %>% #slice(1:3) %>%
-  ggplot(aes(x=reorder(predict,-AICm),y=AICm,fill = reponse))+geom_col(position = "dodge") +
-  geom_text(aes(y=AICm, label = AICm),position = position_dodge(width = .9), hjust = 1) + #
-  scale_fill_manual(values=colorsS(7)) +
-  labs(title="One Factor Gaussian Quantile Regression AICm scores", x="Model",y="AICm") +
-  theme(axis.text = element_text(size=15,face="bold")) +
-  coord_flip()+theme_bw();dp
-ggsave(sprintf("%s%s/RQ Nonlineaire/%s_%s_Nlrq_AIC_scores.png",wdgraph,species[sp,1],prgm,species[sp,1]), plot = dp, width = 8, height = 8)
-
-# Sauvegarde des outputs ----
-wb <- loadWorkbook(paste(wdres,prgm,"_BDD",".xlsx", sep="")) # addWorksheet(wb, sheetName = "RQ_line")
-writeData(wb, sheet = "Nlrq", x = indnlrq_1, startCol = 1, startRow = 1,withFilter = FALSE)
-writeData(wb, sheet = "Nlrq_coeff", x = smnlrq_1, startCol = 1, startRow = 1,withFilter = FALSE)
-saveWorkbook(wb,file=paste(wdres,prgm,"_BDD",".xlsx", sep=""), overwrite = TRUE)
-save.image(file = paste(wdwork,etude,"_NLRQ_BDD",".RData", sep=""))
+  } # species
+  # ----
+  
+  smrq_l <- smrq_t_list %>% map_dfr(., ~.)
+  sdmlist_name <- unique(smrq_l$sdmname)
+  # Graphic representation of model performance
+  plot_dp<- smrq_l %>% #filter(!str_detect(mode, "4var")) %>%
+    mutate(model_desc=str_remove(predict,"Gaussian "))%>% 
+    group_by(tau) %>%
+    ggplot(aes(x=reorder(model_desc,-AIC),y=AIC,color = factor(tau),shape=reponse))+
+    geom_point(alpha=0.8, size= 5) +
+    scale_color_manual(values=colRQ) +
+    labs(title="Quantile Regression AIC scores : Linear", x="Model",y="AIC",color="Quantile",shape="Biologic") +
+    theme(axis.text = element_text(size=10,face="bold")) +
+    coord_flip(); plot_dp
+  ggsave(sprintf("%s%s/%s/%s_%s_nlRQ_AIC_scores.png",
+               wdgraph,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp]), 
+         plot = plot_dp, width = 16, height = 8, dpi=600)
+  
+  # Sauvegarde des outputs ----
+  wb <- loadWorkbook(paste(wdres,"CSLN_BDD",".xlsx", sep="")) # addWorksheet(wb, sheetName = "rql")
+  writeData(wb, sheet = "nlRQ_coeff", x = smrq_l, startCol = 1, startRow = 1,withFilter = FALSE)
+  saveWorkbook(wb,file=paste(wdres,"CSLN_BDD",".xlsx", sep=""), overwrite = TRUE)
+  
+  rm(list=c("smrq_tmp","smrq","rqsup","rqinf","rqlim","RqMod_mat","RqMod_t",
+            "modelq","modelq0","df","dfrq","tmp",
+            "CSLN","CSLN_pur","Mars_csv","Mars_csv_sf"))
+  rm(list=ls(pattern="scene")); rm(list=ls(pattern="plot"))
+  save.image(file = paste(wdwork,etude,"_nlRQ_BDD",".RData", sep=""))
 } #end if choixttt 1
 # ----
 
 #________________________________________________________________
-# 2 : Non-linear Two factor Gaussian Quantile Regression ----
+# 2 : GRAPHS ON DEMAND ----
 if (choixttt==2 | choixttt==12 | choixttt==23 | choixttt==123){
-funcname <- gauss2d  ; funcnom = "Gaussian two factors";  #
-indnlrq_1 <- as.data.frame(matrix(nrow=0,ncol=7));
-smnlrq_1 <- as.data.frame(matrix(nrow=0,ncol=7))
-indic=1 # SDM increment number
-for (sp in spe) { #sp=1
-  df <- CSLN_Mars[which(CSLN_Mars$SPCourt == species[sp,1]),]
-  indnlrq_2 <- as.data.frame(matrix(nrow=0,ncol=7));
-  smnlrq_2 <- as.data.frame(matrix(nrow=0,ncol=7))
-  smnlrq_tmp <- array(0, dim=c(5, 4, length(taus)))
-  for (rep in answ){ #rep=1
-    for (sa in sai) {# sa=1
-      for (k in explo) { # k=1 explo
-      for (k2 in explo[-c(1:k)]) { # k2=2 explo[-c(1:k)]
-        yt = reponse[rep,1] ; yl = sprintf("%s (%s)",reponse[rep,2],reponse[rep,3])
-        zt = "Zone"
-        x1t = sprintf("%s%s",pred_red[k,1],saison[sa,1]); x1l = sprintf("%s%s (%s)",pred_red[k,2],saison[sa,1],pred_red[k,3])
-        x2t = sprintf("%s%s",pred_red[k2,1],saison[sa,1]); x2l = sprintf("%s%s (%s)",pred_red[k2,2],saison[sa,1],pred_red[k2,3])
-        xt<-paste(x1t,x2t,sep="&"); xl<-paste(x1l,x2l,sep=" & ")
-        xxx <-c("Beta 0",x1l,x2l,paste(x1l,x2l,sep=" & "))
-        dfrq <-df[,c(yt,x1t,x2t,zt)]; dfrq <-as.data.frame(na.omit(dfrq))
-        y <- jitter(dfrq[,1]); x1 <- jitter(dfrq[,2]); x2 <- jitter(dfrq[,3]);
-        z <- dfrq[,4]; nbcol <- length(levels(factor(z)))
-        lci <- list(A=quantile(y,FactA_CI2d),mu1=median(x1),sigma1=sd(x1),mu2=median(x2),sigma2=sd(x2)); #,epsilon=0
-        conditions<- data.frame(name = paste("SDM",indic,sep=""),Sp = species[sp,1],
-                                reponse=yl, predict = xl, Season=saison[sa,2],
-                                yt=yt,x1t=x1t,x2t=x2t,sai=saison[sa,1],
-                                SDM_desc = funcnom, type = paste(deparse(body(funcname)[[2]]), collapse = ''))
-        # tryCatch({ # INDICATORS and COEFFICIENTS EXTRACTION ----
-        indnlrq_3<- vector()
-        for (t in 1:length(taus)){ #t=3
-          tryCatch({
-            modnlq<-NULL
-            # NLRQ PARAMETER CONTROL TO AVOID R ABORT WHEN SUMMARY(MODEL) : InitialStepSize=0 (ex=1) ----
-            cc<-nlrq.control(maxiter=100, k=2, InitialStepSize = 0, big=1e+20, eps=1e-06, beta=0.97)
-            modnlq<-nlrq(y~funcname(x1,x2,A,mu1,sigma1,mu2,sigma2), start=lci, tau=taus[t],control=cc, method="BFGS") #,epsilon
-
-            indnlrq_3 <- c(AIC(modnlq),indnlrq_3)
-            smnlrq <- summary(modnlq) #, se="boot"
-            smnlrq_tmp[,,t]<-smnlrq[["coefficients"]]
-            Var<-rownames(smnlrq[["coefficients"]])
-            colvar<-colnames(smnlrq[["coefficients"]])
-            tmp <- as.data.frame(smnlrq[["coefficients"]]);
-            tmp$coeff <- row.names(tmp); tmp$SDM_tau <- taus[t];
-            tmp<-cbind(tmp,conditions)
-            smnlrq_2 <- rbind(smnlrq_2,tmp)
-          },error = function(e) {print(e)})#,finally = {})
-        }
-        tmp <- data.frame(AICm=round(median(indnlrq_3,na.rm=TRUE),1));
-        tmp <- cbind(tmp,conditions)
-        indnlrq_2 <- rbind(indnlrq_2,tmp);
-        # },error = function(e) {print(e)})#,finally = {})
-        #----
-
-        tryCatch({ # GRAPH SUMMARY ----
-          mlista<-vector(mode = "list", length = dim(smnlrq_tmp)[1])
-          for (i in 1:dim(smnlrq_tmp)[1]){ #i=1
-            smnlrq_tmp_df <- as.data.frame(cbind(taus,t(smnlrq_tmp[i,,])))
-            colnames(smnlrq_tmp_df)<-c("taus",colvar)
-            smnlrq_tmp_df$lowerbd<- smnlrq_tmp_df$Value-smnlrq_tmp_df$`Std. Error`
-            smnlrq_tmp_df$upperbd<- smnlrq_tmp_df$Value+smnlrq_tmp_df$`Std. Error`
-            sma <- ggplot(smnlrq_tmp_df,aes(x=taus))+
-              geom_ribbon(aes(ymin=lowerbd, ymax=upperbd), fill=colorsS(3)[2], alpha=0.8)+
-              geom_point(aes_string(y="Value"),col=colorsS(3)[1],size=1)+geom_line(aes_string(y="Value"),col=colorsS(3)[1],size=.5, alpha=0.8)+
-              geom_hline(yintercept = 0,col=colorsS(3)[3])+
-              labs(title=Var[i], y=NULL, x=NULL) + theme_bw()+
-              theme(plot.title = element_text(hjust = 0.5,size=9,face="bold"),
-                    axis.text.y = element_text(size=6,face="bold"),axis.text.x = element_text(size=8,face="bold"),
-                    panel.grid.minor = element_blank())
-            assign(paste('sma', i, sep=''), sma)
-            mlista[[i]] <- eval(parse(text = paste('sma', i, sep='')))
+  k_choosen<- which(pred_red$Var %in% c("flow_mxd")) # flow_mxd inunt sal_dtd temp_m tenfon_m mudrate_m
+  k2_choosen<- which(pred_red$Var %in% c("inunt"))# 
+  taus_choosen <- which(taus %in% c(0.975))  # c(0.5,0.85,0.9,0.95,0.975,0.99)
+  spe_choosen <- which(speciesMP$SPCourt %in% c("CERED"))  # CERED CORVO HEDDI LIMBA PERUL SCRPL
+  reponse_choosen <- which(reponse$rvar %in% c("Biomass_gAFDWm2","Density_indm2")) # Biomass_gAFDWm2 Density_indm2
+  sai_choosen <- which(saison$M_Def %in% "Year") #  Year Winter Summer
+  plot_dp3dlist<-list(); plot_dp2dlist<-list()
+  
+  for (sp in spe_choosen) { # sp=spe_choosen
+    for (sa in sai_choosen) {# sa=sai_choosen
+      for (k in k_choosen) { # k=k_choosen
+        for (k2 in k2_choosen) { # k2=k2_choosen 
+          for (t in taus_choosen){ # t= taus_choosen
+            for (rep in reponse_choosen){ # rep=reponse_choosen[1]
+              sdmname_chosen <- sprintf("nlRQ2_%g%g%g%g%g",sp,sa,rep,k,k2)
+              modelq <- modelq_list[[sdmname_chosen]]
+              smrq_t <- smrq_t_list[[sdmname_chosen]]
+              RqMod_t <- RqMod_list[[sdmname_chosen]]
+              rqlim_t <- rqlim_t_list[[sdmname_chosen]]
+              rqsup_t <- rqsup_t_list[[sdmname_chosen]]
+              rqinf_t <- rqinf_t_list[[sdmname_chosen]]
+              df <- CSLN_Mars[which(CSLN_Mars$SPCourt == speciesMP$SPCourt[sp]),]
+              yt = reponse[rep,1] ; yl = sprintf("%s (%s)",reponse[rep,2],reponse[rep,3])
+              zt = "Zone"
+              x1t = sprintf("%s%s",pred_red[k,1],saison[sa,1]); x1l = sprintf("%s%s (%s)",pred_red[k,2],saison[sa,1],pred_red[k,3])
+              x2t = sprintf("%s%s",pred_red[k2,1],saison[sa,1]); x2l = sprintf("%s%s (%s)",pred_red[k2,2],saison[sa,1],pred_red[k2,3])
+              dfrq <-df[,c(yt,x1t,x2t)]; dfrq <-as.data.frame(na.omit(dfrq)) %>% rename(x1=!!x1t,x2=!!x2t,y=!!yt)
+              y <- dfrq$y <- jitter(dfrq$y); x1 <- dfrq$x1 <- jitter(dfrq$x1); x2 <- dfrq$x2 <- jitter(dfrq$x2)
+              z <- dfrq$z
+              
+              smrq <- smrq_t %>% filter(tau==taus[t])
+              RqMod_mat <- RqMod_t %>% filter(tau==taus[t])
+              rqlim <- rqlim_t %>% filter(tau==taus[t]) %>% select(RqLim)
+              rqsup<-rqsup_t %>% filter(tau==taus[t]); rqinf<-rqinf_t %>% filter(tau==taus[t])
+              
+              titleG <- sprintf("%s %s in %s",analysis,speciesMP$Taxon_SNa[sp],saison[sa,2])
+              xt<-paste("Gaussian 2d",x1t,x2t,sep=' '); 
+              xl<-paste("Gaussian 2d",x1l,x2l,sep=' ')
+              subtitleG <- sprintf("%s %s model, AIC = %g, Rone = %g",yl,smrq$mode,smrq$AIC,smrq$Rone)
+              
+              # 2D static graphic : RASTER
+             plot_dp2d <- ggplot(RqMod_mat) +
+                geom_raster(aes(x = x1, y = x2, fill = RqMod),alpha=0.8) + 
+                geom_point(data=rqinf,aes(x=x1, y=x2), shape=21, size=1, color=colInliers, fill=colInliers, alpha=.5, na.rm = TRUE) +
+                geom_point(data=rqsup,aes(x=x1, y=x2), shape=23, size=1, color=colOutliers, fill=colOutliers, alpha=.5, na.rm = TRUE) +
+                labs(title=titleG,subtitle=subtitleG, x=x1l, y=x2l,fill = paste("SDM-NEO\n",reponse[rep,3],sep="")) +
+                guides(alpha = "none") +
+                Scalf_rq2d() +
+                facet_wrap(taust ~ .); plot_dp2d
+              plot_dp2dlist[[length(plot_dp2dlist)+1]] <- plot_dp2d
+              ggsave(sprintf("%s%s/%s/%s_%s_nlRQ22d_%s_%s_%s_%s_%s.png",
+                             wdgraph,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],
+                             saison[sa,2],yt,x1t,x2t,taus[t]),
+                     plot = plot_dp2d, width = 10, height = 9, dpi=600)
+              
+              # Experimental points on 3D graphic
+              # define standard layout scene
+              RqMod_mat <- array(RqMod_mat$RqMod,dim=c(graphfine,graphfine))
+              myscene<-list(camera = list(eye = list(x = -1.5, y = 1.5, z = 0.3)), aspectmode='cube',
+                            xaxis = list(title = x1l), yaxis = list(title = x2l), zaxis = list(title = yl))
+              
+              # 3D plot with model surface
+              plot_dp3d <- plot_ly(showlegend=F, scene=paste("scene",rep,sep="")) %>% 
+                add_surface(x = gridx1x2mat[["x"]], y = gridx1x2mat[["y"]], z = RqMod_mat,
+                            opacity = 0.9, colorscale = list(c(0,1),c(blank,colRQ[t])),
+                            colorbar=list(title=list(text=paste("SDM-NEO\n",reponse[rep,3],"\nTau=",taus[t],sep="")))) %>%
+                add_trace(x = rqsup$x1, y = rqsup$x2, z = rqsup$y, mode = "markers", type = "scatter3d",
+                          marker = list(size = 2, color = colOutliers, opacity = 0.5, symbol = "diamond"))%>%
+                add_trace(x = rqinf$x1, y = rqinf$x2, z = rqinf$y, mode = "markers", type = "scatter3d",
+                          marker = list(size = 2, color = colInliers, opacity = 0.5, symbol = "circle")) %>%
+                layout(title = titleG, scene = myscene); plot_dp3d
+              plot_dp3dlist[[length(plot_dp3dlist)+1]] <- plot_dp3d
+              saveWidget(plot_dp3d, sprintf("%s%s/%s/%s_%s_nlRQ23d_%s_%s_%s_%s_%s.html",
+                                            wdgraphEx,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],
+                                            saison[sa,2],yt,x1t,x2t,taus[t]),
+                         selfcontained = F, libdir = "lib")
+            }
+            plot_rq2dbis <- ggarrange(plotlist=plot_dp2dlist, ncol=2, nrow=1,
+                                      labels="AUTO") + bgcolor("white")
+            # plot_rq2dbis <- annotate_figure(plot_rq2dbis, top = text_grob(titleG, face = "bold", size = 14)); print(plot_rq2dbis)
+            ggsave(sprintf("%s%s/%s/%s_%s_nlRQ22d_%s_%s_%s_%s.png",
+                           wdgraph,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],
+                           saison[sa,2],x1t,x2t,taus[t]),
+                   plot = plot_rq2dbis, width = 16, height = 8, dpi=600)
+            
+            subtitleG <- sprintf("%s, tau = %g",xl,taus[t])
+            scene <- list(camera = list(eye = list(x = -1.5, y = 1.5, z = 0.3)), aspectmode='cube',
+                          xaxis = list(title = x1l), yaxis = list(title = x2l), 
+                          zaxis = list(title = sprintf("%s (%s)",reponse[1,2],reponse[1,3])),
+                          domain=list(x=c(0,0.5),y=c(0,1)))
+            scene2 <- list(camera = list(eye = list(x = -1.5, y = 1.5, z = 0.3)), aspectmode='cube',
+                           xaxis = list(title = x1l), yaxis = list(title = x2l), 
+                           zaxis = list(title = sprintf("%s (%s)",reponse[2,2],reponse[2,3])),
+                           domain=list(x=c(0.5,1),y=c(0,1)))
+            plot_dp3dF <- subplot(plot_dp3dlist, shareX = TRUE, shareY = TRUE, nrows = 2) %>%
+              layout(title = paste(titleG,subtitleG,sep="\n"),
+                     scene = scene, scene2 = scene2)
+            saveWidget(plot_dp3dF,sprintf("%s%s/%s/%s_%s_nlRQ23dFacet_%s_%s_%s_%s.html",
+                                          wdgraphEx,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],
+                                          saison[sa,2],x1t,x2t,taus[t]),
+                       selfcontained = F, libdir = "lib")
           }
-          nncol = 2; nnrow=ceiling(dim(smnlrq_tmp)[1]/nncol)
-          sm <- ggarrange(plotlist=mlista, ncol=nncol, nrow=nnrow,legend="bottom",common.legend = TRUE)
-          titreG <- sprintf("%s - in %s - %s\n%s of %s vs %s",species[sp,2],saison[sa,2],prgm,funcnom,yl,xl)
-          sm <- annotate_figure(sm,top = text_grob(titreG, face = "bold", size = 10))+bgcolor("white")#; print(sm)
-          ggsave(sprintf("%s%s/RQ Nonlineaire/Summaries/%s_Nlrq2d_sm_%s_%s_%s.png",
-                         wdgraph,species[sp,1],prgm,species[sp,1],yt,xt),plot = sm, width = 5, height = 5)
-        },error = function(e) {print(e)})#,finally = {})
-        indic<-indic+1
-      } #k2
-      } #k explo
-    } # saison
-  } #reponse
-  indnlrq_1 <- rbind(indnlrq_1,indnlrq_2)
-  indnlrq_1$AICm<-as.numeric(indnlrq_1$AICm)
-  indnlrq_1 <- indnlrq_1 %>% arrange(reponse,AICm)
-  smnlrq_1 <- rbind(smnlrq_1,smnlrq_2)
-} #species
-
-# Graphic representation of model performance
-dp<-indnlrq_1 %>% group_by(Sp) %>% arrange(AICm,.by_group = TRUE) %>% slice(1:20) %>% #filter(str_detect(mode, "Inter"))%>%
-  group_by(Sp,reponse) %>% arrange(AICm,.by_group = TRUE) %>% #slice(1:3) %>%
-  ggplot(aes(x=reorder(predict,-AICm),y=AICm,fill = reponse))+geom_col(position = "dodge") +
-  geom_text(aes(y=AICm, label = AICm),position = position_dodge(width = .9), hjust = 1) + #
-  scale_fill_manual(values=colorsS(7)) +
-  labs(title="Two Factor Gaussian Quantile Regression AICm scores", x="Model",y="AICm") +
-  theme(axis.text = element_text(size=15,face="bold")) +
-  coord_flip()+theme_bw();dp
-ggsave(sprintf("%s%s/RQ Nonlineaire/%s_%s_Nlrq2d_AIC_scores.png",wdgraph,species[sp,1],prgm,species[sp,1]), plot = dp, width = 8, height = 8)
-
-# Sauvegarde des outputs ----
-wb <- loadWorkbook(paste(wdres,prgm,"_BDD",".xlsx", sep="")) # addWorksheet(wb, sheetName = "RQ_line")
-writeData(wb, sheet = "Nlrq2d", x = indnlrq_1, startCol = 1, startRow = 1,withFilter = FALSE)
-writeData(wb, sheet = "Nlrq2d_coeff", x = smnlrq_1, startCol = 1, startRow = 1,withFilter = FALSE)
-saveWorkbook(wb,file=paste(wdres,prgm,"_BDD",".xlsx", sep=""), overwrite = TRUE)
-save.image(file = paste(wdwork,etude,"_NLRQ2d_BDD",".RData", sep=""))
-} #end if choixttt 2
-# ----
+        }
+      }
+    }
+  }
+  rm(list=ls(pattern="scene")); rm(list=ls(pattern="plot"))
+} #end if choixttt 2 ----
 
 #________________________________________________________________
-# 3 : TRACE DES GRAPHES DOUBLE GAUSSIENS ----
+# 3 : MARS SHAPEFILE ON DEMAND ----
 if (choixttt==3 | choixttt==13 | choixttt==23 | choixttt==123){
-sdmlist<-sdm_choice
-  # sdmlist<-indnlrq_1[,-sai]; sdmlist$SDM_tau<-SDM_tau_all; sdm<-1:length(indnlrq_1$name) # to scan all possibilities
-funcname <- gauss2d 
-Mars_SDM2d<-Mars_dat_sf %>% dplyr::select(c(NINJ,Lon,Lat,Zone,Tidal_level,Annee,pred_red$Var))
-for (sp in spe) { #sp=1
-  df <- CSLN_Mars[which(CSLN_Mars$SPCourt == species[sp,1]),]
-  for (sdi in sdm){ #sdi=1
-    for (sa in sai) {# sa=1
-      rep<-which(reponse$rvar==sdmlist$yt[sdi])
-      k=which(pred_red$Var==sdmlist$x1t[sdi]); k2=which(pred_red$Var==sdmlist$x2t[sdi]);
-      funcnom = sdmlist$SDM_desc[sdi]; 
-      
-      yt = reponse[rep,1] ; yl = sprintf("%s (%s)",reponse[rep,2],reponse[rep,3])
-      zt = "Zone"
-      x1t = sprintf("%s%s",pred_red[k,1],saison[sa,1]); x1l = sprintf("%s%s (%s)",pred_red[k,2],saison[sa,1],pred_red[k,3])
-      x2t = sprintf("%s%s",pred_red[k2,1],saison[sa,1]); x2l = sprintf("%s%s (%s)",pred_red[k2,2],saison[sa,1],pred_red[k2,3])
-      xt<-paste(x1t,x2t,sep="&"); xl<-paste(x1l,x2l,sep=" & ")
-      xxx <-c("Beta 0",x1l,x2l,paste(x1l,x2l,sep=" & "))
-      dfrq <-df[,c(yt,x1t,x2t,zt)]; dfrq <-as.data.frame(na.omit(dfrq))
-      y <- jitter(dfrq[,1]); x1 <- jitter(dfrq[,2]); x2 <- jitter(dfrq[,3]); 
-      z <- dfrq[,4]; nbcol <- length(levels(factor(z)))
-      coeff_nlrq <- smnlrq_1[smnlrq_1$name==sdmlist$name[sdi],]
-      lci <- list(A=quantile(y,FactA_CI2d),mu1=median(x1),sigma1=sd(x1),mu2=median(x2),sigma2=sd(x2)); #,epsilon=0
-    
-      # Experimental points on 3D graphic
-      titreG <- sprintf("%s - %s - %s\n%s vs %s",species[sp,2],saison[sa,2],funcnom,yl,xl)
-      dp1 <- plot_ly(showlegend=F) %>% add_trace(x = x1, y = x2, z = y, 
-                                    mode = "markers", type = "scatter3d",
-                                    marker = list(size = 2, color = "blue", symbol = 104))%>%
-                                    layout(title = titreG, scene = list(xaxis = list(title = x1l), 
-                                           yaxis = list(title = x2l), zaxis = list(title = yl)))
-      # Surface model of initial conditions
-      x1mod <- seq(min(x1),max(x1),length.out=length(x1)); x2mod <- seq(min(x2),max(x2),length.out=length(x1))
-      grid<-mesh(x1mod,x2mod)
-      Zinit<-funcname(x1=grid[["x"]],x2=grid[["y"]],A=lci[[1]],mu1=lci[[2]],sigma1=lci[[3]],mu2=lci[[4]],sigma2=lci[[5]]) #,epsilon=lci[[6]]
-      # dp1bis <- dp1 %>% add_surface(x = ~grid[["x"]], y = ~grid[["y"]],z = ~Zinit,
-      #               opacity = 0.6,colorscale = list(c(0,1),c(blank,colIC)),
-      #               colorbar=list(title=list(text="Initial conditions"),limits=c(0,max(Zinit))))
-      # htmlwidgets::saveWidget(dp1bis,sprintf("%s%s/RQ Nonlineaire/Graphes 3D/%s_Nlrq2d_Initial_%s_%s_%s_%s_%s.html",
-      #                                     wdgraphEx,species[sp,1],prgm,species[sp,1],sdmlist$name[sdi],yt,xt,taus[t]), selfcontained = F, libdir = "lib")
+  Mars_SDM<-Mars_dat_sf %>% dplyr::select(c(NINJ,Lon,Lat,Zone,Tidal_level,Annee,pred_red$Var))
+  k_choosen<- which(pred_red$Var %in% c("flow_mxd")) # flow_mxd inunt sal_dtd temp_m tenfon_m mudrate_m
+  k2_choosen<- which(pred_red$Var %in% c("inunt"))# 
+  taus_choosen <- which(taus %in% c(0.975))  # c(0.5,0.85,0.9,0.95,0.975,0.99)
+  spe_choosen <- which(speciesMP$SPCourt %in% c("CERED"))  # CERED CORVO HEDDI LIMBA PERUL SCRPL
+  reponse_choosen <- which(reponse$rvar %in% c("Biomass_gAFDWm2","Density_indm2")) # Biomass_gAFDWm2 Density_indm2
+  sai_choosen <- which(saison$M_Def %in% "Year") #  Year Winter Summer
 
-      dp4<-dp1
-      nlrqMod <- list()
-      for (t in 1:length(taus)){ # t=6 length(taus)
-        coeff_nlrqt <- coeff_nlrq[coeff_nlrq$SDM_tau==taus[t],]
-        tryCatch({
-        # Definition of point over model
-        nlrqlim<-funcname(x1=x1,x2=x2,A=coeff_nlrqt$Value[1],
-                          mu1=coeff_nlrqt$Value[2],sigma1=coeff_nlrqt$Value[3],
-                          mu2=coeff_nlrqt$Value[4],sigma2=coeff_nlrqt$Value[5]) #,epsilon=coeff_nlrqt$Value[6]
-        x1sup<-x1[y>nlrqlim]; x2sup<-x2[y>nlrqlim]; ysup<-y[y>nlrqlim]
-        x1inf<-x1[y<=nlrqlim]; x2inf<-x2[y<=nlrqlim]; yinf<-y[y<=nlrqlim]; rm(nlrqlim)
-        # Definition of model surface
-        nlrqMod[[t]]<-funcname(x1=grid[["x"]],x2=grid[["y"]],A=coeff_nlrqt$Value[1],
-                          mu1=coeff_nlrqt$Value[2],sigma1=coeff_nlrqt$Value[3],
-                          mu2=coeff_nlrqt$Value[4],sigma2=coeff_nlrqt$Value[5]) #,epsilon=coeff_nlrqt$Value[6]
-        nlrqMod[[t]][which(nlrqMod[[t]]<0)]<-NA
-        
-        # 2D static graphic : RASTER
-        dp2d <- ggplot() +
-          geom_raster(aes(x = grid[["x"]], y = grid[["y"]], fill = nlrqMod[[t]])) +
-          # geom_point(data=dfrq, aes(x = x1, y = x2), shape = 1, size = 2, color = colIC) +
-          geom_point(aes(x = x1inf, y = x2inf), shape = 8, size = 2, color = colIC, alpha=0.5) +
-          geom_point(aes(x = x1sup, y = x2sup), shape = 1, size = 2, color = prettyred, alpha=0.5) +
-          labs(title=titreG,x=x1l, y=x2l,fill = paste("SDM-NEO\n",reponse[rep,3],"\nTau=",taus[t],sep="")) +
-          scale_fill_gradient(low=blank, high=collist[t],limits = c(0,max(nlrqMod[[t]]))); dp2d # +scale_fill_distiller(palette = "Spectral")
-        ggsave(sprintf("%s%s/RQ Nonlineaire/%s_Nlrq2d_%s_%s_%s_%s_%s.png",
-                       wdgraph,species[sp,1],prgm,species[sp,1],sdmlist$name[sdi],yt,xt,taus[t]),plot = dp2d, width = 10, height = 9)
-    
-        # 3D plot with model surface and initial condition
-        dp3 <- dp1 %>% add_surface(x = grid[["x"]], y = grid[["y"]], z = nlrqMod[[t]],
-                                   opacity = 0.7, colorscale = list(c(0,1),c(blank,collist[t])),
-                                   colorbar=list(title=list(text=paste("SDM-NEO\n",reponse[rep,3],"\nTau=",taus[t],sep=""),
-                                                 limits=c(0,max(nlrqMod[[t]]))))) %>%
-                       add_trace(x = x1sup, y = x2sup, z = ysup,
-                                   mode = "markers", type = "scatter3d",
-                                   marker = list(size = 2, color = prettyred, symbol = 104))%>%
-                       add_surface(x = ~grid[["x"]], y = ~grid[["y"]],z = ~Zinit,
-                                   opacity = 0.4,colorscale = list(c(0,1),c(blank,colIC)),
-                                   colorbar=list(title=list(text="Initial conditions"),limits=c(0,max(Zinit)))) %>%
-                       layout(title = titreG)
-        htmlwidgets::saveWidget(dp3,sprintf("%s%s/RQ Nonlineaire/Graphes 3D/%s_Nlrq2d_%s_%s_%s_%s_%s.html",
-                                            wdgraphEx,species[sp,1],prgm,species[sp,1],sdmlist$name[sdi],yt,xt,taus[t]), selfcontained = F, libdir = "lib")
-        # 3D plot with all taus models surface added
-        dp4 <- dp4 %>% add_surface(x = grid[["x"]], y = grid[["y"]], z = nlrqMod[[t]],
-                                   opacity = 0.6,
-                                   colorscale = list(c(0,1),c(blank,collist[t])),
-                                   colorbar=list(title=list(text=paste("SDM-NEO\n",reponse[rep,3],"\nTau=",taus[t],sep=""),
-                                                            limits=c(0,max(nlrqMod[[t]])))))# %>%
-        
-        # # 3D static graphic
-        # data conversion
-        # zmod<-nlrqMod[[t]]; rownames(zmod) = x1; colnames(zmod) = x2
-        # zmod<-as.data.frame(zmod) %>% rownames_to_column(var="x1") %>% 
-        #   pivot_longer(-x1) %>% mutate(x1=as.numeric(x1),name=as.numeric(name)) %>%
-        #   rename(x1z=x1,x2z=name,yz=value)
-        # jet.colors <- colorRampPalette( c("blue", "green") ); color <- jet.colors(100)
-        # persp(x = grid[["x"]], y = grid[["y"]], z = nlrqMod[[t]], col = color, phi = 30, theta = -30)
-        
-        },error = function(e) {print(e)})#,finally = {})
-      } #taus
-      # 3D plot with all taus models surface and initial condition
-      dp4 <- dp4 %>% add_trace(x = x1sup, y = x2sup, z = ysup,
-                      mode = "markers", type = "scatter3d",
-                      marker = list(size = 2, color = prettyred, symbol = 104))%>%
-            add_surface(x = ~grid[["x"]], y = ~grid[["y"]],z = ~Zinit,
-                        opacity = 0.4,colorscale = list(c(0,1),c(blank,colIC)),
-                        colorbar=list(title=list(text="Initial conditions"),limits=c(0,max(Zinit))))
-      htmlwidgets::saveWidget(dp4, sprintf("%s%s/RQ Nonlineaire/Graphes 3D/%s_Nlrq2dStack_%s_%s_%s_%s.html",
-                                           wdgraphEx,species[sp,1],prgm,species[sp,1],sdmlist$name[sdi],yt,xt), selfcontained = F, libdir = "lib")
-      
-      # MARS3D SDM CALCULATION ----
-      tau <- sdmlist$SDM_tau[sdi]
-      coeff_nlrqt <- coeff_nlrq[coeff_nlrq$SDM_tau==tau,]
-      x1M <- pull(Mars_dat_sf, x1t); x2M <- pull(Mars_dat_sf, x2t); 
-      Mars_SDM2d$SDM<-funcname(x1=x1M,x2=x2M,A=coeff_nlrqt$Value[1],
-               mu1=coeff_nlrqt$Value[2],sigma1=coeff_nlrqt$Value[3],
-               mu2=coeff_nlrqt$Value[4],sigma2=coeff_nlrqt$Value[5]) #,epsilon=coeff_nlrqt$Value[6]
-      Mars_SDM2d$SDM[which(Mars_SDM2d$SDM<0)]<-NA
-      Mars_SDM2d<-Mars_SDM2d%>%rename(!!paste(species[sp,1],sdi,saison[sa,1],sep=""):=SDM) # !!'string': to interpret text as variable
-      # ----
-    } #sai
-  } #sdm
-  st_write(Mars_SDM2d, sprintf("%sLayers made/SDM_NEO_nlrq2d_%s.shp",wdGIS,species[sp,1]),append=FALSE)
-} #spe
-# Sauvegarde des outputs ----
-wb <- loadWorkbook(paste(wdres,prgm,"_BDD",".xlsx", sep=""))
-writeData(wb, sheet = "Nlrq2d_sdmlist", x = sdmlist, startCol = 1, startRow = 1,withFilter = FALSE)
-saveWorkbook(wb,file=paste(wdres,prgm,"_BDD",".xlsx", sep=""), overwrite = TRUE)
-save.image(file = paste(wdwork,etude,"_NLRQ2d_BDD",".RData", sep=""))
-} #end if choixttt 3
-
-#________________________________________________________________
-# 4 : TEMPORAL EVOLUTION OF SDM FOR GIP SEINE AVAL ----
-# # Definition of temporal periods
-# Mars_SDM2d$Period<-"2011-2018"
-# Mars_SDM2d$Period[Mars_SDM2d$Annee %in% 1990:1999]<-"1990-1999"
-# Mars_SDM2d$Period[Mars_SDM2d$Annee %in% 2000:2010]<-"2000-2010"
-# Mars_SDM2d$Period<-as.factor(Mars_SDM2d$Period)
-# 
-# # TIDAL_LEVEL CALCULATION : should be in mars matlab script ? ----
-# Mars_SDM2d$Tidal_level<-NA
-# Mars_SDM2d$Tidal_level[Mars_SDM2d$inunt>=0 & Mars_SDM2d$inunt<0.25]<-"Supratidal"
-# Mars_SDM2d$Tidal_level[Mars_SDM2d$inunt>=0.25 & Mars_SDM2d$inunt<0.75]<-"Intertidal"
-# Mars_SDM2d$Tidal_level[Mars_SDM2d$inunt>=0.75 & Mars_SDM2d$inunt<=1]<-"Infratidal"
-# Mars_SDM2d$Tidal_level<-as.factor(Mars_SDM2d$Tidal_level)
-
-# ASSIGNMENT OF AREAS TO SAMPLING POINTS
-# ADD NINJ OF MARS_CSV FOR EACH SAMPLING POINT IN FAUNA
-# Mars_SDM2d <- st_intersection(Mars_SDM2d,ES_Areas)
-# Mars_SDM2d$Zone<-as.factor(Mars_SDM2d$Zone)
-
-titreG <- paste(y," Estuary evolution for ",species[sp,2], " - ", prgm,sep="")
-bp <- ggplot(Mars_SDM2d, aes(CERED1,fill=Period)) + geom_boxplot() + 
-  facet_grid(Tidal_level~Zone) +
-  coldiscFS(length(levels(Mars_SDM2d$Period))) + 
-  theme(axis.text.x=element_text(angle=-90, vjust=0.4,hjust=1)); bp
-bp <- bp + ggtitle(titreG)
-ggsave(paste(wdgraph,species[sp,1],"/",etude,"_Bxp_",species[sp,1],"_",y,".png",sep=""), plot = bp, width = 12, height = 6)
-
+  for (sp in spe_choosen) { # sp=spe_choosen
+    for (sa in sai_choosen) {# sa=sai_choosen
+      for (k in k_choosen) { # k=k_choosen
+        for (k2 in k2_choosen) { # k2=k2_choosen 
+          for (t in taus_choosen){ # t= taus_choosen
+            for (rep in reponse_choosen){ # rep=reponse_choosen[1]
+              sdmname_chosen <- sprintf("nlRQ2_%g%g%g%g%g",sp,sa,rep,k,k2)
+              sdmname_tau <- sprintf("%s_t%g",sdmname_chosen,taus[t])
+              modelq <- modelq_list[[sdmname_chosen]]
+              yt = reponse[rep,1] ; yl = sprintf("%s (%s)",reponse[rep,2],reponse[rep,3])
+              zt = "Zone"
+              x1t = sprintf("%s%s",pred_red[k,1],saison[sa,1]); x1l = sprintf("%s%s (%s)",pred_red[k,2],saison[sa,1],pred_red[k,3])
+              xt<-paste(x1t,modelq[["formula"]][[3]][[1]],x2t,sep=' '); xl<-paste(x1l,modelq[["formula"]][[3]][[1]],x2l,sep=' ')
+              x2t = sprintf("%s%s",pred_red[k2,1],saison[sa,1]); x2l = sprintf("%s%s (%s)",pred_red[k2,2],saison[sa,1],pred_red[k2,3])
+              x1M <- as.data.frame(pull(Mars_dat_sf, x1t)) %>% rename_all(~"x1")
+              x2M <- as.data.frame(pull(Mars_dat_sf, x2t)) %>% rename_all(~"x2")
+              x1x2mars <- bind_cols(x1M,x2M)
+              lci <- list(A=quantile(y,FactA_CI2d),mu1=median(x1),sigma1=sd(x1),mu2=median(x2),sigma2=sd(x2)); #,epsilon=0
+              xt<-paste(x1t,x2t,sep=paste('&')); 
+              xl<-paste(x1l,x2l,sep=paste('&'))
+              
+              titleG <- sprintf("%s %s in %s",analysis,speciesMP$Taxon_SNa[sp],saison[sa,2])
+              subtitleG = sprintf("%s & %s", x1l,x2l)
+              capt = sprintf("%s Quantile regression\n%s", smrq_l$mode, sdmname_tau)
+              
+              # MARS3D SDM CALCULATION
+              modelq<-nlrq(y~gauss2d(x1,x2,A,mu1,sigma1,mu2,sigma2), start=lci, tau=taus[t],control=cc, method="BFGS") #,epsilon
+              RqModMars <- as.data.frame(predict(modelq,newdata=x1x2mars)) %>%
+                rename_all(~"RqMod") %>%
+                mutate(across(everything(), function(x){replace(x, which(x<0), NA)})) %>% 
+                mutate(tau=taus[t], taust=sprintf("tau= %s",tau),
+                       sdmname=sdmname) %>% 
+                bind_cols(x1x2mars)
+              Mars_SDM$SDM<-pull(RqModMars %>% filter(tau==taus[t]) %>% select(RqMod))
+              Mars_SDM$SDM[which(Mars_SDM$SDM<0)]<-NA
+              Mars_SDM<-Mars_SDM%>%rename(!!sprintf("%s_t%g",sdmname_chosen,taus[t]):=SDM) # !!'string': to interpret text as variable
+              
+              # SDM-NEO MAP BUILDING
+              Mars_SDM_sf <- Mars_SDM %>% dplyr::select(c(Annee, !!sdmname_tau)) # raster::select also exists!
+              anMars<-unique(Mars_SDM_sf$Annee)
+              mlist<-vector(mode = "list", length = length(anMars))
+              for (ann in 1:length(anMars)) { # ann=1
+                titleG = sprintf("SDM-NEO for %s in %s",speciesMP[sp,2],anMars[ann])
+                Mars_SDM_sfi<-Mars_SDM_sf %>% filter(Mars_SDM_sf$Annee==anMars[ann])
+                sfp<-ggplot(data = Mars_SDM_sfi) +
+                  geom_sf(aes_string(fill = sdmname_tau), color = NA) + #
+                  labs(x="Latitude",y="Longitude",
+                       fill = sprintf("SDM-NEO\n%s\nTau=%s",yl,taus[t])) +
+                  theme(plot.margin = margin(0.05,0.05,0.05,0.05, "cm")) +
+                  Scale_map() # + coord_sf(xlim = c(-88, -78), ylim = c(24.5, 33), expand = FALSE)
+                assign(paste('sfp', ann, sep=''), 
+                       sfp + theme(legend.position="none",
+                                   axis.title.x=element_blank(), axis.text.x=element_blank(),axis.ticks.x=element_blank(),
+                                   axis.title.y=element_blank(), axis.text.y=element_blank(),axis.ticks.y=element_blank()) +
+                         labs(title=anMars[ann]))
+                mlist[[ann]] <- eval(parse(text = paste('sfp', ann, sep='')))
+                sfp <- sfp + labs(title=titleG, subtitle=subtitleG, caption=capt)
+                ggsave(sprintf("%s%s/%s/Map Detail/%s_%s_%s_%s_%s_%s.png",
+                               wdgraphEx,speciesMP[sp,1],analysis,
+                               etude,speciesMP[sp,1],sdmname_tau,yt,xt,anMars[ann]),
+                       plot = sfp, width = 10, height = 9, dpi=600)
+              } #year
+              titleG = sprintf("SDM-NEO for %s in %s",speciesMP[sp,2],yl)
+              nncol = 5; nnrow=ceiling(length(anMars)/nncol)
+              sfp <- ggarrange(plotlist=mlist, ncol=nncol, nrow=nnrow, common.legend = TRUE, legend="bottom")+
+                theme(plot.margin = margin(0.05,0.05,0.05,0.05, "cm")) 
+              sfp <- annotate_figure(sfp, top = text_grob(sprintf("%s\n%s",titleG,subtitleG), face = "bold", size = 14),
+                                     bottom=capt)+
+                bgcolor("white"); #print(sfp)
+              ggsave(sprintf("%s%s/%s/%s_%s_%s_%s_%s.png",
+                             wdgraphEx,speciesMP[sp,1],analysis,
+                             etude,speciesMP[sp,1],sdmname_tau,yt,xt),
+                     plot = sfp, width = 10, height = 12, dpi=600)
+            }
+          }
+        }
+      }
+    }
+  }
+  st_write(Mars_SDM, sprintf("%sLayers made/SDM_NEO_RQ_%s.shp",wdGIS,speciesMP$SPCourt[sp]),append=FALSE)
+  rm(list=c("Mars_SDM_sfi","Mars_SDM_sf","mlist"))
+  rm(list=ls(pattern="sfp"))
+  save.image(file = paste(wdwork,etude,"_nlRQ_BDD",".RData", sep=""))
+} #end if choixttt 3 ----
+beepr::beep(2)
+save.image(file = paste(wdwork,etude,"_nlRQ_BDD",".RData", sep=""))

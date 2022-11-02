@@ -2,7 +2,7 @@
 # TREATMENT OF BIOLOGIC DATA FROM CSLN BEFORE SDM TREATMENT
 # Amelie LEHUEN Janvier 2022
 #_______________________________________________________________________________
-diffr("1.0 Pretreatment Biologic data.R","1.1 Pretreatment Biologic data GIPSA.R")
+# diffr("1.0 Pretreatment Biologic data.R","1.1 Pretreatment Biologic data GIPSA.R")
 
 rm(list=ls())
 #________________________________________________________________

@@ -7,14 +7,15 @@
 rm(list=ls())
 #________________________________________________________________
 # PACKAGES USED ----
-library(tidyverse)
-library(ggpubr) ; library(grid) ; library(gridExtra)
+library(tidyverse); library(beepr)
+library(rstatix)
+library(ggpubr) ; # stat_compare_means ggarrange
 library(RColorBrewer) ; library(wesanderson) 
 library(treemap)
 
 #________________________________________________________________
 # WORKING ENVIRONMENT AND LOADING OF BASIC DATA ----
-pc <- "E:/" #"C:/Users/lehuen201/Nextcloud/" "E:/" 
+pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" # 
 tsk <- "A_SDM_NEO/"
 wdpath <- paste(pc,"Melting Pot/BDD/",tsk,sep=""); 
 wdwork <- paste(wdpath,"Matrices/",sep="")
@@ -24,12 +25,12 @@ setwd(paste(wdpath,"Scripts/",sep=""))
 
 #________________________________________________________________
 # DEFINITION OF BASIC VARIABLES ----
-prgm <- "CSLN" # CSLN Mabes Geco Beaug
+prgm <- "CSLN"
 etude <- paste(prgm,"_Zone",sep="")
-load(paste(wdwork,"CSLN_Mars_GIPSAZone_BDD",".RData", sep=""))
+load(paste(wdwork,"CSLN_Mars_Zone_BDD",".RData", sep=""))
 
-spe <- 1:6#nrow(species) # 1:CERED 2:CORVO 3:HEDDI 4:LIMBA 5:PERUL 6:SCRPL
-reponse<-reponse[1:3,] # 1:Biomass_gAFDWm2 2:Density_indm2 3:MSRtot 4:Itot  
+spe <- 1:nrow(speciesMP) # 1:CERED 2:CORVO 3:HEDDI 4:LIMBA 5:PERUL 6:SCRPL
+reponse<-reponse[1:2,] # 1:Biomass_gAFDWm2 2:Density_indm2
 answ <- 1:nrow(reponse)
 
 #________________________________________________________________
@@ -41,58 +42,98 @@ colSpec <- colorRampPalette(brewer.pal(8, "Spectral"));
 colDark <- colorRampPalette(brewer.pal(8, "Dark2"));
 Scale_col <- function(x) {scale_colour_manual(values=colDarj(x))}
 Scale_fill <- function(x) {scale_fill_manual(values=colDarj(x))}
+Scale_brew <- function() {scale_colour_brewer(palette="Spectral",aesthetics=c("colour","fill"))}
 
 #________________________________________________________________
 # GLOBAL VISION OF DATA ----
-# Nb record per species
-dp<-CSLN %>% count(SP,SPCourt,Taxon_SNa)%>%group_by(SP)%>%
-              arrange(desc(n),.by_group = TRUE)%>%slice(1:14) %>%
-              ggplot(aes(x=reorder(Taxon_SNa,n),y=n,fill = SP))+geom_col() +
+# Nb record per speciesMP
+dp<-CSLN %>% count(SP,SPCourt,Taxon_SNa) %>% group_by(SP) %>%
+              arrange(desc(n),.by_group = TRUE) %>% slice(1:20) %>%
+              ggplot(aes(x=reorder(Taxon_SNa,n),y=n,fill = SP))+
+              geom_col() +
               geom_text(aes(y=60, label = n)) + #
               scale_fill_manual(values=colDarj(CSLN_unique$Annee))+
-              labs(title="List of top 20 occurences species, including model species", x="Species",y="Occurence")+
+              labs(title="List of top 20 occurences speciesMP", x="Species",y="Occurence")+
+              coord_flip()+
               theme(axis.text = element_text(size=15,face="bold"))+
-              coord_flip()+theme_bw();dp
-ggsave(sprintf("%s%s_Species_Occr_List20.png",wdgraph,etude), plot = dp, width = 10, height = 8)
+              theme_bw();dp
+ggsave(sprintf("%s%s_Species_Occr_List20.png",wdgraph,etude), plot = dp, width = 10, height = 8, dpi=600)
 
 # Treemap 2 levels : Tidal levels distribution ----
 titre = paste("Total Density (ind.m-2) of Species"," - ", etude,sep="")
-Sumry<-CSLN %>% group_by(Zone,SPCourt) %>% #Tidal_level
+Sumry<-CSLN_mud %>% group_by(Zone,SPCourt) %>% #Tidal_level
   summarise(Smry=sum(Density_indm2,na.rm=TRUE),Nb=n()) #n_distinct(idStationUnique)
 Sumry$label <- paste(Sumry$SPCourt, Sumry$Nb, sep = "\n")
-png(filename=paste(wdgraph,etude,"_TreeMap2 Zone Level Density",".png",sep=""),width=1000, height=600)
+png(filename=sprintf("%s%s_TreeMap2 Zone Level Density.png",wdgraph,etude),width=6000, height=3600, res = 600)
 treemap(Sumry,index=c("Zone","label"),vSize="Smry",vColor="Zone",type="index",
-        title=titre, palette=colDarj(CSLN_unique$Annee), fontface.labels=c(2,2),
+        title=titre, palette=colSpec(CSLN_unique$Zone), fontface.labels=c(2,1),
         border.col=c("black","white"), border.lwds=c(3,1),bg.labels=0,
-        fontsize.labels=c(12,9), fontcolor.labels=c("black","white"),
+        fontsize.labels=c(12,9), fontcolor.labels=c("black","black"),
         align.labels=list( c("left","bottom"), c("right","center")))
 dev.off()
 
 titre = paste("Total Biomass (gAFDW.m-2) of Species"," - ", etude,sep="")
-Sumry<-CSLN %>% group_by(Zone,SPCourt) %>% 
+Sumry<-CSLN_mud %>% group_by(Zone,SPCourt) %>% 
   summarise(Smry=sum(Biomass_gAFDWm2,na.rm=TRUE),Nb=n()) #n_distinct(idStationUnique)
 Sumry$label <- paste(Sumry$SPCourt, Sumry$Nb, sep = "\n")
-png(filename=paste(wdgraph,etude,"_TreeMap2 Zone Level Biomass",".png",sep=""),width=1000, height=600)
+png(filename=sprintf("%s%s_TreeMap2 Zone Level Biomass.png",wdgraph,etude),width=6000, height=3600, res = 600)
 treemap(Sumry,index=c("Zone","label"),vSize="Smry",vColor="Zone",type="index",
-        title=titre, palette=colDarj(CSLN_unique$Annee), fontface.labels=c(2,2),
+        title=titre, palette=colSpec(CSLN_unique$Zone), fontface.labels=c(2,1),
         border.col=c("black","white"), border.lwds=c(3,1),bg.labels=0,
-        fontsize.labels=c(12,9), fontcolor.labels=c("black","white"),
+        fontsize.labels=c(12,9), fontcolor.labels=c("black","black"),
         align.labels=list( c("left","bottom"), c("right","center")))
 dev.off()
 
 # Treemap 3 levels: Distribution spatial ----
 titre = paste("Total Density (ind.m-2) of Species"," - ", etude,sep="")
-Sumry<-CSLN %>% group_by(Zone,Tidal_level,SPCourt) %>%
+Sumry<-CSLN_mud %>% group_by(Zone,Tidal_level,SPCourt) %>%
   summarise(Smry=sum(Density_indm2,na.rm=TRUE),Nb=n())
 Sumry$label <- paste(Sumry$SPCourt, Sumry$Nb, sep = "\n")
-png(filename=paste(wdgraph,etude,"_TreeMap3 Zone Density",".png",sep=""),width=1000, height=600)
+png(filename=sprintf("%s%s_TreeMap3 Zone Density.png",wdgraph,etude),width=6000, height=3600, res = 600)
 treemap(Sumry,index=c("Zone","Tidal_level","label"),vSize="Smry",vColor="Zone",type="index",
-        title=titre, palette=colDarj(CSLN_unique$Annee), fontface.labels=c(2,2,1),
+        title=titre, palette=colSpec(CSLN_unique$Zone), fontface.labels=c(2,2,1),
         border.col=c("black","white","gray81"), border.lwds=c(4,3,1),bg.labels=0,
-        fontsize.labels=c(14,14,10), fontcolor.labels=c("black","white","gray81"),
+        fontsize.labels=c(14,14,10), fontcolor.labels=c("black","black","gray81"),
         align.labels=list( c("left","bottom"), c("left","top"), c("right","center")))
 dev.off()
 # ----
+
+# GRAPHICS OF MSR AND BPC PER PERIOD FACET MUDFLATS
+stat.test <- CSLN_mud_BTA %>% group_by(Zone) %>% wilcox_test(MSR.ZTPAS ~ Period) %>% 
+  add_xy_position(x = "Period",group = "Zone",dodge = 0,step.increase = 0.05) %>% 
+  mutate(xmin=xmin-1,xmax=xmax-1) %>% filter(p.adj.signif!="ns")
+gpA <- ggplot(CSLN_mud_BTA) + 
+  geom_boxplot(aes(x=Period, y = MSR.ZTPAS, fill = Period)) + 
+  # coord_cartesian(ylim = c(0, 100)) +
+  facet_grid(. ~ Zone, scales = "free_y") + #facet_grid(. ~ Zone # facet_wrap(vars(Zone)
+  labs(y = "MSR (mW/m2)",x="") +
+  stat_pvalue_manual(stat.test,label = "p.adj.signif", tip.length = 0.02) +
+  Scale_brew() +
+  theme(axis.text.x = element_blank(),axis.ticks = element_blank()); gpA
+
+stat.test <- CSLN_mud_BTA %>% group_by(Zone) %>% wilcox_test(BPc.ZTPAS ~ Period) %>% 
+  add_xy_position(x = "Period",group = "Zone",dodge = 0,step.increase = 0.05) %>% 
+  mutate(xmin=xmin-1,xmax=xmax-1) %>% filter(p.adj.signif!="ns")
+gpB <- ggplot(CSLN_mud_BTA) + 
+  geom_boxplot(aes(x=Period, y = BPc.ZTPAS, fill = Period)) + 
+  # coord_cartesian(ylim = c(0, 100)) +
+  facet_grid(. ~ Zone, scales = "free_y") + 
+  labs(y = "BPc",x="") +
+  stat_pvalue_manual(stat.test,label = "p.adj.signif", tip.length = 0.02) +
+  Scale_brew() +
+  theme(axis.text.x = element_blank(),axis.ticks = element_blank()); #gpB
+titre <- paste("Life traits indexes",sep="")
+bp <- ggarrange(gpA,gpB, ncol=1, nrow=2, labels="AUTO", legend="bottom", common.legend = TRUE)
+bp <- annotate_figure(bp,top = text_grob(titre, face = "bold", size = 14))+ #,bottom="Period"
+      bgcolor("white"); bp
+ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 10, height = 8, dpi=600)
+
+# # GENERAL BILAN
+# CSLN_mud_sm <- CSLN_mud %>%
+#   group_by(Taxon_SNa) %>%
+#   summarise(Density_indm2_m = mean(Density_indm2)) %>%
+#   arrange(desc(Densite_moyenne)) %>%
+#   slice(1:20)
 
 #________________________________________________________________
 # FONCTION boxplot with facets
@@ -122,33 +163,33 @@ bargraph_sd <- function(df,x,y,sd,fil,face,xlab,ylab,title,palette){
 titre <- paste("Periodic Evolution of Specific Richness",sep="")
 bp<-boxplot_amlh(CSLN_sm,CSLN_sm$Period,CSLN_sm$SR,CSLN_sm$Period,CSLN_sm$Zone,
                  "Years","Specific Richness",titre,colDarj(CSLN_unique$Zone)) ;bp 
-ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 12, height = 6)
+ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 12, height = 6, dpi=600)
 bp1<-bp+ labs(title="Specific Richness",x="",y="") + theme(legend.position='none')
 
 titre <- paste("Periodic Evolution of Pielou",sep="")
 bp<-boxplot_amlh(CSLN_sm,CSLN_sm$Period,CSLN_sm$Pielou,CSLN_sm$Period,CSLN_sm$Zone,
                  "Years","Index of Equitability",titre,colDarj(CSLN_unique$Zone)) ;bp 
-ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 12, height = 6)
+ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 12, height = 6, dpi=600)
 bp2<-bp+ labs(title="Index of Equitability",x="",y="") + theme(legend.position='none')
 
 titre <- paste("Periodic Evolution of Total Biomass",sep="")
 bp<-boxplot_amlh(CSLN_sm,CSLN_sm$Period,CSLN_sm$Biomass_t,CSLN_sm$Period,CSLN_sm$Zone,
-                 "Years","Total Biomass (gAFDW/m²)",titre,colDarj(CSLN_unique$Zone)) +
+                 "Years","Total Biomass (gAFDW/m2)",titre,colDarj(CSLN_unique$Zone)) +
                 ylim(0,750);bp 
-ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 12, height = 6)
-bp3<-bp+ labs(title="Total Biomass (gAFDW/m²)",x="",y="") + theme(legend.position='none')
+ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 12, height = 6, dpi=600)
+bp3<-bp+ labs(title="Total Biomass (gAFDW/m2)",x="",y="") + theme(legend.position='none')
 
 titre <- paste("Periodic Evolution of Metabolic Rate",sep="")
 bp<-boxplot_amlh(CSLN_sm,CSLN_sm$Period,CSLN_sm$MSRtot_t,CSLN_sm$Period,CSLN_sm$Zone,
-                 "Years","Total MSRtot (mW/m²)",titre,colDarj(CSLN_unique$Zone)) ;bp 
-ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 12, height = 6)
-bp4<-bp+ labs(title="Total MSRtot (mW/m²)",x="",y="") + theme(legend.position='none')
+                 "Years","Total MSRtot (mW/m2)",titre,colDarj(CSLN_unique$Zone)) ;bp 
+ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 12, height = 6, dpi=600)
+bp4<-bp+ labs(title="Total MSRtot (mW/m2)",x="",y="") + theme(legend.position='none')
 
 titre <- paste("Periodic Evolution of Biodiversity",sep="")
 bp <- ggarrange(bp1,bp2,bp3,bp4, ncol=2, nrow=2, labels="AUTO", legend="bottom", common.legend = TRUE)
-bp <- annotate_figure(bp,top = textGrob(titre, gp=gpar(fontsize=15,font=1)),
+bp <- annotate_figure(bp,top = text_grob(titre, face = "bold", size = 14),
                       bottom=xlab)+bgcolor("white"); bp
-ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 15, height = 15)
+ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 15, height = 15, dpi=600)
 
 #________________________________________________________________
 ## BARPLOT BY PERIOD AND FACET ZONE
@@ -163,58 +204,58 @@ titre <- paste("Temporal Evolution of Specific Richness",sep="")
 bp <-bargraph_sd(df,df$Period,df$SR_m,df$SR_sd,df$Period,df$Zone,
                  xlab,"Specific Richness",titre,colDarj(CSLN_unique$Zone)) + 
     theme(axis.text.x=element_text(angle=90, vjust=0.4,hjust=1)); bp
-ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 12, height = 6)
+ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 12, height = 6, dpi=600)
 bp1<-bp+ labs(title="Specific Richness",y="") + theme(legend.position='none')
 
 titre <- paste("Temporal Evolution of Density",sep="")
 bp <-bargraph_sd(df,df$Period,df$Biomass_t_m,df$Biomass_t_sd,df$Period,df$Zone,
-                 xlab,"Total Biomass (gAFDW/m²)",titre,colDarj(CSLN_unique$Zone)) + 
+                 xlab,"Total Biomass (gAFDW/m2)",titre,colDarj(CSLN_unique$Zone)) + 
   theme(axis.text.x=element_text(angle=90, vjust=0.4,hjust=1)); bp
-ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 12, height = 6)
-bp2<-bp+ labs(title="Total Biomass (gAFDW/m²)",y="") + theme(legend.position='none')
+ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 12, height = 6, dpi=600)
+bp2<-bp+ labs(title="Total Biomass (gAFDW/m2)",y="") + theme(legend.position='none')
 
 titre <- paste("Temporal Evolution of Pielou index",sep="")
 bp <-bargraph_sd(df,df$Period,df$Pielou_m,df$Pielou_sd,df$Period,df$Zone,
                  xlab,"Index of Equitability",titre,colDarj(CSLN_unique$Zone)) + 
   theme(axis.text.x=element_text(angle=90, vjust=0.4,hjust=1)); bp
-ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 12, height = 6)
+ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 12, height = 6, dpi=600)
 bp3<-bp+ labs(title="Index of Equitability",y="") + theme(legend.position='none')
 
 titre <- paste("Temporal Evolution of metabolic rate",sep="")
 bp <-bargraph_sd(df,df$Period,df$MSRtot_t_m,df$MSRtot_t_sd,df$Period,df$Zone,
-                 xlab,"Total MSRtot (mW/m²)",titre,colDarj(CSLN_unique$Zone)) + 
+                 xlab,"Total MSRtot (mW/m2)",titre,colDarj(CSLN_unique$Zone)) + 
   theme(axis.text.x=element_text(angle=90, vjust=0.4,hjust=1)); bp
-ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 12, height = 6)
-bp4<-bp+ labs(title="Total MSRtot (mW/m²)",y="") + theme(legend.position='none')
+ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 12, height = 6, dpi=600)
+bp4<-bp+ labs(title="Total MSRtot (mW/m2)",y="") + theme(legend.position='none')
 
 # Un plot pour les 3 differents graphiques
 titre=paste("Temporal Evolution of Benthic fauna",sep="")
 bp <- ggarrange(bp1,bp2,bp3,bp4, ncol=2, nrow=2, labels="AUTO", legend="bottom", common.legend = TRUE)
-bp <- annotate_figure(bp,top = textGrob(titre, gp=gpar(fontsize=15,font=1)),
+bp <- annotate_figure(bp,top = text_grob(titre, face = "bold", size = 14),
                       bottom=xlab)+bgcolor("white"); bp
-ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 15, height = 15)
+ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 15, height = 15, dpi=600)
 
 #________________________________________________________________
 # CHOSEN SPECIES FOCUS ----
-CSLN_sp <- CSLN_sp %>% filter(SPCourt %in% species[1:6,1])
-titre <- paste("Periodic Evolution of Biomass for chosen species",sep="")
-bp<-ggplot(CSLN_sp)+geom_boxplot(aes(x=Period,y=Biomass_gAFDWm2,fill=Period))+ 
+CSLN_mud_spm <- CSLN_mud_spm %>% filter(SPCourt %in% speciesMP$SPCourt)
+titre <- paste("Periodic Evolution of Biomass for chosen speciesMP",sep="")
+bp<-ggplot(CSLN_mud_spm)+geom_boxplot(aes(x=Period,y=Biomass_m,fill=Period))+ 
   facet_grid(SPCourt~Zone)+ # Period, scales="free_y", margins=TRUE
   scale_y_continuous(trans = "log10") + 
   theme(legend.position="bottom",
         axis.text.x=element_blank())+ #element_text(angle=-90, vjust=0.4,hjust=1)) +
-  labs(title=titre,y="Biomass (gAFDW/m²)") +
+  labs(title=titre,y="Biomass (gAFDW/m2)") +
   Scale_fill(CSLN_unique$Annee) ;bp
-ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 10, height = 10)
+ggsave(paste(wdgraph,etude," ",titre,".png",sep=""), plot = bp, width = 10, height = 10, dpi=600)
 
 # Boxplot des reponses par annee pour 1 esp avec facet ----
 for (sp in spe){ #sp=1
-  df <- CSLN[which(CSLN$SPCourt == species[sp,1]),]
+  df <- CSLN_mud[which(CSLN_mud$SPCourt == speciesMP$SPCourt[sp]),]
   mlist<-vector(mode = "list", length = length(answ))
   for (rep in answ){ # rep=3
     x <- "Annee"; y <- reponse[rep,1]
     z <- "Period"
-    titreG <- paste(y," time evolution for ",species[sp,2], " - ", etude,sep="")
+    titreG <- paste(y," time evolution for ",speciesMP$Taxon_SNa[sp], " - ", etude,sep="")
     bp <- ggplot(df, aes_string(x,y,fill=z)) + geom_boxplot() + 
       facet_wrap(~Zone) + #,scales="free_y"
       theme(axis.text.x=element_text(angle=-90, vjust=0.4,hjust=1)) +
@@ -222,28 +263,29 @@ for (sp in spe){ #sp=1
       theme(legend.position="bottom",legend.title = element_blank())+
       scale_y_continuous(trans = "log10") + annotation_logticks(sides="lr") +
       Scale_fill(CSLN_unique$Annee) #bp
-    ggsave(paste(wdgraph,species[sp,1],"/",etude,"_Bxp_",species[sp,1],"_",y,".png",sep=""), plot = bp, width = 12, height = 6)
+    ggsave(paste(wdgraph,speciesMP$SPCourt[sp],"/",etude,"_Bxp_",speciesMP$SPCourt[sp],"_",y,".png",sep=""), plot = bp, width = 12, height = 6, dpi=600)
     bp <- bp + labs(title=sprintf("%s (%s)",reponse[rep,2],reponse[rep,3]) ,y="") + theme(legend.position='none')
     assign(paste('bp', rep, sep=''), bp + theme(legend.position="none"))
     mlist[[rep]] <- eval(parse(text = paste('bp', rep, sep='')));
   }
   if (length(answ)>1 ){
-    titreG <- paste("Responses time evolution for ",species[sp,2], " - ", etude,sep="")
+    titreG <- paste("Responses time evolution for ",speciesMP$Taxon_SNa[sp], " - ", etude,sep="")
     nncol = length(answ); nnrow=ceiling(length(answ)/nncol)
     bp <- ggarrange(plotlist=mlist,ncol=nncol, nrow=nnrow, labels="AUTO",legend="bottom",common.legend = TRUE)
     bp <- annotate_figure(bp, top = text_grob(titreG, face = "bold", size = 14))+bgcolor("white"); print(bp)
-    ggsave(paste(wdgraph,species[sp,1],"/",etude,"_Bxp_",species[sp,1],"_Answ",".png",sep=""), plot = bp, width = 16, height = 6)
+    ggsave(paste(wdgraph,speciesMP$SPCourt[sp],"/",etude,"_Bxp_",speciesMP$SPCourt[sp],"_Answ",".png",sep=""), plot = bp, width = 16, height = 6, dpi=600)
   }}
 
 # # Boxplot des Densites moy par annee pour 1 esp avec facet ----
 # for (sp in spe){ 
-#   df <- CSLN_sp[which(CSLN_sp$SPCourt == species[sp,1]),]
-#   titreG <- paste("Time evolution for ",species[sp,2], " - ", etude,sep="")
+#   df <- CSLN_sp[which(CSLN_sp$SPCourt == speciesMP[sp,1]),]
+#   titreG <- paste("Time evolution for ",speciesMP[sp,2], " - ", etude,sep="")
 #   bp <- ggplot(df, aes(Annee,Density_indm2,fill=Period)) + geom_boxplot() + 
 #     facet_wrap(~Zone) +
 #     labs(title=titreG) + 
 #     scale_y_continuous(trans = "log10") + annotation_logticks(sides="lr") + 
 #     theme(axis.text.x=element_text(angle=-90, vjust=0.4,hjust=1)) +
 #     Scale_fill(CSLN_unique$Annee); bp
-#   ggsave(paste(wdgraph,species[sp,1],"/",etude,"_Bxp1Zone_",species[sp,1],"_","Density_indm2",".png",sep=""), plot = bp, width = 12, height = 6)
+#   ggsave(paste(wdgraph,speciesMP[sp,1],"/",etude,"_Bxp1Zone_",speciesMP[sp,1],"_","Density_indm2",".png",sep=""), plot = bp, width = 12, height = 6, dpi=600)
 # }
+beepr::beep(2)

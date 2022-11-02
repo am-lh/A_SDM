@@ -6,18 +6,12 @@
 rm(list=ls())
 #________________________________________________________________
 # PACKAGES USED ----
-# install.packages("devtools"); library(devtools);Sys.setenv("R_REMOTES_NO_ERRORS_FROM_WARNINGS"=TRUE)
-# install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis")
 library(readxl) ; library(openxlsx) # Edition d'un fichier Excel
 library(tidyverse) #The toolbox indispensable
-library(vegan) # traitement des donnees envir (diversity, adonis2,metaMDS,vegdist)
-library(labdsv) # Analyse des communautes (invdal)
-library(pairwiseAdonis) #(pairwise.adonis)
-library(pastecs) ; library(clustsig) ; library(dendextend) # # Analyse TPA (abund); Analyse SIMPROF (simprof); library(ggdendro) ggdendrogramm# Graphics packages
-library(RColorBrewer) ; library(wesanderson) # Palettes de couleurs
-library(ggpubr);library(gridExtra) ; library(grid) # Mozaic of graphs tools
-library(treemap) # pour les graphiques treemap
-options(scipen=999) # Empeche affichage scientifique des nombres
+library(vegan) # environmental data processing diversity for Shannon
+# GIS Packages
+library(sf); library(sfheaders); # st_as_sf ; sf_to_df
+options(scipen=999) # Prevents scientific display of numbers
 
 #________________________________________________________________
 # WORKING ENVIRONMENT AND LOADING OF BASIC DATA ----
@@ -29,7 +23,6 @@ wdwork <- paste(wdtask,"Matrices/",sep="")
 wdgraph <- paste(wdtask,"Graphiques/",sep="")
 wdres <- paste(wdtask,"Resultats/",sep="")
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
-wdlogos <- paste(pc,"Melting Pot/Rapport - Presentations/Images/Logos/",sep="") # To add logos on map
 wdscript <- (paste(pc,"Melting Pot/BDD/Scripts/",sep=""))
 wdmsr <- (paste(wdscript,"MSR/MSR.R",sep=""))
 # setwd(paste(wdtask,"Scripts/",sep=""))
@@ -37,26 +30,11 @@ setwd(wdtask)
 # If exists
 # load(file = paste(wdwork,"CSLN_Mars_BDD",".RData", sep=""))
 
-#________________________________________________________________
-# DEFINITION OF THE GRAPHIC CHARTER ----
-theme_set(theme_bw()) # theme_gray() theme_bw() theme_light()
-colDarj <- function(x) {wes_palette("Darjeeling2",x, type = "continuous")}
-colZiss <- function(x) {wes_palette("Zissou1",x, type = "continuous")}
-colSpec <- colorRampPalette(brewer.pal(8, "Spectral")); 
-colDark <- colorRampPalette(brewer.pal(8, "Dark2"));
-Scale_col <- function(x) {scale_colour_manual(values=colDarj(x))}
-Scale_fill <- function(x) {scale_fill_manual(values=colDarj(x))}
-
 # ________________________________________________________________
 # DEFINITION OF BASIC VARIABLES ----
-# to be upgraded
-species <-data.frame(SPCourt=c("CERED","CORVO","HEDDI","MACBA","PERUL","SCRPL"),
-                     Taxon_SNa=c("Cerastoderma edule","Corophium volutator","Hediste diversicolor","Macoma balthica","Peringia ulvae","Scrobicularia plana"))
-speciesB <-data.frame(SPCourt=c("AREMA","BATPI","BATSA","CYACA","ETELO","NEPCI","NEPHO","PYGEL"),
-                     Taxon_SNa=c("Arenicola marinea","Bathyporea pilosa","Bathyporea sarsi","Cyathura carinata","Eteone longa","Nephtys cirrosa","Nephtys hombergii","Pygospio elegans"))
-reponse <-data.frame(rvar=c("Biomass_gAFDWm2","Density_indm2","MSRtot","Itot"),
-                     rdescr=c("Biomass","Density","Specific Respiration Rate","Metabolic Rate"),
-                     runit=c("gAFDW/m2","ind/m2","mW/m2","mW/m2"))
+reponse <-data.frame(rvar=c("Biomass_gAFDWm2","Density_indm2","MSRtot"),
+                     rdescr=c("Biomass","Density","Specific Respiration Rate"),
+                     runit=c("gAFDW/m2","ind/m2","mW/m2"))
 predictMNT <- data.frame(pvar=c("moyenneMu","modeMu","medianeMu","siltsArgiles","sablesFins","sablesMoyens","sablesGrossiers","graviers"),
                          pdescr=c("Granulometric Mean","Granulometric Mode","Granulometric Median","Mud and Silts","Light Sands","Medium Sands","Coarse Sands","Gravels"),
                          punit=c("µm","µm","µm","%","%","%","%","%"))
@@ -67,7 +45,14 @@ predictMNT <- data.frame(pvar=c("moyenneMu","modeMu","medianeMu","siltsArgiles",
 fauna_file <- paste(wdsource,"CSLN_Biology_source.xlsx",sep="")
 CSLN <- as.data.frame(read_excel(fauna_file,sheet = "Biology_station", na = ""))
 granulo <- as.data.frame(read_excel(fauna_file,sheet = "Granulo", na = ""))
+BioturbP <- as.data.frame(read_excel(paste(wdtask,"Sources/Faune/","Bioturbation _Potential.xlsx",sep=""),sheet = "Bioturbation _Potential", na = "")) 
+speciesList <-BioturbP %>% select(SPCourt,ScientificName_accepted) %>% rename(Taxon_SNa=ScientificName_accepted)
+speciesMP <- speciesList %>% filter(SPCourt %in% c("CERED","CORVO","HEDDI","MACBA","PERUL","SCRPL"))
+speciesBonus <-speciesList %>% 
+  filter(SPCourt %in% c("AREMA","BATPI","BATSA","CYACA","ETELO","NEPCI","NEPHO","PYGEL")) %>%
+  bind_rows(speciesMP)
 # summary(CSLN)
+
 # MARS
 mars_file <- paste(wdres,"ES_Ncf_BDD.xlsx",sep="")
 Varnames <- as.data.frame(read_excel(mars_file,sheet = "Varnames", na = "",col_names = c("Var", "Desc", "Unit", "NAval", "Dim", "Varid")))
@@ -77,58 +62,78 @@ saison[1,1] <- "" # Remplacement du NaN pour l'annee
 # GIS
 ES_Areas<-paste(wdGIS,"Layers made/ES_Areas_WGS.shp",sep="")
 ES_Areas<-st_read(ES_Areas,quiet=TRUE,crs=4326) %>% st_transform(2154)
-ES_Areas<-ES_Areas %>% filter(Zone!="NA") # | Zone !="Bay"
+ES_Areas<-ES_Areas %>% filter(Zone!="NA") #
 Mars_csv<-paste(wdres,"ES_Mars_Maps_sh.csv",sep="")
 Mars_csv<-read.csv(Mars_csv); Mars_csv[Mars_csv == "NaN"] <- NA
 Mars_csv<-Mars_csv %>% filter(!is.na(Lat) & !is.na(Lon) & !is.na(flow_m))# %>% filter(Lat!="NaN" | Lon!="NaN")
-# TIDAL_LEVEL CALCULATION : should be in mars matlab script ? ----
-Mars_csv$Tidal_level<-NA
-Mars_csv$Tidal_level[Mars_csv$inunt>=0 & Mars_csv$inunt<0.25]<-"Supratidal"
-Mars_csv$Tidal_level[Mars_csv$inunt>=0.25 & Mars_csv$inunt<0.75]<-"Intertidal"
-Mars_csv$Tidal_level[Mars_csv$inunt>=0.75 & Mars_csv$inunt<=1]<-"Infratidal"
-Mars_csv$Tidal_level<-as.factor(Mars_csv$Tidal_level)
-# Definition of temporal periods
-Mars_csv$Period<-"2011-2018"
-Mars_csv$Period[Mars_csv$Annee %in% 1990:1999]<-"1990-1999"
-Mars_csv$Period[Mars_csv$Annee %in% 2000:2010]<-"2000-2010"
-Mars_csv$Period<-as.factor(Mars_csv$Period)
-Mars_csv_sf<-st_as_sf(Mars_csv, coords=c("Lon","Lat"),crs=4326,na.fail=FALSE,remove = FALSE) %>% st_transform(2154)
 Mars_dat_sf<-paste(wdGIS,"Layers made/ES_Maille_nc.shp",sep="")
 Mars_dat_sf<-st_read(Mars_dat_sf,quiet=TRUE,crs=4326) %>% st_transform(2154) %>%
   rename(NINJ=NINJ_v, Lon=Lon_c, Lat=Lat_c) %>% select(-id_maille)
-# TIDAL_LEVEL CALCULATION : should be in mars matlab script ? ----
-Mars_dat_sf$Tidal_level<-NA
-Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0 & Mars_dat_sf$inunt<0.25]<-"Supratidal"
-Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0.25 & Mars_dat_sf$inunt<0.75]<-"Intertidal"
-Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0.75 & Mars_dat_sf$inunt<=1]<-"Infratidal"
-Mars_dat_sf$Tidal_level<-as.factor(Mars_dat_sf$Tidal_level)
-# Definition of temporal periods
-Mars_dat_sf$Period<-"2011-2018"
-Mars_dat_sf$Period[Mars_dat_sf$Annee %in% 1990:1999]<-"1990-1999"
-Mars_dat_sf$Period[Mars_dat_sf$Annee %in% 2000:2010]<-"2000-2010"
-Mars_dat_sf$Period<-as.factor(Mars_dat_sf$Period)
-anMars<-unique(Mars_csv$Annee)
 # Mars_mesh<-paste(wdGIS,"Maillage Mars3D/Maillage_mars3D_WGS.shp",sep="")
 # Mars_mesh<-st_read(Mars_mesh,quiet=TRUE,crs=4326) %>% st_transform(2154)
 # cadreES_Mars<-Mars_mesh[Mars_mesh$NINJ=="Cadre_ES",] # Keep aside ES frame in shp
 # Mars_mesh<-Mars_mesh[Mars_mesh$NINJ!="Cadre_ES",]# Remove of ES frame in shp
+anMars<-unique(Mars_csv$Annee) # used for RQ scripts
 
 #________________________________________________________________
 # PRELIMINARY TREATMENT ----
-colnames(CSLN)[which(colnames(CSLN) =="ScientificName_accepted")]<- "Taxon_SNa"
-CSLN <-CSLN %>% left_join(granulo[,-c(21:24)]) %>% 
+CSLN <- CSLN %>% 
+  rename(Taxon_SNa=ScientificName_accepted)%>%
+  left_join(granulo[,-c(21:24)]) %>%
   arrange(idStationUnique, Taxon_SNa) %>% 
   mutate(IndBodySize_gAFDW=Biomass_gAFDWm2/Density_indm2)
 CSLN$IndBodySize_gAFDW[CSLN$Density_indm2==0]<-0
-CSLN$SP<-"OTHER"; CSLN$SP[CSLN$SPCourt %in% species$SPCourt]<-"SpCh"; CSLN$SP[CSLN$SPCourt %in% speciesB$SPCourt]<-"SpMSR";
+CSLN$SP<-"OTHER"; CSLN$SP[CSLN$Taxon_SNa %in% speciesList$Taxon_SNa]<-"SpBTA";
+CSLN$SP[CSLN$Taxon_SNa %in% speciesMP$Taxon_SNa]<-"SpCh";
+
 # Definition of seasons and temporal periods
 CSLN$Season[CSLN$Mois %in% 1:3]   <- "Q1"
 CSLN$Season[CSLN$Mois %in% 4:6]   <- "Q2"
 CSLN$Season[CSLN$Mois %in% 7:10]  <- "Q3"
 CSLN$Season[CSLN$Mois %in% 11:12] <- "Q4"
-CSLN$Period<-"2011-2018"
-CSLN$Period[CSLN$Annee %in% 1990:1999]<-"1990-1999"
-CSLN$Period[CSLN$Annee %in% 2000:2010]<-"2000-2010"
+CSLN$Period<-NA 
+CSLN$Period[CSLN$Annee <2000 ]<-"1996-1999" 
+CSLN$Period[CSLN$Annee %in% 2000:2005]<-"2000-2005"
+CSLN$Period[CSLN$Annee %in% 2006:2010]<-"2006-2010"
+CSLN$Period[CSLN$Annee %in% 2011:2015]<-"2011-2015"
+CSLN$Period[CSLN$Annee %in% 2016:2019]<-"2015-2019"
+# Definition of temporal periods
+Mars_csv$Period<-NA 
+Mars_csv$Period[Mars_csv$Annee <2000 ]<-"1996-1999" 
+Mars_csv$Period[Mars_csv$Annee %in% 2000:2005]<-"2000-2005"
+Mars_csv$Period[Mars_csv$Annee %in% 2006:2010]<-"2006-2010"
+Mars_csv$Period[Mars_csv$Annee %in% 2011:2015]<-"2011-2015"
+Mars_csv$Period[Mars_csv$Annee %in% 2016:2019]<-"2015-2019"
+Mars_csv$Period<-as.factor(Mars_csv$Period)
+# Definition of temporal periods
+Mars_dat_sf$Period<-NA 
+Mars_dat_sf$Period[Mars_dat_sf$Annee <2000 ]<-"1996-1999" 
+Mars_dat_sf$Period[Mars_dat_sf$Annee %in% 2000:2005]<-"2000-2005"
+Mars_dat_sf$Period[Mars_dat_sf$Annee %in% 2006:2010]<-"2006-2010"
+Mars_dat_sf$Period[Mars_dat_sf$Annee %in% 2011:2015]<-"2011-2015"
+Mars_dat_sf$Period[Mars_dat_sf$Annee %in% 2016:2019]<-"2015-2019"
+Mars_dat_sf$Period<-as.factor(Mars_dat_sf$Period)
+# TIDAL_LEVEL CALCULATION : should be in mars matlab script ? ----
+Mars_csv$Tidal_level<-NA
+Mars_csv$Tidal_level[Mars_csv$inunt>=0 & Mars_csv$inunt<0.25]<-"Supratidal"
+Mars_csv$Tidal_level[Mars_csv$inunt>=0.25 & Mars_csv$inunt<0.75]<-"Intertidal"
+Mars_csv$Tidal_level[Mars_csv$inunt>=0.75 & Mars_csv$inunt<1]<-"Infratidal"
+Mars_csv$Tidal_level[Mars_csv$inunt==1]<-"Subtidal"
+Mars_csv$Tidal_level<-as.factor(Mars_csv$Tidal_level)
+Mars_csv_sf<-st_as_sf(Mars_csv, coords=c("Lon","Lat"),crs=4326,na.fail=FALSE,remove = FALSE) %>% st_transform(2154)
+# TIDAL_LEVEL CALCULATION : should be in mars matlab script ? ----
+Mars_dat_sf$Tidal_level<-NA
+Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0 & Mars_dat_sf$inunt<0.25]<-"Supratidal"
+Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0.25 & Mars_dat_sf$inunt<0.75]<-"Intertidal"
+Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0.75 & Mars_dat_sf$inunt<1]<-"Infratidal"
+Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt==1]<-"Subtidal"
+Mars_dat_sf$Tidal_level<-as.factor(Mars_dat_sf$Tidal_level)
+
+# BIOTURBATION POTENTIAL (solan & quieros https://doi.org/10.1002/ece3.769) ----
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# MIEUX DEFINIR LES UNITES DU CALCUL BPc ET SON USAGE DENSITE? ABONDANCE? ...
+CSLN<- CSLN %>% left_join(BioturbP %>% select(AphiaID_accepted,Mi,Ri), by=c("AphiaID_accepted"))
+CSLN$BPc <-sqrt(CSLN$Biomass_gAFDWm2/CSLN$Density_indm2)*CSLN$Density_indm2*CSLN$Mi*CSLN$Ri
 
 # Deleting unused columns
 suppr_col<-c("Source","Site","Campagne","Jour","id_station","Taxon", #"Station_originelle",
@@ -147,7 +152,9 @@ CSLN$Biomass_gAFDWm2[CSLN$Filtre=="INTERMUD"]<-as.vector(tmp$medInd)
 # Deleting unusable records
 CSLN<-CSLN %>% filter(!is.na(Density_indm2), !is.na(Biomass_gAFDWm2), !is.na(AphiaID_accepted),
                       longitude!="NaN",latitude!="NaN",
-                      ((Biomass_gAFDWm2!=0 & Density_indm2!=0) | (Biomass_gAFDWm2==0 & Density_indm2==0)))
+                      ((Biomass_gAFDWm2!=0 & Density_indm2!=0) | (Biomass_gAFDWm2==0 & Density_indm2==0))) %>%
+              filter(!grepl("d?bris", Taxon_SNa))
+
 # Removal of duplicates on the idStationUnique and SPCourt pairs
 CSLN<-CSLN %>% distinct(idStationUnique,SPCourt, .keep_all = TRUE) %>% arrange(Annee)
 # summary(CSLN)
@@ -182,7 +189,6 @@ CSLN_sf$Zone[CSLN_sf$Zone=="NA"]<-NA; CSLN_sf$Type[CSLN_sf$Type=="NA"]<-NA;
 CSLN_Mars<-sf_to_df(CSLN_sf,fill=TRUE)
 CSLN_Mars<-CSLN_Mars %>% left_join(Mars_csv,by=c("NINJ"="NINJ","Annee"="Annee","Period"))
 
-# # # TIDAL_LEVEL CALCULATION : should be in mars matlab script ? ----
 # # Add missing tidal levels on other years : TO BE DELETED WHEN ALL RUN ON MARS ?
 # CSLN_Mars[CSLN_Mars$NINJ %in% CSLN_Mars$NINJ[which(CSLN_Mars$Tidal_level=="Intertidal")],
 #           "Tidal_level"]<-"Intertidal"
@@ -190,9 +196,12 @@ CSLN_Mars<-CSLN_Mars %>% left_join(Mars_csv,by=c("NINJ"="NINJ","Annee"="Annee","
 #           "Tidal_level"]<-"Infratidal"
 # CSLN_Mars[CSLN_Mars$NINJ %in% CSLN_Mars$NINJ[which(CSLN_Mars$Tidal_level=="Supratidal")],
 #           "Tidal_level"]<-"Supratidal"
+# CSLN_Mars[CSLN_Mars$NINJ %in% CSLN_Mars$NINJ[which(CSLN_Mars$Tidal_level=="Subtidal")],
+#           "Tidal_level"]<-"Subtidal"
 
 # Suppression of missing information for levels
-CSLN_Mars<-CSLN_Mars %>% filter(!is.na(Zone)) #filter(!is.na(Tidal_level) & !is.na(Zone))
+CSLN_Mars<-CSLN_Mars %>% filter(!is.na(Zone)) #!is.na(Tidal_level)
+# summary(CSLN_Mars)
 
 #________________________________________________________________
 # METABOLIC RATE CALCULATION (with yearly med temp for the moment) ----
@@ -205,7 +214,6 @@ for (i in which(!is.na(CSLN_Mars$temp_m) & CSLN_Mars$SP!="OTHER")){
 }
 setwd(wdtask) # when the package is done, with repertory in it, no more needed
 CSLN_Mars$MSRtot<-CSLN_Mars$MSR_mW*CSLN_Mars$Density_indm2
-# CSLN_Mars$Itot<-CSLN_Mars$MSRtot
 
 #________________________________________________________________
 # FINAL SET FOR BASIS TABLE ----
@@ -218,8 +226,8 @@ CSLN_Mars<-CSLN_Mars %>% group_by(list(facto_col)) %>% arrange(list(facto_col), 
 CSLN_Mars<-CSLN_Mars %>% select(-`list(facto_col)`)
 # MOVE DESCRIPTIVE FIELDS AT BEGINNING OF TABLE
 CSLN_Mars<-CSLN_Mars %>% relocate(c(all_of(facto_col)))
-CSLN_Mars<-CSLN_Mars %>% relocate(c("IndBodySize_gAFDW","MSR_mW","MSRtot"),.after=Biomass_gAFDWm2) #,"Itot"
-# FACTORISATION FOR BASIS TABLE ----
+CSLN_Mars<-CSLN_Mars %>% relocate(c("IndBodySize_gAFDW","MSR_mW","MSRtot","BPc"),.after=Biomass_gAFDWm2)
+# FACTORISATION FOR BASIS TABLE
 CSLN_Mars[,facto_col] <- lapply(CSLN_Mars[,facto_col], as.factor)
 
 # Creation of vector with number of unique values for all field in databasis
@@ -235,60 +243,96 @@ CSLN_pur<-CSLN_Mars # CSLN_Mars<-CSLN_pur #summary(CSLN_pur) # Save before more 
 # summary(CSLN_Mars)
 
 #________________________________________________________________
-# FAUNA SUMMARY BY ZONE : SPECIES CHOSEN
-CSLN_Mars_sp <- CSLN_Mars %>% 
-  select(Zone,Tidal_level,Period,Annee,Season,SP,SPCourt,Density_indm2,Biomass_gAFDWm2,MSRtot) %>% # 
-  filter(SP=="SpCh") %>% select(-SP) %>%
-  complete(nesting(Zone,Tidal_level,Period,Annee,Season),nesting(SPCourt), # 
-           fill=list(Biomass_gAFDWm2=0,Density_indm2=0))
-CSLN_Mars_spm <- CSLN_Mars_sp %>% 
-  group_by(Zone,Tidal_level,Period,Annee,Season,SPCourt) %>% # 
+# DISCARD DATA NOT RELEVANT FOR STUDY ----
+CSLN <- CSLN_Mars %>%
+  filter(!Zone  %in% c("Channel","Bay")) %>% # at minimum
+  filter(Period != "1996-1999") %>%
+  filter(!SPCourt %in% c("SEMBA","AMPIM","AUSMO","BALCR","MYTED","BIVAL","ANNEL"))
+CSLN_mud <- CSLN %>%
+  filter(grepl("Mudflat", Zone)) # focus on mudflat only
+
+#_BREAK_SAVE_________________________________________________----
+# save.image(file = paste(wdwork,"CSLN_Mars_BDD",".RData", sep=""))
+# load(file = "C:/Users/lehuen201/Nextcloud/Melting Pot/BDD/A_SDM_NEO/Matrices/CSLN_Mars_BDD.RData")
+
+#________________________________________________________________
+# DATA SUMMARIES ----
+CSLN_mud_BTA <- CSLN_mud %>% # maxime
+  select(Zone,Tidal_level,Period,Annee,Season,idStationUnique,
+         SPCourt,Taxon_SNa,Density_indm2,Biomass_gAFDWm2,MSR_mW,MSRtot,BPc) %>%
+  filter(Taxon_SNa %in% speciesList$Taxon_SNa) %>%
+  filter(!is.na(MSRtot),!is.na(BPc)) %>%
+  group_by(idStationUnique,Zone,Tidal_level,Period,Annee) %>%  #,Season
+  summarise(MSR.iZTPAS = sum(MSRtot, na.rm =TRUE),
+            BPc.iZTPAS = sum(BPc, na.rm =TRUE)) %>% 
+  group_by(Zone,Period,Tidal_level,Annee) %>% #,Season
+  summarise(MSR.ZTPAS = mean(MSR.iZTPAS, na.rm =TRUE),
+            BPc.ZTPAS = mean(BPc.iZTPAS, na.rm =TRUE))
+
+CSLN_mud_spm <- CSLN_mud %>% 
+  select(Zone,Tidal_level,Period,Annee,Season,
+         SPCourt,Taxon_SNa,Density_indm2,Biomass_gAFDWm2,MSRtot,BPc) %>% # 
+  # filter(Taxon_SNa %in% speciesList$Taxon_SNa) %>%
+  complete(nesting(Zone,Tidal_level,Period,Annee,Season),nesting(SPCourt,Taxon_SNa), # 
+           fill=list(Biomass_gAFDWm2=0,Density_indm2=0,MSRtot=0,BPc=0)) %>% 
+  group_by(Zone,Tidal_level,Period,Annee,SPCourt,Taxon_SNa) %>% # ,Season
   summarise(Biomass_m=median(Biomass_gAFDWm2,na.rm=TRUE),Biomass_sd=sd(Biomass_gAFDWm2,na.rm=TRUE),
             Density_m=median(Density_indm2,na.rm=TRUE),Density_sd=sd(Density_indm2,na.rm=TRUE),
-            MSRtot_m=median(MSRtot,na.rm=TRUE),MSRtot_sd=sd(MSRtot,na.rm=TRUE))
+            MSRtot_m=median(MSRtot,na.rm=TRUE),MSRtot_sd=sd(MSRtot,na.rm=TRUE),
+            BPc_m=median(BPc,na.rm=TRUE),BPc_sd=sd(BPc,na.rm=TRUE),
+            n_records = n())
+
 # DIVERSITY TABLE BY ZONE
-CSLN_Mars_sm <- CSLN_Mars %>%
-  select(Zone,Tidal_level,Period,Annee,Season,SPCourt,Density_indm2,Biomass_gAFDWm2,MSRtot) %>% # 
-  group_by(Zone,Tidal_level,Period,Annee,Season) %>% # 
-  summarise(SR=n_distinct(SPCourt), n_records=n(),
+CSLN_sm <- CSLN_mud %>%
+  select(Zone,Tidal_level,Period,
+         SPCourt,Taxon_SNa,Density_indm2,Biomass_gAFDWm2,MSRtot,BPc) %>% # Annee,Season,
+  filter(Taxon_SNa %in% speciesList$Taxon_SNa) %>%
+  group_by(Zone,Tidal_level,Period) %>% # ,Annee,Season
+  summarise(SR=n_distinct(SPCourt), 
+            n_records=n(),
             Biomass_t=sum(Biomass_gAFDWm2,na.rm=TRUE),
-            MSRtot_t=sum(MSRtot,na.rm=TRUE)) %>%
-  unite("code",Zone,Tidal_level,Period,Annee,Season,sep = "_",remove = FALSE) # 
-# CONTINGENCY TABLE
-CSLN_cont <- CSLN_Mars %>%
-  select(Zone,Tidal_level,Period,Annee,Season,SPCourt,Density_indm2) %>% # 
-  complete(nesting(Zone,Tidal_level,Period,Annee,Season),nesting(SPCourt), # 
-           fill=list(Density_indm2=0)) %>%
-  group_by(Zone,Tidal_level,Period,Annee,Season,SPCourt) %>% # 
-  summarise(Density_m=median(Density_indm2,na.rm=TRUE)) %>%
-  pivot_wider(names_from = SPCourt, values_from = Density_m, values_fill = 0) %>%
-  unite("code",Zone,Tidal_level,Period,Annee,Season,sep = "_",remove = TRUE) # 
-CSLN_cont_mat<-as.matrix(CSLN_cont[,-1])
-row.names(CSLN_cont_mat)<-CSLN_cont$code
+            MSRtot_t=sum(MSRtot,na.rm=TRUE),
+            BPc_t=sum(BPc,na.rm=TRUE)) %>%
+  unite("code",Zone,Tidal_level,Period,sep = "_",remove = FALSE) # ,Annee,Season
+
+# CONTINGENCY TABLE : SPCourt alone lead to duplicate lines for pivot_wider, keep Taxon = OK
+CSLN_cont <- CSLN_mud %>% 
+  select(Zone,Tidal_level,Period, # Annee,Season,
+         Taxon_SNa,Density_indm2) %>% # 
+  complete(nesting(Zone,Tidal_level,Period),nesting(Taxon_SNa), # ,Annee,Season
+           fill=list(Density_indm2=0)) %>% 
+  group_by(Zone,Tidal_level,Period,Taxon_SNa) %>% # ,Annee,Season
+  summarise(Density_m=median(Density_indm2,na.rm=TRUE)) %>% 
+  select(Zone,Tidal_level,Period,
+         Taxon_SNa,Density_m) %>% # ,Annee,Season
+  group_by(Zone,Tidal_level,Period,Taxon_SNa) %>% # ,Annee,Season
+  pivot_wider(names_from = Taxon_SNa, values_from = Density_m, values_fill = 0) %>%
+  unite("code",Zone,Tidal_level,Period,sep = "_",remove = TRUE) # ,Annee,Season
+  CSLN_cont_mat<-as.matrix(CSLN_cont[,-1])
+  row.names(CSLN_cont_mat)<-CSLN_cont$code
 
 # SHANNON & PIELOU INDEXES ----
 # Pielou's index of equitability (J ): normalization of the Shannon-Wiener index (H'), 
 # a value of taxonomic diversity as a function of the number of taxa per area and the 
 # abundance of individuals within each taxon; 0 means that one taxon dominates the others,
 # 1 means that there is an equitable distribution of individuals between taxa
-CSLN_Mars_sm$Shannon<-diversity(CSLN_cont_mat,index="shannon")
-CSLN_Mars_sm$Pielou<-CSLN_Mars_sm$Shannon/log2(CSLN_Mars_sm$SR)
+CSLN_sm$Shannon<-diversity(CSLN_cont_mat,index="shannon")
+CSLN_sm$Pielou<-CSLN_sm$Shannon/log2(CSLN_sm$SR)
 
 CSLN_cont_mat<-subset(CSLN_cont_mat,rowSums(CSLN_cont_mat)!=0)
 CSLN_cont_name<-data.frame(code=row.names(CSLN_cont_mat))  %>% 
-  separate(code, c("Zone", "Tidal_level", "Period", "Annee","Season"), sep = "_",remove = TRUE) %>% # 
+  separate(code, c("Zone", "Tidal_level", "Period"), sep = "_",remove = TRUE) %>% # , "Annee","Season"
   unite("ZP",Zone,Period,sep = "_",remove = FALSE) %>% 
   unite("ZT",Zone,Tidal_level,sep = "_",remove = FALSE) %>% 
-  unite("ZA",Zone,Annee,sep = "_",remove = FALSE) %>%
-  unite("ZS",Zone,Season,sep = "_",remove = FALSE) %>%
+  # unite("ZA",Zone,Annee,sep = "_",remove = FALSE) %>%
+  # unite("ZS",Zone,Season,sep = "_",remove = FALSE) %>%
   unite("PT",Period,Tidal_level,sep = "_",remove = FALSE) %>%
-  unite("PS",Period,Season,sep = "_",remove = FALSE) %>%
-  unite("ZPA",Zone,Period,Annee,sep = "_",remove = FALSE) %>%  
-  unite("ZTP",Zone,Tidal_level,Period,sep = "_",remove = FALSE) %>%
-  unite("ZPS",Zone,Period,Season,sep = "_",remove = FALSE) %>%  
-  unite("ZTP",Zone,Tidal_level,Season,sep = "_",remove = FALSE) %>%
-  unite("ZTPA",Zone,Tidal_level,Period,Annee,sep = "_",remove = FALSE)
-  unite("ZTPS",Zone,Tidal_level,Period,Season,sep = "_",remove = FALSE)
+  # unite("PS",Period,Season,sep = "_",remove = FALSE) %>%
+  # unite("ZPA",Zone,Period,Annee,sep = "_",remove = FALSE) %>%  
+  unite("ZTP",Zone,Tidal_level,Period,sep = "_",remove = FALSE) #%>%
+  # unite("ZPS",Zone,Period,Season,sep = "_",remove = FALSE) %>%
+  # unite("ZTPA",Zone,Tidal_level,Period,Annee,sep = "_",remove = FALSE)# %>%
+  # unite("ZTPS",Zone,Tidal_level,Period,Season,sep = "_",remove = FALSE)
 
 # save.image(file = paste(wdwork,"CSLN_Mars_BDD",".RData", sep=""))
   
@@ -297,12 +341,12 @@ CSLN_cont_name<-data.frame(code=row.names(CSLN_cont_mat))  %>%
   wb <- loadWorkbook(paste(wdres,"CSLN_BDD",".xlsx", sep=""))
   writeData(wb, sheet = "CSLN", x = CSLN, startCol = 1, startRow = 1,withFilter = FALSE)
   writeData(wb, sheet = "CSLN_Mars", x = CSLN_Mars, startCol = 1, startRow = 1,withFilter = FALSE)
-  writeData(wb, sheet = "CSLN_Mars_sm", x = CSLN_Mars_sm, startCol = 1, startRow = 1,withFilter = FALSE)
+  writeData(wb, sheet = "CSLN_sm", x = CSLN_sm, startCol = 1, startRow = 1,withFilter = FALSE)
   writeData(wb, sheet = "Varnames", x = Varnames, startCol = 1, startRow = 1,withFilter = FALSE)
   writeData(wb, sheet = "Predicteurs", x = predict, startCol = 1, startRow = 1,withFilter = FALSE)
   writeData(wb, sheet = "Saison", x = saison, startCol = 1, startRow = 1,withFilter = FALSE)
   writeData(wb, sheet = "Reponse", x = reponse, startCol = 1, startRow = 1,withFilter = FALSE)
-  writeData(wb, sheet = "Species", x = species, startCol = 1, startRow = 1,withFilter = FALSE)
+  writeData(wb, sheet = "Species", x = speciesList, startCol = 1, startRow = 1,withFilter = FALSE)
   saveWorkbook(wb,file=paste(wdres,"CSLN_BDD",".xlsx", sep=""), overwrite = TRUE)
 
   save.image(file = paste(wdwork,"CSLN_Mars_BDD",".RData", sep=""))
