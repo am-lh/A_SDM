@@ -21,7 +21,7 @@ library(htmlwidgets) # library(leaflet) # saveWidget ; for interactive maps
 theme_set(theme_bw()) # theme_gray() theme_bw() theme_light()
 
 pal_cspx <- function(x) {divergingx_hcl(x,palette = "Zissou 1")}; # show_col(pal_cspx(6)) # colorspace
-colRQ<-pal_cspx(6); colBin<-c(pal_cspx(6)[3],pal_cspx(6)[5]); blank<-alpha("#dae8ed",0.1); # show_col(colBin)
+colRQ<-pal_cspx(6); colBin<-c(pal_cspx(6)[3],pal_cspx(6)[5]); blank<-alpha("#dae8ed",0.1); # show_col(colRQ)
 Scalc_rq<- function() {scale_colour_manual(values=colRQ)}
 Scalf_rq2d <- function() {scale_fill_gradientn(colours=colRQ)} # function(x) {scale_fill_material("teal")} # 
 
@@ -33,15 +33,16 @@ Scale_map<- function() {scale_fill_distiller(palette = "Spectral")}
 
 #________________________________________________________________
 # WORKING ENVIRONMENT AND LOADING OF BASIC DATA ----
-pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" # 
-tsk <- "A_SDM_NEO/"
-wdpath <- paste(pc,"Melting Pot/BDD/",tsk,sep=""); 
+# tsk <- "A_SDM_NEO/"
+wdtask <- "./" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
 wdwork <- paste(wdpath,"Matrices/",sep="")
 wdgraph <- paste(wdpath,"Graphiques/",sep="")
-wdgraphEx<-wdgraph #paste(pc,"Copie-HD/Melting Potes/",tsk,"Graphiques/",sep="")
 wdres <- paste(wdpath,"Resultats/",sep="")
-wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
 setwd(wdpath)
+
+pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
+wdgraphEx<-wdgraph #paste(pc,"Copie-HD/Melting Potes/",tsk,"Graphiques/",sep="")
+wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
 
 #________________________________________________________________
 # DEFINITION OF BASIC VARIABLES ----

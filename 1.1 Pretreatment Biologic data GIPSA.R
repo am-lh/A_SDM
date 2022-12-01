@@ -40,21 +40,22 @@ Scale_fill <- function(x) {scale_fill_manual(values=colDarj(x))}
 
 #________________________________________________________________
 # WORKING ENVIRONMENT AND LOADING OF BASIC DATA ----
-pc <- "E:/" #"C:/Users/lehuen201/Nextcloud/" # 
-tsk <- "A_SDM_NEO/"
-wdtask <- paste(pc,"Melting Pot/BDD/",tsk,sep="")
+# tsk <- "A_SDM_NEO/"
+wdtask <- "./" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
 wdsource <- paste(wdtask,"Sources/Faune/CSLN/",sep="")
 wdwork <- paste(wdtask,"Matrices/",sep="")
 wdgraph <- paste(wdtask,"Graphiques/",sep="")
 wdres <- paste(wdtask,"Resultats/",sep="")
-wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
-wdlogos <- paste(pc,"Melting Pot/Rapport - Presentations/Images/Logos/",sep="") # To add logos on map
-wdscript <- (paste(pc,"Melting Pot/BDD/Scripts/",sep=""))
-wdmsr <- (paste(wdscript,"MSR/MSR.R",sep=""))
 # setwd(paste(wdtask,"Scripts/",sep=""))
 setwd(wdtask)
 # If exists
 # load(file = paste(wdwork,"CSLN_Mars_GIPSA_BDD",".RData", sep=""))
+
+pc <- "E:/" #"C:/Users/lehuen201/Nextcloud/" #
+wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
+wdlogos <- paste(pc,"Melting Pot/Rapport - Presentations/Images/Logos/",sep="") # To add logos on map
+wdscript <- (paste(pc,"Melting Pot/BDD/Scripts/",sep=""))
+wdmsr <- (paste(wdscript,"MSR/MSR.R",sep=""))
 
 # ________________________________________________________________
 # DEFINITION OF BASIC VARIABLES ----

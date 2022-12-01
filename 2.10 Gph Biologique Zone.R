@@ -15,9 +15,9 @@ library(treemap)
 
 #________________________________________________________________
 # WORKING ENVIRONMENT AND LOADING OF BASIC DATA ----
-pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" # 
-tsk <- "A_SDM_NEO/"
-wdpath <- paste(pc,"Melting Pot/BDD/",tsk,sep=""); 
+# pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" # 
+# tsk <- "A_SDM_NEO/"
+wdtask <- "./" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
 wdwork <- paste(wdpath,"Matrices/",sep="")
 wdgraph <- paste(wdpath,"Graphiques/",sep="")
 wdres <- paste(wdpath,"Resultats/",sep="")

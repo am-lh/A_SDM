@@ -23,16 +23,16 @@ colorsD <- colorRampPalette(brewer.pal(8, "Dark2")); coldiscD <- function(x) {sc
 
 #________________________________________________________________
 # WORKING ENVIRONMENT AND LOADING OF BASIC DATA ----
-pc <- "E:/" #"C:/Users/lehuen201/Nextcloud/" "E:/" 
-tsk <- "A_SDM_NEO/"
-wdpath <- paste(pc,"Melting Pot/BDD/",tsk,sep=""); 
+# tsk <- "A_SDM_NEO/"
+wdtask <- "./" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
 wdwork <- paste(wdpath,"Matrices/",sep="")
 wdgraph <- paste(wdpath,"Graphiques/",sep="")
-wdgraphEx<-paste(pc,"Copie-HD/Melting Potes/",tsk,"Graphiques/",sep="")
-# wdgraphEx<-paste("C:/Users/lehuen201/Melting Potes/",tsk,"Graphiques/",sep="")
 wdres <- paste(wdpath,"Resultats/",sep="")
-wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
 setwd(wdpath)
+
+pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
+wdgraphEx<-wdgraph #paste(pc,"Copie-HD/Melting Potes/",tsk,"Graphiques/",sep="")
+wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
 
 #________________________________________________________________
 # DEFINITION OF BASIC VARIABLES ----

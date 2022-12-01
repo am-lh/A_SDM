@@ -15,20 +15,20 @@ options(scipen=999) # Prevents scientific display of numbers
 
 #________________________________________________________________
 # WORKING ENVIRONMENT AND LOADING OF BASIC DATA ----
-pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
-tsk <- "A_SDM_NEO/"
-wdtask <- paste(pc,"Melting Pot/BDD/",tsk,sep="")
+# tsk <- "A_SDM_NEO/"
+wdtask <- "./" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
 wdsource <- paste(wdtask,"Sources/Faune/CSLN/",sep="")
 wdwork <- paste(wdtask,"Matrices/",sep="")
 wdgraph <- paste(wdtask,"Graphiques/",sep="")
 wdres <- paste(wdtask,"Resultats/",sep="")
-wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
-wdscript <- (paste(pc,"Melting Pot/BDD/Scripts/",sep=""))
-wdmsr <- (paste(wdscript,"MSR/MSR.R",sep=""))
-# setwd(paste(wdtask,"Scripts/",sep=""))
 setwd(wdtask)
 # If exists
 # load(file = paste(wdwork,"CSLN_Mars_BDD",".RData", sep=""))
+
+pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
+wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
+wdscript <- paste(pc,"Melting Pot/BDD/Scripts/",sep="")
+wdmsr <- (paste(wdscript,"MSR/MSR.R",sep=""))
 
 # ________________________________________________________________
 # DEFINITION OF BASIC VARIABLES ----
