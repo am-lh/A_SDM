@@ -96,30 +96,30 @@ tmap_save(tm_Bio, filename = paste(wdres,'CSLN_Mars Map.html',sep=""))
 
 # #________________________________________________________________
 # # # OPTION LEAFLET----
-# # pal <- colorFactor(
-# #   palette = "viridis",na.color = NA,
-# #   levels = factor(bds$Type))
-# # map_leaflet <- leaflet() %>%
-# #   addProviderTiles("OpenStreetMap.HOT") %>% #addTiles()
-# #   # setView(lng = 2.80, lat = 46.80, zoom = 5) %>%
-# #   # addMarkers(data = CSLN_sf) %>%  # ATTENTION HYPER LONG !!! 
-# #   addPolygons(data = bds,
-# #               label = ~Type, # En passant la souris
-# #               popup = ~Zone, # En cliquant sur l'icone
-# #               fill = TRUE, 
-# #               fillColor = ~pal(Type),
-# #               fillOpacity = 0.8,
-# #               highlightOptions = highlightOptions(color = "white", weight = 2)) %>% 
-# #    addRectangles(
-# #     lng1 = boxbds[1], lat1 = boxbds[2],
-# #     lng2 = boxbds[3], lat2 = boxbds[4],
-# #     color = "green",
-# #     fill = FALSE) %>%
-# #   addLegend(
-# #     title = "Zones",
-# #     pal = pal, values = bds$Type)
-# # map_leaflet
-# # saveWidget(map_leaflet, 'test_leaflet.html', selfcontained = TRUE)
+# pal <- colorFactor(
+#   palette = "viridis",na.color = NA,
+#   levels = factor(bds$Type))
+# map_leaflet <- leaflet() %>%
+#   addProviderTiles("OpenStreetMap.HOT") %>% #addTiles()
+#   # setView(lng = 2.80, lat = 46.80, zoom = 5) %>%
+#   # addMarkers(data = CSLN_sf) %>%  # ATTENTION HYPER LONG !!!
+#   addPolygons(data = bds,
+#               label = ~Type, # En passant la souris
+#               popup = ~Zone, # En cliquant sur l'icone
+#               fill = TRUE,
+#               fillColor = ~pal(Type),
+#               fillOpacity = 0.8,
+#               highlightOptions = highlightOptions(color = "white", weight = 2)) %>%
+#    addRectangles(
+#     lng1 = boxbds[1], lat1 = boxbds[2],
+#     lng2 = boxbds[3], lat2 = boxbds[4],
+#     color = "green",
+#     fill = FALSE) %>%
+#   addLegend(
+#     title = "Zones",
+#     pal = pal, values = bds$Type)
+# map_leaflet
+# saveWidget(map_leaflet, 'test_leaflet.html', selfcontained = TRUE)
 
 
 #________________________________________________________________

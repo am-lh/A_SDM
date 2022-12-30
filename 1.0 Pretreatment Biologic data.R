@@ -43,7 +43,7 @@ predictMNT <- data.frame(pvar=c("moyenneMu","modeMu","medianeMu","siltsArgiles",
 # LOADING DATA ----
 # FAUNA
 fauna_file <- paste(wdsource,"CSLN_Biology_source.xlsx",sep="")
-CSLN <- as.data.frame(read_excel(fauna_file,sheet = "Biology_station", na = ""))
+CSLN_raw <- as.data.frame(read_excel(fauna_file,sheet = "Biology_station", na = ""))
 granulo <- as.data.frame(read_excel(fauna_file,sheet = "Granulo", na = ""))
 BioturbP <- as.data.frame(read_excel(paste(wdtask,"Sources/Faune/","Bioturbation _Potential.xlsx",sep=""),sheet = "Bioturbation _Potential", na = "")) 
 speciesList <-BioturbP %>% select(SPCourt,ScientificName_accepted) %>% rename(Taxon_SNa=ScientificName_accepted)
@@ -51,7 +51,7 @@ speciesMP <- speciesList %>% filter(SPCourt %in% c("CERED","CORVO","HEDDI","MACB
 speciesBonus <-speciesList %>% 
   filter(SPCourt %in% c("AREMA","BATPI","BATSA","CYACA","ETELO","NEPCI","NEPHO","PYGEL")) %>%
   bind_rows(speciesMP)
-# summary(CSLN)
+# summary(CSLN_raw)
 
 # MARS
 mars_file <- paste(wdres,"ES_Ncf_BDD.xlsx",sep="")
@@ -77,7 +77,7 @@ anMars<-unique(Mars_csv$Annee) # used for RQ scripts
 
 #________________________________________________________________
 # PRELIMINARY TREATMENT ----
-CSLN <- CSLN %>% 
+CSLN <- CSLN_raw %>% 
   rename(Taxon_SNa=ScientificName_accepted)%>%
   left_join(granulo[,-c(21:24)]) %>%
   arrange(idStationUnique, Taxon_SNa) %>% 
@@ -212,7 +212,7 @@ for (i in which(!is.na(CSLN_Mars$temp_m) & CSLN_Mars$SP!="OTHER")){
   CSLN_Mars$MSR_mW[i]<-msr(CSLN_Mars$Density_indm2[i],CSLN_Mars$Biomass_gAFDWm2[i],
                            CSLN_Mars$AphiaID_accepted[i],CSLN_Mars$temp_m[i],1,"w")*1000 #Mean MSR (mW/ind)
 }
-setwd(wdtask) # when the package is done, with repertory in it, no more needed
+setwd("../A_SDM_NEO") # when the package is done, with repertory in it, no more needed
 CSLN_Mars$MSRtot<-CSLN_Mars$MSR_mW*CSLN_Mars$Density_indm2
 
 #________________________________________________________________
@@ -312,8 +312,8 @@ CSLN_cont <- CSLN_mud %>%
   row.names(CSLN_cont_mat)<-CSLN_cont$code
 
 # SHANNON & PIELOU INDEXES ----
-# Pielou's index of equitability (J ): normalization of the Shannon-Wiener index (H'), 
-# a value of taxonomic diversity as a function of the number of taxa per area and the 
+# Pielou's index of equitability (J ): normalization of the Shannon-Wiener index (H'),
+# a value of taxonomic diversity as a function of the number of taxa per area and the
 # abundance of individuals within each taxon; 0 means that one taxon dominates the others,
 # 1 means that there is an equitable distribution of individuals between taxa
 CSLN_sm$Shannon<-diversity(CSLN_cont_mat,index="shannon")

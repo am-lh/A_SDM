@@ -1,0 +1,254 @@
+---
+title: "My title"
+author: "Amélie Lehuen"
+date: "2022-12-14"
+description: "add info on script"
+toc: true # table of content at beginning of document
+number-sections: true
+highlight-style: pygments
+format: 
+  html: 
+    self-contained: true
+    code-fold: false
+    html-math-method: katex # displays equations
+  pdf:
+    code-line-numbers: true
+    geometry: 
+      - top=20mm
+      - left=20mm
+  docx: 
+    reference-doc: default
+
+bibliography: references.bib
+
+editor: visual
+execute:
+  eval: true
+  echo: false
+  message: false
+  warning: false
+  output: true
+  include: true
+  cache: false #create cache of results of chunks
+---
+
+# My title
+
+## Introduction
+
+Describe action of the script.
+
+::: {.callout-important collapse="true"}
+## To improve
+
+Don't forget at some point to read about quarto projects https://quarto.org/docs/projects/quarto-projects.html.
+:::
+
+## Script preparation
+
+### Packages
+
+```{r}
+#| label: load-packages
+#| code-summary: "Packages"
+#| include: false
+
+library(readxl) ; library(openxlsx); 
+library(beepr); library(clipr) # Edition d'un fichier Excel
+library(tidyverse); #The toolbox indispensable 
+library(broom); library(purrr) # tidy,glance,augment
+library(scales) ; library(grafify) ; library(ggthemes) # show_col & viridis ; colorblind palettes ; scale_color_colorblind (8)
+library(RColorBrewer) ; library(colorspace); library(ggsci) ; library(wesanderson) # Palettes; hcl_palettes; id; 
+library(ggpubr);library(gridExtra) ; library(grid) # Mozaic of graphs tools
+library(lubridate)
+library(knitr)
+```
+
+### Working Environment
+
+```{r}
+#| label: workenvir
+#| echo: true
+
+rm(list=ls())
+spec <- "CERED"
+flume <- "Qfluff"
+Run <- "Lehuen_2022"
+wdtask <- "./DATA"
+wdsource <- paste(wdtask,spec,"/",sep="") #,"/",Run
+wdres <-  paste(wdtask,"Resultats/",sep="")
+wdmat <-  paste(wdtask,"Matrices/",sep="")
+wdgraph <-  paste(wdtask,"Graphiques/",sep="")
+setwd("./")
+```
+
+### Graphic charter
+
+```{r}
+#| label: graphchart
+theme_set(theme_bw(base_size = 16)) # theme_gray() theme_bw() theme_light() theme_dark()
+pal_clb <- function(x) {graf_col_palette(palette = "fishy")(x)}; # show_col(pal_clb(6))
+colBin<-c(pal_clb(6)[1],pal_clb(6)[2]); colMisc<-pal_clb(6)[6]# show_col(colBin)
+Scalc_bin<- function() {scale_colour_manual(values=colBin)}
+Scalc_lon<- function(x) {scale_colour_manual(values=pal_clb(x))}
+# Scale_brew <- function() {scale_colour_brewer(palette="Spectral",aesthetics=c("colour","fill"))}
+```
+
+### Home made functions
+
+```{r}
+#| label: functmade
+#| echo: true
+scale <- function(x) {(x - max(x, na.rm = TRUE))} # (x - x[1])
+```
+
+## Load of External data and Basic Variables
+
+### External data
+
+"./" for files in same folder, "../" folder parent folder
+
+```{r}
+#| label: externdata
+#| echo: true
+binderin <- sprintf("./Model Base Script Data.xlsx")
+data <- as.data.frame(read_excel(binderin,sheet = "Exp_Plan", na = ""))
+rdatain <- sprintf("%sCSLN_Mars_BDD.RData",wdwork)
+load(rdatain)
+```
+
+### Output binder and data
+
+```{r}
+#| label: outfiles
+#| echo: true
+binderout <- sprintf("binderout.xlsx")
+rdataout  <- sprintf("dataout.xlsx")
+# if exists
+load(rdataout)
+```
+
+### Basic variables
+
+```{r}
+#| label: basicvar
+#| echo: true
+discarded_run <- c("")
+nelrow<-2; nelcol<-1
+```
+
+# First block of action
+
+A litterature ref is done by adding an "Insert anything" tool (CTRL+/) : "/Citation". Points to Zotero, looks like [@cozzoli2014], and creates the reference table. Can also inserted by the button insert.
+
+You can add an equation @eq-one to illustrate the calculation : "/Inline Math" or "Display math"
+
+$$
+price = \hat{\beta}_0 + \hat{\beta}_1 \times area + \epsilon
+$$ {#eq-one}
+
+::: callout-note
+Other way in Citedrive, or direct ref from Pubmed... to explore
+:::
+
+## The big calculations, loops or stuff
+
+```{r}
+#| label: calculation_1
+#| include : false # necessary to avoid fluffy doc
+
+1+1
+```
+
+## The results choices, and graphs or table out
+
+### Refer to the @fig-scatterplot built to comment. You can add inline results, such as `r nrow(mpg)` observations in data.
+
+```{r}
+#| label: fig-scatterplot
+#| fig-cap: "This is the legend."
+#| fig-alt: "This is the figure description."
+#| fig-width: 6
+#| fig-height: 3.5
+
+ggplot(mpg, aes(x = hwy, y = cty, color = cyl)) +
+  geom_point(alpha = 0.5, size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal()
+```
+
+### Multiple Figures
+
+Two plots in the same @fig-mpg . In @fig-mpg-1 and @fig-mpg-2 side by side.
+
+```{r}
+#| label: fig-mpg
+#| fig-cap: "Global title."
+#| fig-subcap:
+#|   - "sub title of graph1"
+#|   - "sub title of graph2"
+#| layout-ncol: 2
+#| column: page
+
+ggplot(mpg, aes(x = hwy, y = cty, color = cyl)) +
+  geom_point(alpha = 0.5, size = 2) +
+  scale_color_viridis_c() +
+  theme_minimal()
+
+ggplot(mpg, aes(x = hwy, y = cty, color = displ)) +
+  geom_point(alpha = 0.5, size = 2) +
+  scale_color_viridis_c(option = "E") +
+  theme_minimal()
+```
+
+```{r}
+#| label: calculation_2
+#| echo: false
+mean_cty <- round(mean(mpg$cty), 2)
+mean_hwy <- round(mean(mpg$hwy), 2)
+```
+
+The average city mileage of the cars in our data is `r mean_cty` and the average highway mileage is `r mean_hwy`.
+
+### Table
+
+Put a nice table to sum up @tbl-stats
+
+```{r}
+#| label: tbl-stats
+#| tbl-cap: "table legend"
+
+mpg %>%
+  summarise(
+    `Median price` = median(hwy),
+    `IQR price` = IQR(hwy),
+    `Median area` = median(cty),
+    `IQR area` = IQR(cty),
+    `Correlation, r` = cor(hwy, cty)
+    ) %>%
+  kable(digits = c(0, 0, 0, 0, 2))
+```
+
+# Final actions and save
+
+Rdata are saved in `rdataout`. An excel file collects data in `r binderout` , with sheets for :
+
+-   data : contains whatever
+
+```{r}
+#| label: finalsave_xls
+wb <- copyWorkbook(loadWorkbook(binderin))
+if (!("AllMeas" %in% names(wb))) {addWorksheet(wb=wb, sheetName = "AllMeas")}
+writeData(wb, sheet = "AllMeas", x = data, startCol = 1, startRow = 1,withFilter = FALSE)
+saveWorkbook(wb,file=binderout, overwrite = TRUE)
+
+```
+
+```{r}
+#| label: finalsave_r
+
+save.image(file = rdataout)
+beepr::beep(2)
+```
+
+# References {.unnumbered}

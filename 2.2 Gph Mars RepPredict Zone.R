@@ -1,8 +1,6 @@
 # ______________________________________________________________________________
 # CREATION DE GRAPHIQUES DESCRIPTIFS DES DONNEES PROGRAMME REPONSES PREDICTEURS
 # ______________________________________________________________________________
-# NB animation graphique en time series https://www.datanovia.com/en/blog/
-# gganimate-how-to-create-plots-with-beautiful-animation-in-r/
 
 rm(list=ls())
 #________________________________________________________________
@@ -16,11 +14,11 @@ library(GGally); library(RColorBrewer)
 # WORKING ENVIRONMENT AND LOADING OF BASIC DATA ----
 # pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" # 
 # tsk <- "A_SDM_NEO/"
-wdtask <- "./" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
+wdpath <- "./" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
 wdwork <- paste(wdpath,"Matrices/",sep="")
 wdgraph <- paste(wdpath,"Graphiques/",sep="")
 wdres <- paste(wdpath,"Resultats/",sep="")
-setwd(wdpath)
+# setwd(wdpath)
 
 #________________________________________________________________
 # DEFINITION OF BASIC VARIABLES ----
@@ -72,22 +70,51 @@ ggscatterhist<-function (df, x = x, y = y,color = z,
 #________________________________________________________________
 # GLOBAL VISION OF DATA ----
 # Matrix set visualisation ----
-for (sp in spe){
-  for (sa in sai){
+corr_col <- function(data, mapping, method="p", use="pairwise", ...){
+  # grab data
+  x <- eval_data_col(data, mapping$x)
+  y <- eval_data_col(data, mapping$y)
+  # calculate correlation
+  corr <- cor(x, y, method=method, use=use)
+  # calculate colour based on correlation value
+  colFn <- colorRampPalette(c("blue", "white", "red"), interpolate ='spline')
+  fill <- colFn(100)[findInterval(corr, seq(-1, 1, length=100))]
+  ggally_text(
+    label = as.character(round(corr, 2)),
+    mapping = aes(),
+    xP = 0.5, yP = 0.5,
+    ...) + #  ggally_cor(data = data, mapping = mapping, ...) + 
+    theme_void() +
+    theme(panel.background = element_rect(fill=fill))
+
+} #wrap(cor_func,method = 'spearman', symbol = "Corr:\n")
+
+for (sp in spe){ # sp=1
+  for (sa in sai){ # sa=1
     df <- CSLN_mud %>% filter(SPCourt == speciesMP$SPCourt[sp]) %>%
-      select(paste(predict[,1],saison[sa,1],sep=""),reponse[,1])
+      select(paste(predict[,1],saison[sa,1],sep=""),reponse[1:2,1])
     colnames(df)<-c(predict[,2],reponse[,2])
     titreG <- paste("Mars3D Predictors for ",speciesMP$Taxon_SNa[sp]," in ",saison[sa,2]," - ", prgm, sep="")
-    tp <- ggpairs(df, title=titreG) +
-      theme(plot.title = element_text(size=18,face="bold"),
-            strip.text.x = element_text(size=12,face="bold"),
-            strip.text.y = element_text(size=10,face="bold"))
-    ggsave(paste(wdgraph,speciesMP$SPCourt[sp],"/",etude,"_MatRP_",speciesMP$SPCourt[sp],saison[sa,1],".png",sep=""), plot = tp, width = 16, height = 9)
+    tp <- ggpairs(df, title=titreG, 
+                  upper = list(continuous = corr_col),
+                  lower = list(continuous= wrap("smooth", size = .5, alpha = 0.4, color = "navyblue"))) #+ #
+      # theme(plot.title = element_text(size=18,face="bold"),
+      #       strip.text.x = element_text(size=12,face="bold"),
+      #       strip.text.y = element_text(size=10,face="bold"))
+    ggsave(paste(wdgraph,speciesMP$SPCourt[sp],"/",etude,"_MatRP_",speciesMP$SPCourt[sp],saison[sa,1],".png",sep=""), 
+           plot = tp, width = 16, height = 9, dpi=600)
     # Simple correlation matrix ----
+    
+    # library(ggcorrplot)
+    # ggcorrplot(cor(df,use= "na.or.complete"), method = "circle",type = "upper",hc.order = TRUE,lab=TRUE)
+    # dfcor<-rcorr(data.matrix(df))
+    # ggcorrplot(dfcor$r, p.mat=dfcor$p, sig.level = 0.05, insig = "blank",
+               # method = "circle",type = "upper",hc.order = TRUE,lab=TRUE) #
+    
     cp <- ggcorr(df, method = c("pairwise", "pearson"),
                  low="#FC4E07", mid="white", high="#00AFBB", nbreaks = 5,# palette=RdBu,
                  geom="tile", hjust = 0.85, angle = 0, layout.exp=3, size=4,
-                 label=TRUE,label_alpha = TRUE,label_round=2,label_size=4)+
+                 label=TRUE,label_alpha = TRUE,label_round=1,label_size=4)+
       labs(title=paste("Mars3D Predictors for ",speciesMP$Taxon_SNa[sp]," in ",saison[sa,2]," - ", prgm, sep=""))+
       theme(plot.title = element_text(size=18,face="bold"))+
       theme_bw()

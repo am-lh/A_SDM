@@ -34,7 +34,7 @@ Scale_map<- function() {scale_fill_distiller(palette = "Spectral")}
 #________________________________________________________________
 # WORKING ENVIRONMENT AND LOADING OF BASIC DATA ----
 # tsk <- "A_SDM_NEO/"
-wdtask <- "./" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
+wdpath <- "./" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
 wdwork <- paste(wdpath,"Matrices/",sep="")
 wdgraph <- paste(wdpath,"Graphiques/",sep="")
 wdres <- paste(wdpath,"Resultats/",sep="")
