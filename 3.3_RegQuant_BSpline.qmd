@@ -156,9 +156,9 @@ graphfine<-50 # graph resolution for 2D and 3D graphs surfaces
 #| label: calculation_1
 
 if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
-  modelq_rqbs_list <- list()
-  smrq_t_rqbs_list <- list(); RqMod_rqbs_list <- list(); # rqResid_t_rqbs_list <- list()
-  rqlim_t_rqbs_list <- list(); rqinf_t_rqbs_list <- list(); rqsup_t_rqbs_list <- list();
+  modelq_list <- list()
+  smrq_t_list <- list(); RqMod_list <- list(); # rqResid_t_list <- list()
+  rqlim_t_list <- list(); rqinf_t_list <- list(); rqsup_t_list <- list();
   for (sp in spe) { # sp=1
     df <- CSLN_Mars[which(CSLN_Mars$SPCourt == speciesMP$SPCourt[sp]),]
     for (sa in sai) {# sa=1
@@ -183,7 +183,7 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
           tryCatch({
             modelq<-rq(y~bs(x1,degree=3,knots=median(x1)), tau=taus);  # rq(y~bspline1(x1,median(x1)), tau=taus); #
             # modelq<-rq(y~bs(x1,degree=2,knots=median(x1)), tau=taus);  # rq(y~bspline1(x1,median(x1)), tau=taus); # 
-            modelq_rqbs_list[[sdmname]] <- modelq
+            modelq_list[[sdmname]] <- modelq
             xt<-paste("B-Spline",x1t,sep=' '); #"B-Spline deg",modelq$formula[[3]][["degree"]] 
             xl<-paste("B-Spline",x1l,sep=' ')
             subtitleG <- sprintf("%s vs %s",yl,xl)
@@ -209,7 +209,7 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
                        predict=xl,predictt=xt)
                smrq_t[[t]] <- smrq_tmp 
             }
-            smrq_t_rqbs_list[[sdmname]] <- smrq_t <- smrq_t %>% map_dfr(., ~.)
+            smrq_t_list[[sdmname]] <- smrq_t <- smrq_t %>% map_dfr(., ~.)
 
             # Out of limits points calculation
             rqlim_t <- as.data.frame(fitted(modelq)) %>%
@@ -227,10 +227,10 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
               bind_cols(x1Mod) 
             RqMod_t <- melt(RqMod_t,id.vars =c("x1"),variable.name = "tau",value.name = "RqMod") %>% 
               mutate(taust=sprintf("tau= %s",tau),tau=as.numeric(as.character(tau)))
-            RqMod_rqbs_list[[sdmname]] <- RqMod_t
-            rqlim_t_rqbs_list[[sdmname]] <- rqlim_t
-            rqsup_t_rqbs_list[[sdmname]] <- rqsup_t
-            rqinf_t_rqbs_list[[sdmname]] <- rqinf_t
+            RqMod_list[[sdmname]] <- RqMod_t
+            rqlim_t_list[[sdmname]] <- rqlim_t
+            rqsup_t_list[[sdmname]] <- rqsup_t
+            rqinf_t_list[[sdmname]] <- rqinf_t
 
             # GRAPHIC PART ----
             # SUMMARY GRAPHS
@@ -292,7 +292,7 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
             tryCatch({
               modelq<-rq(y~bs(x1*x2,degree=3,knots=c(median(x1),median(x2))), tau=taus); #rq(y~bspline2(x1,x2,median(x1),median(x2)), tau=taus);
               # modelq<-rq(y~bs(x1*x2,degree=2,knots=c(median(x1),median(x2))), tau=taus); #rq(y~bspline2(x1,x2,median(x1),median(x2)), tau=taus);
-              modelq_rqbs_list[[sdmname]] <- modelq
+              modelq_list[[sdmname]] <- modelq
               xt<-paste("B-Spline 2d",x1t,"&",x2t,sep=' '); 
               xl<-paste("B-Spline 2d",x1l,"&",x2l,sep=' ')
               subtitleG <- sprintf("%s vs %s",yl,xl)
@@ -318,7 +318,7 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
                          predict=xl,predictt=xt)
                 smrq_t[[t]] <- smrq_tmp 
               }
-              smrq_t_rqbs_list[[sdmname]] <- smrq_t <- smrq_t %>% map_dfr(., ~.)
+              smrq_t_list[[sdmname]] <- smrq_t <- smrq_t %>% map_dfr(., ~.)
               
               # Out of limits points calculation
               rqlim_t <- as.data.frame(predict(modelq)) %>%
@@ -336,10 +336,10 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
                 bind_cols(gridx1x2) 
               RqMod_t <- melt(RqMod_t,id.vars =c("x1","x2"),variable.name = "tau",value.name = "RqMod") %>% 
                 mutate(taust=sprintf("tau= %s",tau),tau=as.numeric(as.character(tau)))
-              RqMod_rqbs_list[[sdmname]] <- RqMod_t
-              rqlim_t_rqbs_list[[sdmname]] <- rqlim_t
-              rqsup_t_rqbs_list[[sdmname]] <- rqsup_t
-              rqinf_t_rqbs_list[[sdmname]] <- rqinf_t
+              RqMod_list[[sdmname]] <- RqMod_t
+              rqlim_t_list[[sdmname]] <- rqlim_t
+              rqsup_t_list[[sdmname]] <- rqsup_t
+              rqinf_t_list[[sdmname]] <- rqinf_t
 
               # GRAPHIC PART ----
               # SUMMARY GRAPHS
@@ -438,7 +438,7 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
   } # species
   # ----
   
-  smrq_l <- smrq_t_rqbs_list %>% map_dfr(., ~.)
+  smrq_l <- smrq_t_list %>% map_dfr(., ~.)
   sdmlist_name <- unique(smrq_l$sdmname)
   # Graphic representation of model performance
   plot_dp<-smrq_l %>% mutate(model_desc=str_remove(predict,"B-Spline deg 3")) %>% #filter(!str_detect(mode, "4var")) %>%
@@ -487,12 +487,12 @@ for (sp in spe_choosen) { # sp=spe_choosen
         for (t in taus_choosen){ # t= taus_choosen
           for (rep in reponse_choosen){ # rep=reponse_choosen[1]
             sdmname_chosen <- sprintf("RQbs2_%g%g%g%g%g",sp,sa,rep,k,k2)
-            modelq <- modelq_rqbs_list[[sdmname_chosen]]
-            smrq_t <- smrq_t_rqbs_list[[sdmname_chosen]]
-            RqMod_t <- RqMod_rqbs_list[[sdmname_chosen]]
-            rqlim_t <- rqlim_t_rqbs_list[[sdmname_chosen]]
-            rqsup_t <- rqsup_t_rqbs_list[[sdmname_chosen]]
-            rqinf_t <- rqinf_t_rqbs_list[[sdmname_chosen]]
+            modelq <- modelq_list[[sdmname_chosen]]
+            smrq_t <- smrq_t_list[[sdmname_chosen]]
+            RqMod_t <- RqMod_list[[sdmname_chosen]]
+            rqlim_t <- rqlim_t_list[[sdmname_chosen]]
+            rqsup_t <- rqsup_t_list[[sdmname_chosen]]
+            rqinf_t <- rqinf_t_list[[sdmname_chosen]]
             df <- CSLN_Mars[which(CSLN_Mars$SPCourt == speciesMP$SPCourt[sp]),]
             yt = reponse[rep,1] ; yl = sprintf("%s (%s)",reponse[rep,2],reponse[rep,3])
             zt = "Zone"
@@ -618,7 +618,7 @@ if (choixttt==3 | choixttt==13 | choixttt==23 | choixttt==123){
             for (rep in reponse_choosen){ # rep=reponse_choosen[1]
               sdmname_chosen <- sprintf("RQbs2_%g%g%g%g%g",sp,sa,rep,k,k2)
               sdmname_tau <- sprintf("%s_t%g",sdmname_chosen,taus[t])
-              modelq <- modelq_rqbs_list[[sdmname_chosen]]
+              modelq <- modelq_list[[sdmname_chosen]]
               yt = reponse[rep,1] ; yl = sprintf("%s (%s)",reponse[rep,2],reponse[rep,3])
               zt = "Zone"
               x1t = sprintf("%s%s",pred_red[k,1],saison[sa,1]); x1l = sprintf("%s%s (%s)",pred_red[k,2],saison[sa,1],pred_red[k,3])
