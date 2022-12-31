@@ -46,6 +46,7 @@ library(broom); library(purrr) # tidy,glance,augment
 library(patchwork)
 library(scales) ; library(grafify) ; library(ggthemes) # show_col & viridis ; colorblind palettes ; scale_color_colorblind (8)
 library(RColorBrewer) ; library(colorspace); library(ggsci) ; library(wesanderson) # Palettes; hcl_palettes; id; 
+library(scales); library(RColorBrewer); library(wesanderson); library(grafify); library(colorspace); library(ggsci); library(gplots) # show_col and colors colors colors!
 library(ggpubr);library(gridExtra) ; library(grid) # Mozaic of graphs tools
 library(lubridate)
 library(rstatix)
@@ -87,6 +88,19 @@ colDark <- colorRampPalette(brewer.pal(8, "Dark2"));
 Scale_col <- function(x) {scale_colour_manual(values=colDarj(x))}
 Scale_fill <- function(x) {scale_fill_manual(values=colDarj(x))}
 Scale_brew <- function() {scale_colour_brewer(palette="Spectral",aesthetics=c("colour","fill"))}
+
+pal_cspx <- function(x) {divergingx_hcl(x,palette = "Zissou 1")}; # show_col(pal_cspx(6)) # colorspace
+colRQ<-pal_cspx(4); colBin<-c(pal_cspx(6)[3],pal_cspx(6)[5]); blank<-alpha("#dae8ed",0.1); # show_col(colBin)
+Scalc_rq<- function() {scale_colour_manual(values=colRQ)}
+Scalf_rq2d <- function() {scale_fill_gradientn(colours=colRQ)} # function(x) {scale_fill_material("teal")} # 
+
+pal_ggscc <- pal_material("teal"); # show_col(pal_ggscc(9)) # ggsci
+colSum <- c(pal_ggscc(9)[3],pal_ggscc(9)[7],pal_ggscc(9)[1]) # show_col(colSum)
+colInliers<-pal_material("teal")(10)[5] ; colOutliers = pal_material("deep-orange")(10)[5] # show_col(colOutliers)
+Scalc_misc <- function() {scale_color_discrete_diverging(palette = "Blue-Red 3")}
+Scale_map<- function() {scale_fill_distiller(palette = "Spectral")}
+colIC <- col2hex("gray50")
+
 ```
 
 ```{r}
@@ -560,9 +574,7 @@ plot_rq <- list()
 for (repi in 1:2) {
   tmp<-list()
   for (sdi in 1:nrow(sdmname)) { # sdi=1
-    
     tmp[[sdi]] <- rqdata$dp2d_plot_list[[rqname[sdi,repi]]][[t]]
-    
   }
   plot_rq[[repi]]<-tmp
   
@@ -595,8 +607,6 @@ for (repi in 1:2){
   tmp <- list()
   for (sdi in 1:nrow(sdmname)) { # sdi=1
       tmp[[sdi]] <- nlrqdata$dp2d_plot_list[[nlrq2name[sdi,repi]]][[t]]
-
-      
   }
   plot_nlrq[[repi]]<-tmp
   plot_nlrq_t <- ggarrange(plotlist = plot_nlrq[[repi]], 
@@ -628,64 +638,9 @@ plot_rqbs <- list()
 for (repi in 1:2) {
   tmp <- list()
   for (sdi in 1:nrow(sdmname)) { # sdi=1
-    sp_i<-as.numeric(substr(sdmname[sdi,repi],1,1))
-    sa_i<-as.numeric(substr(sdmname[sdi,repi],2,2))
-    rep_i<-as.numeric(substr(sdmname[sdi,repi],3,3))
-    k_i<-as.numeric(substr(sdmname[sdi,repi],4,4))
-    k2_i<-as.numeric(substr(sdmname[sdi,repi],5,5))
-    
-    yt = reponse[rep_i,1]
-    yl = sprintf("%s (%s)",reponse[rep_i,2],reponse[rep_i,3])
-    zt = "Zone"
-    x1t = sprintf("%s%s",pred_red[k_i,1],saison[sa_i,1])
-    x1l = sprintf("%s%s (%s)",pred_red[k_i,2],saison[sa_i,1],pred_red[k_i,3])
-    x2t = sprintf("%s%s",pred_red[k2_i,1],saison[sa_i,1])
-    x2l = sprintf("%s%s (%s)",pred_red[k2_i,2],saison[sa_i,1],pred_red[k2_i,3])
-    
-    
-    modelq <- modelq_rqbs_list[rqbs2name[sdi,repi]]
-    RqMod_mat <- RqMod_rqbs_list[[rqbs2name[sdi,repi]]] %>% 
-      filter(tau==taus[t])
-    smrq <- smrq_t_rqbs_list[[rqbs2name[sdi,repi]]] %>% 
-      filter(tau==taus[t])
-    rqlim <- rqlim_t_rqbs_list[[rqbs2name[sdi,repi]]] %>% 
-      filter(tau==taus[t]) %>% 
-      select(RqLim)
-    rqsup <- rqsup_t_rqbs_list[[rqbs2name[sdi,repi]]] %>% 
-      filter(tau==taus[t])
-    rqinf <- rqinf_t_rqbs_list[[rqbs2name[sdi,repi]]] %>% 
-      filter(tau==taus[t])
-    
-    titleG <- sprintf("%s (t=%g) %s in %s",analysis,taus[t],
-                      speciesMP$Taxon_SNa[sp],saison[sa,2])
-    subtitleG <- sprintf("SDM-NEO %s",reponse[rep,3])
-    capt = sprintf("AIC = %g", smrq$AIC)
-    
-    # 2D static graphic : RASTER
-    tmp[[sdi]] <- ggplot(RqMod_mat) +
-      geom_raster(aes(x = x1, y = x2, fill = RqMod),alpha=0.7) + 
-      geom_point(data=rqinf,aes(x=x1, y=x2), 
-                 shape=21, size=1, color=colInliers, 
-                 fill=colInliers, alpha=.5, na.rm = TRUE) +
-      geom_point(data=rqsup,aes(x=x1, y=x2), 
-                 shape=23, size=1, color=colOutliers, 
-                 fill=colOutliers, alpha=.5, na.rm = TRUE) +
-      labs(
-        x=x1l, y=x2l,
-        # title=titleG, 
-        # subtitle=subtitleG,
-        caption = capt,
-        fill = NULL # paste("SDM-NEO\n",reponse[rep,3],sep="")
-        ) +
-      guides(alpha = "none") +
-      Scalf_rq2d() +
-      # facet_wrap(taust ~ .) + 
-      # coord_fixed(max(RqMod_mat$x1)/max(RqMod_mat$x2)) +
-      theme(text = element_text(size = 12))
-      print(tmp[[sdi]])
-      plot_rqbs[[repi]]<-tmp
+    tmp[[sdi]] <- rqbsdata$dp2d_plot_list[[rqbs2name[sdi,repi]]][[t]]
   }
-  
+  plot_rqbs[[repi]]<-tmp
   plot_rqbs_t <- ggarrange(plotlist = plot_rqbs[[repi]], 
                          ncol=1, nrow=length(plot_rqbs[[repi]]),
                          labels="AUTO",legend="right",
@@ -792,6 +747,72 @@ plot_t[[2]]
 ### 3D visualisation
 
 ```{r}
+#| label: graphrq3d
+#| output: false
+# Linear RQ Graphics generation
+analysis <- "RQ Linear"
+rqname<- matrix(paste0("RQ2int_",sdmname),nrow=4,ncol=2)
+
+plot_rq <- list()  
+for (repi in 1:2) {
+  tmp<-list()
+  for (sdi in 1:nrow(sdmname)) { # sdi=1
+    tmp[[sdi]] <- rqdata$dp3d_plot_list[[rqname[sdi,repi]]][[t]]
+  }
+  plot_rq[[repi]]<-tmp
+  
+# PLOTLY FACET
+
+}
+
+```
+
+```{r}
+#| label: graphnlrq3d
+#| output: false
+# Nonlinear RQ Graphics generation
+analysis <- "RQ Nonlinear"
+nlrq2name<- matrix(paste0("nlRQ2_",sdmname),nrow=4,ncol=2)
+
+plot_nlrq <- list()
+for (repi in 1:2){
+  tmp <- list()
+  for (sdi in 1:nrow(sdmname)) { # sdi=1
+      tmp[[sdi]] <- nlrqdata$dp3d_plot_list[[nlrq2name[sdi,repi]]][[t]]
+  }
+  plot_nlrq[[repi]]<-tmp
+
+  
+  
+}
+
+```
+
+```{r}
+#| label: graphrqbs3d
+#| eval: false
+#| output: false
+# BSplines RQ Graphics generation
+analysis <- "RQ BSpline"
+rqbs2name<- matrix(paste0("RQbs2_",sdmname),nrow=4,ncol=2)
+
+plot_rqbs <- list()
+for (repi in 1:2) {
+  tmp <- list()
+  for (sdi in 1:nrow(sdmname)) { # sdi=1
+    tmp[[sdi]] <- rqbsdata$dp3d_plot_list[[rqbs2name[sdi,repi]]][[t]]
+  }
+  plot_rqbs[[repi]]<-tmp
+
+  
+  
+}
+
+```
+
+
+
+```{r}
 #| label: graphboard2
 #| eval: false
 
@@ -799,42 +820,18 @@ for (repi in 1:2) {
   tmp<-list()
   subtitleG <- sprintf("SDM-NEO %s",reponse[repi,3])
   for (i in 1:length(plot_rq[[repi]])) {
-    
-    x1mod <- seq(min(x1),max(x1),length.out=graphfine)
-    x2mod <- seq(min(x2),max(x2),length.out=graphfine)
-    x1x2mod <- data.frame(cbind(x1mod,x2mod)) %>% rename(x1=x1mod,x2=x2mod)
-    gridx1x2 <- expand.grid(x1mod,x2mod) %>% rename(x1=Var1,x2=Var2)
-    gridx1x2mat <- mesh(x1mod,x2mod)
-
-    
-    myscene<-list(camera = list(eye = list(x = -1.5, y = 1.5, z = 0.3)), 
-                  aspectmode='cube',
-                  xaxis = list(title = x1l), yaxis = list(title = x2l), zaxis = list(title = yl))
-
-    dp3d <- plot_ly(showlegend=F, scene=paste("scene",repi,sep="")) %>%
-      add_surface(x = gridx1x2mat[["x"]], 
-                  y = gridx1x2mat[["y"]],
-                  z = RqMod_mat,
-                  opacity = 0.9, colorscale = list(c(0,1),c(blank,colRQ[t])),
-                  colorbar=list(title=list(text=paste("SDM-NEO\n",reponse[repi,3],"\nTau=",taus[t],sep="")))) %>%
-      add_trace(x = rqsup$x1, 
-                y = rqsup$x2, 
-                z = rqsup$y, 
-                mode = "markers", type = "scatter3d",
-                marker = list(size = 2, color = colOutliers, opacity = 0.5, symbol = "diamond")) %>%
-      add_trace(x = rqinf$x1, 
-                y = rqinf$x2, 
-                z = rqinf$y, 
-                mode = "markers", type = "scatter3d",
-                marker = list(size = 2, color = colInliers, opacity = 0.5, symbol = "circle")) %>%
-      layout(title = titleG, scene = myscene)
-    dp3d
-plot_dp3dlist[[length(plot_dp3dlist)+1]] <- dp3d
-# saveWidget(dp3d, sprintf("%s%s/%s/%s_%s_RQ2int3d_%s_%s_%s_%s_%s.html",
-#                          wdgraphEx,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],
-#                          saison[sa,2],yt,x1t,x2t,taus[t]),
-#            selfcontained = F, libdir = "lib")
+      tmp[[sdi]] <- rqbsdata$dp3d_plot_list[[rqname[sdi,repi]]][[t]]
+  
   }
+  plot_nlrq[[repi]]<-tmp
+  plot_nlrq_t <- ggarrange(plotlist = plot_nlrq[[repi]], 
+                         ncol=1, nrow=length(plot_nlrq[[repi]]),
+                         labels="AUTO",legend="right",
+                         common.legend = FALSE)
+  plot_nlrq_t <- annotate_figure(plot_nlrq_t,
+                        top = text_grob(analysis)) +
+        bgcolor("white")
+
 }
 
 

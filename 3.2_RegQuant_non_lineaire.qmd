@@ -286,11 +286,11 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
             },error = function(e) {print(e)})#,finally = {})
           }
           modelq_list[[sdmname]] <- modelq_t
+          smrq_t_list[[sdmname]] <- smrq_t <- smrq_t %>% map_dfr(., ~.)
           RqMod_list[[sdmname]] <- RqMod_t  <- RqMod_t %>% map_dfr(., ~.)
           rqlim_t_list[[sdmname]] <- rqlim_t <- rqlim_t %>% map_dfr(., ~.)
           rqsup_t_list[[sdmname]] <- rqsup_t <- rqsup_t %>% map_dfr(., ~.)
           rqinf_t_list[[sdmname]] <- rqinf_t <- rqinf_t %>% map_dfr(., ~.)
-          smrq_t_list[[sdmname]] <- smrq_t <- smrq_t %>% map_dfr(., ~.)
           rqResid_t_list[[sdmname]] <- rqResid_t <- rqResid_t %>% map_dfr(., ~.)
 
           # GRAPHIC PART ----
@@ -580,7 +580,7 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
                 labs(x=x1l, y=x2l,
                      fill = paste("SDM-NEO\n",reponse[rep,3],sep="")) +
                 guides(alpha = "none") +
-                Scalf_rq2d(); print(dp2dF_plot_list[[sdmname]])
+                Scalf_rq2d()#; print(dp2dF_plot_list[[sdmname]])
  
               dp3d_plot_t[[t]] <- plot_ly(showlegend=F, 
                                    scene=paste("scene",t,sep="")) %>% 
@@ -612,7 +612,7 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
                             colorbar=list(title=list(
                               text="Initial conditions"),
                               limits=c(0,max(Zinit)))) %>%
-                layout(title = titleG, scene = myscene); print(dp3d_plot_t[[t]])
+                layout(title = titleG, scene = myscene)#; print(dp3d_plot_t[[t]])
               
               dp3dS_plot_list[[sdmname]] <- dp3dS_plot_list[[sdmname]] %>% 
                 add_surface(x = gridx1x2mat[["x"]], 
@@ -643,15 +643,11 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
             
             # 3D plot with all taus models surface
             dp3dS_plot_list[[sdmname]] <- dp3dS_plot_list[[sdmname]] %>% 
-              add_trace(x = rqsup$x1, 
-                        y = rqsup$x2, 
-                        z = rqsup$y, 
+              add_trace(x = rqsup$x1, y = rqsup$x2, z = rqsup$y, 
                         mode = "markers", type = "scatter3d",
                         marker = list(size = 2, color = colOutliers, 
                                       opacity = 0.5, symbol = "diamond")) %>%
-              add_trace(x = rqinf$x1, 
-                        y = rqinf$x2, 
-                        z = rqinf$y, 
+              add_trace(x = rqinf$x1, y = rqinf$x2, z = rqinf$y, 
                         mode = "markers", type = "scatter3d",
                         marker = list(size = 2, color = colInliers, 
                                       opacity = 0.5, symbol = "circle")) %>%
@@ -705,222 +701,6 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
 } #end if choixttt 1
 ```
 
-# GRAPHS ON DEMAND
-
-```{r}
-#| label: graphOD
-
-if (choixttt==2 | choixttt==12 | choixttt==23 | choixttt==123){
-  k_choosen<- which(pred_red$Var %in% c("flow_mxd")) # flow_mxd inunt sal_dtd temp_m tenfon_m mudrate_m
-  k2_choosen<- which(pred_red$Var %in% c("inunt"))# 
-  taus_choosen <- which(taus %in% c(0.975))  # c(0.5,0.85,0.9,0.95,0.975,0.99)
-  spe_choosen <- which(speciesMP$SPCourt %in% c("CERED"))  # CERED CORVO HEDDI LIMBA PERUL SCRPL
-  reponse_choosen <- which(reponse$rvar %in% c("Biomass_gAFDWm2","Density_indm2")) # Biomass_gAFDWm2 Density_indm2
-  sai_choosen <- which(saison$M_Def %in% "Year") #  Year Winter Summer
-  dp3d_plot_t<-list(); dp_plot2dlist<-list()
-  
-  for (sp in spe_choosen) { # sp=spe_choosen
-    for (sa in sai_choosen) {# sa=sai_choosen
-      for (k in k_choosen) { # k=k_choosen
-        for (k2 in k2_choosen) { # k2=k2_choosen 
-          for (t in taus_choosen){ # t= taus_choosen
-            for (rep in reponse_choosen){ # rep=reponse_choosen[1]
-              sdmname_chosen <- sprintf("nlRQ2_%g%g%g%g%g",sp,sa,rep,k,k2)
-              modelq <- modelq_list[[sdmname_chosen]]
-              smrq_t <- smrq_t_list[[sdmname_chosen]]
-              RqMod_t <- RqMod_list[[sdmname_chosen]]
-              rqlim_t <- rqlim_t_list[[sdmname_chosen]]
-              rqsup_t <- rqsup_t_list[[sdmname_chosen]]
-              rqinf_t <- rqinf_t_list[[sdmname_chosen]]
-              df <- CSLN_Mars[which(CSLN_Mars$SPCourt == speciesMP$SPCourt[sp]),]
-              yt = reponse[rep,1] ; yl = sprintf("%s (%s)",reponse[rep,2],reponse[rep,3])
-              zt = "Zone"
-              x1t = sprintf("%s%s",pred_red[k,1],saison[sa,1]); x1l = sprintf("%s%s (%s)",pred_red[k,2],saison[sa,1],pred_red[k,3])
-              x2t = sprintf("%s%s",pred_red[k2,1],saison[sa,1]); x2l = sprintf("%s%s (%s)",pred_red[k2,2],saison[sa,1],pred_red[k2,3])
-              dfrq <-df[,c(yt,x1t,x2t)]; dfrq <-as.data.frame(na.omit(dfrq)) %>% rename(x1=!!x1t,x2=!!x2t,y=!!yt)
-              y <- dfrq$y <- jitter(dfrq$y); x1 <- dfrq$x1 <- jitter(dfrq$x1); x2 <- dfrq$x2 <- jitter(dfrq$x2)
-              z <- dfrq$z
-              
-              smrq <- smrq_t %>% filter(tau==taus[t])
-              RqMod_mat <- RqMod_t %>% filter(tau==taus[t])
-              rqlim <- rqlim_t %>% filter(tau==taus[t]) %>% select(RqLim)
-              rqsup<-rqsup_t %>% filter(tau==taus[t]); rqinf<-rqinf_t %>% filter(tau==taus[t])
-              
-              titleG <- sprintf("%s %s in %s",analysis,speciesMP$Taxon_SNa[sp],saison[sa,2])
-              xt<-paste("Gaussian 2d",x1t,x2t,sep=' '); 
-              xl<-paste("Gaussian 2d",x1l,x2l,sep=' ')
-              subtitleG <- sprintf("%s %s model, AIC = %g, Rone = %g",yl,smrq$mode,smrq$AIC,smrq$Rone)
-              
-              # 2D static graphic : RASTER
-             dp2dF_plot_list[[sdmname]] <- ggplot(RqMod_mat) +
-                geom_raster(aes(x = x1, y = x2, fill = RqMod),alpha=0.8) + 
-                geom_point(data=rqinf,aes(x=x1, y=x2), shape=21, size=1, color=colInliers, fill=colInliers, alpha=.5, na.rm = TRUE) +
-                geom_point(data=rqsup,aes(x=x1, y=x2), shape=23, size=1, color=colOutliers, fill=colOutliers, alpha=.5, na.rm = TRUE) +
-                labs(title=titleG,subtitle=subtitleG, x=x1l, y=x2l,fill = paste("SDM-NEO\n",reponse[rep,3],sep="")) +
-                guides(alpha = "none") +
-                Scalf_rq2d() +
-                facet_wrap(taust ~ .); dp2dF_plot_list[[sdmname]]
-              dp_plot2dlist[[length(dp_plot2dlist)+1]] <- dp2dF_plot_list[[sdmname]]
-              ggsave(sprintf("%s%s/%s/%s_%s_nlRQ22d_%s_%s_%s_%s_%s.tiff",
-                             wdgraph,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],
-                             saison[sa,2],yt,x1t,x2t,taus[t]),
-                     plot = dp2dF_plot_list[[sdmname]], width = 10, height = 9, dpi=600)
-              
-              # Experimental points on 3D graphic
-              # define standard layout scene
-              RqMod_mat <- array(RqMod_mat$RqMod,dim=c(graphfine,graphfine))
-              myscene<-list(camera = list(eye = list(x = -1.5, y = 1.5, z = 0.3)), aspectmode='cube',
-                            xaxis = list(title = x1l), yaxis = list(title = x2l), zaxis = list(title = yl))
-              
-              # 3D plot with model surface
-              dp3d_plot <- plot_ly(showlegend=F, scene=paste("scene",rep,sep="")) %>% 
-                add_surface(x = gridx1x2mat[["x"]], y = gridx1x2mat[["y"]], z = RqMod_mat,
-                            opacity = 0.9, colorscale = list(c(0,1),c(blank,colRQ[t])),
-                            colorbar=list(title=list(text=paste("SDM-NEO\n",reponse[rep,3],"\nTau=",taus[t],sep="")))) %>%
-                add_trace(x = rqsup$x1, y = rqsup$x2, z = rqsup$y, mode = "markers", type = "scatter3d",
-                          marker = list(size = 2, color = colOutliers, opacity = 0.5, symbol = "diamond"))%>%
-                add_trace(x = rqinf$x1, y = rqinf$x2, z = rqinf$y, mode = "markers", type = "scatter3d",
-                          marker = list(size = 2, color = colInliers, opacity = 0.5, symbol = "circle")) %>%
-                layout(title = titleG, scene = myscene); dp3d_plot
-              dp3d_plot_t[[length(dp3d_plot_t)+1]] <- dp3d_plot
-              saveWidget(dp3d_plot, sprintf("%s%s/%s/%s_%s_nlRQ23d_%s_%s_%s_%s_%s.html",
-                                            wdgraphEx,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],
-                                            saison[sa,2],yt,x1t,x2t,taus[t]),
-                         selfcontained = F, libdir = "lib")
-            }
-            plot_rq2dbis <- ggarrange(plotlist=dp_plot2dlist, ncol=2, nrow=1,
-                                      labels="AUTO") + bgcolor("white")
-            # plot_rq2dbis <- annotate_figure(plot_rq2dbis, top = text_grob(titleG, face = "bold", size = 14)); print(plot_rq2dbis)
-            ggsave(sprintf("%s%s/%s/%s_%s_nlRQ22d_%s_%s_%s_%s.tiff",
-                           wdgraph,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],
-                           saison[sa,2],x1t,x2t,taus[t]),
-                   plot = plot_rq2dbis, width = 16, height = 8, dpi=600)
-            
-            subtitleG <- sprintf("%s, tau = %g",xl,taus[t])
-            scene <- list(camera = list(eye = list(x = -1.5, y = 1.5, z = 0.3)), aspectmode='cube',
-                          xaxis = list(title = x1l), yaxis = list(title = x2l), 
-                          zaxis = list(title = sprintf("%s (%s)",reponse[1,2],reponse[1,3])),
-                          domain=list(x=c(0,0.5),y=c(0,1)))
-            scene2 <- list(camera = list(eye = list(x = -1.5, y = 1.5, z = 0.3)), aspectmode='cube',
-                           xaxis = list(title = x1l), yaxis = list(title = x2l), 
-                           zaxis = list(title = sprintf("%s (%s)",reponse[2,2],reponse[2,3])),
-                           domain=list(x=c(0.5,1),y=c(0,1)))
-            dp3dF_plot_list <- subplot(dp3d_plot_t, shareX = TRUE, shareY = TRUE, nrows = 2) %>%
-              layout(title = paste(titleG,subtitleG,sep="\n"),
-                     scene = scene, scene2 = scene2)
-            saveWidget(dp3dF_plot_list,sprintf("%s%s/%s/%s_%s_nlRQ23dFacet_%s_%s_%s_%s.html",
-                                          wdgraphEx,speciesMP$SPCourt[sp],analysis,etude,speciesMP$SPCourt[sp],
-                                          saison[sa,2],x1t,x2t,taus[t]),
-                       selfcontained = F, libdir = "lib")
-          }
-        }
-      }
-    }
-  }
-  rm(list=ls(pattern="scene")); rm(list=ls(pattern="plot"))
-} #end if choixttt 2 ----
-```
-
-# MARS SHAPEFILE ON DEMAND
-
-```{r}
-#| label: shapefilemars
-
-if (choixttt==3 | choixttt==13 | choixttt==23 | choixttt==123){
-  Mars_SDM<-Mars_dat_sf %>% dplyr::select(c(NINJ,Lon,Lat,Zone,Tidal_level,Annee,pred_red$Var))
-  k_choosen<- which(pred_red$Var %in% c("flow_mxd")) # flow_mxd inunt sal_dtd temp_m tenfon_m mudrate_m
-  k2_choosen<- which(pred_red$Var %in% c("inunt"))# 
-  taus_choosen <- which(taus %in% c(0.975))  # c(0.5,0.85,0.9,0.95,0.975,0.99)
-  spe_choosen <- which(speciesMP$SPCourt %in% c("CERED"))  # CERED CORVO HEDDI LIMBA PERUL SCRPL
-  reponse_choosen <- which(reponse$rvar %in% c("Biomass_gAFDWm2","Density_indm2")) # Biomass_gAFDWm2 Density_indm2
-  sai_choosen <- which(saison$M_Def %in% "Year") #  Year Winter Summer
-
-  for (sp in spe_choosen) { # sp=spe_choosen
-    for (sa in sai_choosen) {# sa=sai_choosen
-      for (k in k_choosen) { # k=k_choosen
-        for (k2 in k2_choosen) { # k2=k2_choosen 
-          for (t in taus_choosen){ # t= taus_choosen
-            for (rep in reponse_choosen){ # rep=reponse_choosen[1]
-              sdmname_chosen <- sprintf("nlRQ2_%g%g%g%g%g",sp,sa,rep,k,k2)
-              sdmname_tau <- sprintf("%s_t%g",sdmname_chosen,taus[t])
-              modelq <- modelq_list[[sdmname_chosen]]
-              yt = reponse[rep,1] ; yl = sprintf("%s (%s)",reponse[rep,2],reponse[rep,3])
-              zt = "Zone"
-              x1t = sprintf("%s%s",pred_red[k,1],saison[sa,1]); x1l = sprintf("%s%s (%s)",pred_red[k,2],saison[sa,1],pred_red[k,3])
-              xt<-paste(x1t,modelq[["formula"]][[3]][[1]],x2t,sep=' '); xl<-paste(x1l,modelq[["formula"]][[3]][[1]],x2l,sep=' ')
-              x2t = sprintf("%s%s",pred_red[k2,1],saison[sa,1]); x2l = sprintf("%s%s (%s)",pred_red[k2,2],saison[sa,1],pred_red[k2,3])
-              x1M <- as.data.frame(pull(Mars_dat_sf, x1t)) %>% rename_all(~"x1")
-              x2M <- as.data.frame(pull(Mars_dat_sf, x2t)) %>% rename_all(~"x2")
-              x1x2mars <- bind_cols(x1M,x2M)
-              lci <- list(A=quantile(y,FactA_CI2d),mu1=median(x1),sigma1=sd(x1),mu2=median(x2),sigma2=sd(x2)); #,epsilon=0
-              xt<-paste(x1t,x2t,sep=paste('&')); 
-              xl<-paste(x1l,x2l,sep=paste('&'))
-              
-              titleG <- sprintf("%s %s in %s",analysis,speciesMP$Taxon_SNa[sp],saison[sa,2])
-              subtitleG = sprintf("%s & %s", x1l,x2l)
-              capt = sprintf("%s Quantile regression\n%s", smrq_l$mode, sdmname_tau)
-              
-              # MARS3D SDM CALCULATION
-              modelq<-nlrq(y~gauss2d(x1,x2,A,mu1,sigma1,mu2,sigma2), start=lci, tau=taus[t],control=cc, method="BFGS") #,epsilon
-              RqModMars <- as.data.frame(predict(modelq,newdata=x1x2mars)) %>%
-                rename_all(~"RqMod") %>%
-                mutate(across(everything(), function(x){replace(x, which(x<0), NA)})) %>% 
-                mutate(tau=taus[t], taust=sprintf("tau= %s",tau),
-                       sdmname=sdmname) %>% 
-                bind_cols(x1x2mars)
-              Mars_SDM$SDM<-pull(RqModMars %>% filter(tau==taus[t]) %>% select(RqMod))
-              Mars_SDM$SDM[which(Mars_SDM$SDM<0)]<-NA
-              Mars_SDM<-Mars_SDM%>%rename(!!sprintf("%s_t%g",sdmname_chosen,taus[t]):=SDM) # !!'string': to interpret text as variable
-              
-              # SDM-NEO MAP BUILDING
-              Mars_SDM_sf <- Mars_SDM %>% dplyr::select(c(Annee, !!sdmname_tau)) # raster::select also exists!
-              anMars<-unique(Mars_SDM_sf$Annee)
-              mlist<-vector(mode = "list", length = length(anMars))
-              for (ann in 1:length(anMars)) { # ann=1
-                titleG = sprintf("SDM-NEO for %s in %s",speciesMP[sp,2],anMars[ann])
-                Mars_SDM_sfi<-Mars_SDM_sf %>% filter(Mars_SDM_sf$Annee==anMars[ann])
-                sfp<-ggplot(data = Mars_SDM_sfi) +
-                  geom_sf(aes(fill = .data[[sdmname_tau]]), color = NA) + #
-                  labs(x="Latitude",y="Longitude",
-                       fill = sprintf("SDM-NEO\n%s\nTau=%s",yl,taus[t])) +
-                  theme(plot.margin = margin(0.05,0.05,0.05,0.05, "cm")) +
-                  Scale_map() # + coord_sf(xlim = c(-88, -78), ylim = c(24.5, 33), expand = FALSE)
-                assign(paste('sfp', ann, sep=''), 
-                       sfp + theme(legend.position="none",
-                                   axis.title.x=element_blank(), axis.text.x=element_blank(),axis.ticks.x=element_blank(),
-                                   axis.title.y=element_blank(), axis.text.y=element_blank(),axis.ticks.y=element_blank()) +
-                         labs(title=anMars[ann]))
-                mlist[[ann]] <- eval(parse(text = paste('sfp', ann, sep='')))
-                sfp <- sfp + labs(title=titleG, subtitle=subtitleG, caption=capt)
-                ggsave(sprintf("%s%s/%s/Map Detail/%s_%s_%s_%s_%s_%s.tiff",
-                               wdgraphEx,speciesMP[sp,1],analysis,
-                               etude,speciesMP[sp,1],sdmname_tau,yt,xt,anMars[ann]),
-                       plot = sfp, width = 10, height = 9, dpi=600)
-              } #year
-              titleG = sprintf("SDM-NEO for %s in %s",speciesMP[sp,2],yl)
-              nncol = 5; nnrow=ceiling(length(anMars)/nncol)
-              sfp <- ggarrange(plotlist=mlist, ncol=nncol, nrow=nnrow, common.legend = TRUE, legend="bottom")+
-                theme(plot.margin = margin(0.05,0.05,0.05,0.05, "cm")) 
-              sfp <- annotate_figure(sfp, top = text_grob(sprintf("%s\n%s",titleG,subtitleG), face = "bold", size = 14),
-                                     bottom=capt)+
-                bgcolor("white"); #print(sfp)
-              ggsave(sprintf("%s%s/%s/%s_%s_%s_%s_%s.tiff",
-                             wdgraphEx,speciesMP[sp,1],analysis,
-                             etude,speciesMP[sp,1],sdmname_tau,yt,xt),
-                     plot = sfp, width = 10, height = 12, dpi=600)
-            }
-          }
-        }
-      }
-    }
-  }
-  st_write(Mars_SDM, sprintf("%sLayers made/SDM_NEO_RQ_%s.shp",wdGIS,speciesMP$SPCourt[sp]),append=FALSE)
-  rm(list=c("Mars_SDM_sfi","Mars_SDM_sf","mlist"))
-  rm(list=ls(pattern="sfp"))
-  save.image(file = paste(wdwork,etude,"_nlRQ_BDD",".RData", sep=""))
-} #end if choixttt 3 ----
-```
-
 # Final actions and save
 
 Rdata are saved in `rdataout`. An excel file collects data in `r binderout` , with sheets for :
@@ -928,11 +708,16 @@ Rdata are saved in `rdataout`. An excel file collects data in `r binderout` , wi
 -   data : contains whatever
 
 ```{r}
-#| label: finalsave
+#| label: finalsave_xls
 wb <- loadWorkbook(binderout) # addWorksheet(wb, sheetName = "rql")
 writeData(wb, sheet = "nlRQ_coeff", x = smrq_l,
           startCol = 1, startRow = 1,withFilter = FALSE)
 saveWorkbook(wb,file=binderout, overwrite = TRUE)
+
+```
+
+```{r}
+#| label: finalsave_r
 
 save.image(rdataout)
 beepr::beep(2)
