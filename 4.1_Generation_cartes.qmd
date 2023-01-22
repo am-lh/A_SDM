@@ -268,9 +268,12 @@ foldtxt<-"RQ Lineaire"; filtxt<-"Rq"
 for (sp in spe) { # sp=1
   mlist<-vector(mode = "list", length = length(sdm))
   for (sdi in sdm) { # sdi=1
-    x1t<-sdmlist$x1t[sdi]; x2t<-sdmlist$x2t[sdi]; yt<-sdmlist$yt[sdi]
-    x1l<-pred_red$Desc[which(pred_red$Var==x1t)]; x2l<-pred_red$Desc[which(pred_red$Var==x2t)]
-    yl<-reponse$rdescr[which(reponse$rvar==yt)]; ylu<-reponse$runit[which(reponse$rvar==yt)]
+    x1t<-sdmlist$x1t[sdi]; x2t<-sdmlist$x2t[sdi]
+    yt<-sdmlist$yt[sdi]
+    x1l<-pred_red$Desc[which(pred_red$Var==x1t)]
+    x2l<-pred_red$Desc[which(pred_red$Var==x2t)]
+    yl<-reponse$rdescr[which(reponse$rvar==yt)]
+    ylu<-reponse$runit[which(reponse$rvar==yt)]
     zt<-paste(species[sp,1],sdi,saison[sa,1],sep="")
     subtitre = sprintf("%s & %s", x1l,x2l)
     capt = sprintf("%s Quantile regression", sdmlist$SDM_desc[sdi])

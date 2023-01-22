@@ -11,13 +11,6 @@ format:
     self-contained: true
     code-fold: false
     html-math-method: katex # displays equations
-  pdf:
-    code-line-numbers: true
-    geometry: 
-      - top=20mm
-      - left=20mm
-  docx: 
-    reference-doc: default
 
 bibliography: references.bib
 
@@ -58,18 +51,15 @@ options(scipen=999) # Prevents scientific display of numbers
 #| label: workenvir
 
 rm(list=ls())
-# tsk <- "A_SDM_NEO/"
-wdtask <- "../" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
-wdsource <- paste(wdtask,"Sources/Faune/CSLN/",sep="")
-wdwork <- paste(wdtask,"Matrices/",sep="")
-wdgraph <- paste(wdtask,"Graphiques/",sep="")
-wdres <- paste(wdtask,"Resultats/",sep="")
+wdsource <- "Sources/Faune/CSLN/"
+wdwork <- "Matrices/"
+wdgraph <- "Graphiques/"
+wdres <- "Resultats/"
 
 pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
 wdscript <- paste(pc,"Melting Pot/BDD/Scripts/",sep="")
 wdmsr <- (paste(wdscript,"MSR/MSR.R",sep=""))
-# setwd("./")
 ```
 
 ### Definition of the graphic charter

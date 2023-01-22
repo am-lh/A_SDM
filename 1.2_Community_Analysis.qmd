@@ -11,13 +11,6 @@ format:
     self-contained: true
     code-fold: false
     html-math-method: katex # displays equations
-  pdf:
-    code-line-numbers: true
-    geometry: 
-      - top=20mm
-      - left=20mm
-  docx: 
-    reference-doc: default
 
 bibliography: references.bib
 
@@ -69,14 +62,12 @@ library(knitr)
 #| label: workenvir
 #| echo: true
 rm(list=ls())
-# pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" # 
-# tsk <- "A_SDM_NEO/"
-wdtask <- "../" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
-wdsource <- paste(wdtask,"Sources/Faune/CSLN_mud_l/",sep="")
-wdwork <- paste(wdtask,"Matrices/",sep="")
-wdgraph <- paste(wdtask,"Graphiques/",sep="")
-wdres <- paste(wdtask,"Resultats/",sep="")
-# setwd(wdtask)
+
+wdsource <- "Sources/Faune/CSLN/"
+wdmat <- "Matrices/"
+wdgraph <- "Graphiques/"
+wdres <- "Resultats/"
+
 ```
 
 ### Graphic charter
@@ -109,7 +100,7 @@ Scale_brew <- function() {scale_colour_brewer(palette="Spectral",aesthetics=c("c
 ```{r}
 #| label: externdata
 #| echo: true
-rdatain <- sprintf("%sCSLN_Mars_BDD.RData",wdwork)
+rdatain <- sprintf("%sCSLN_Mars_BDD.RData",wdmat)
 load(rdatain)
 ```
 
@@ -119,7 +110,7 @@ load(rdatain)
 #| label: outfiles
 #| echo: true
 binderout <- sprintf("binderout.xlsx")
-rdataout  <- sprintf("%sCSLN_Mars_Zone_BDD.RData",wdwork)
+rdataout  <- sprintf("%sCSLN_Mars_Zone_BDD.RData",wdmat)
 # if exists
 # load(rdataout)
 ```
@@ -316,9 +307,9 @@ CSLN_pairado <- CSLN_pairado %>% filter(sig != "") # Keep only significant pairs
 
 
 # # # SAVE BECAUSE SO LONG TO CALCULATE
-# save(ad,CSLN_adonis,CSLN_pairado,file = paste(wdwork,"CSLN_Zone_Ado.RData", sep=""))
+# save(ad,CSLN_adonis,CSLN_pairado,file = paste(wdmat,"CSLN_Zone_Ado.RData", sep=""))
 
-# load(paste(wdwork,"CSLN_Zone_Ado.RData", sep=""))
+# load(paste(wdmat,"CSLN_Zone_Ado.RData", sep=""))
 
 ```
 
@@ -414,7 +405,7 @@ indvalsummary <- cbind(sp=row.names(indvalsummary),indvalsummary)[order(indvalsu
 indres <- as.data.frame(indval_mat$indcls)
 indres <- cbind(sp=row.names(indres),indres)
 
-# save.image(file = paste(wdwork,"CSLN_BDD_Zone",".RData", sep=""))
+# save.image(file = paste(wdmat,"CSLN_BDD_Zone",".RData", sep=""))
 
 ```
 

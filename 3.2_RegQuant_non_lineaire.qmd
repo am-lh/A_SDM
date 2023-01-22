@@ -11,13 +11,6 @@ format:
     self-contained: true
     code-fold: false
     html-math-method: katex # displays equations
-  pdf:
-    code-line-numbers: true
-    geometry: 
-      - top=20mm
-      - left=20mm
-  docx: 
-    reference-doc: default
 
 bibliography: references.bib
 
@@ -64,15 +57,11 @@ library(htmlwidgets) # library(leaflet) # saveWidget ; for interactive 3D plots
 #| label: workenvir
 
 rm(list=ls())
-# tsk <- "A_SDM_NEO/"
-wdpath <- "../" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
-wdwork <- paste(wdpath,"Matrices/",sep="")
-wdgraph <- paste(wdpath,"Graphiques/",sep="")
-wdres <- paste(wdpath,"Resultats/",sep="")
-# setwd("./")
+wdres <- "Resultats/"
+wdmat <- "Matrices/"
+wdgraph <- "Graphiques/"
 
 pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
-wdgraphEx<-wdgraph #paste(pc,"Copie-HD/Melting Potes/",tsk,"Graphiques/",sep="")
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
 
 etude <- "CSLN_Mars"
@@ -107,6 +96,7 @@ gaussf <- function(x,A,mu,sigma) {
   A*exp(-((x-mu)^2/(2*sigma^2))/(sigma*sqrt(2*pi)))}
 gauss2d <- function(x1,x2,A,mu1,sigma1,mu2,sigma2) {
   A*exp(-(((x1-mu1)^2/(2*sigma1^2))+((x2-mu2)^2/(2*sigma2^2))))}
+
 ```
 
 ## Load of External data and Basic Variables
@@ -116,7 +106,7 @@ gauss2d <- function(x1,x2,A,mu1,sigma1,mu2,sigma2) {
 ```{r}
 #| label: externdata
 
-rdatain <- sprintf("%s%s_BDD.RData",wdwork,etude)
+rdatain <- sprintf("%s%s_BDD.RData",wdmat,etude)
 load(rdatain)
 ```
 
@@ -126,7 +116,7 @@ load(rdatain)
 #| label: outfiles
 
 binderout <- sprintf("%sCSLN_BDD.xlsx",wdres)
-rdataout  <- sprintf("%s%s_nlRQ_BDD.RData",wdwork,etude)
+rdataout  <- sprintf("%s%s_nlRQ_BDD.RData",wdmat,etude)
 # if exists
 # load(rdataout)
 ```
@@ -212,7 +202,7 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
           
           xt<-paste("Gaussian",x1t,sep=' '); 
           xl<-paste("Gaussian",x1l,sep=' ')
-          subtitleG <- sprintf("%s vs %s",yl,xl)
+          subtitleG <- sprintf("%s vs %s",yl,x1l)
           
           # RQ calculation with error management ----
           modelq_t <-vector("list", length(taus))
@@ -303,12 +293,13 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
             geom_point(col=colSum[2],size=1) +
             geom_line(col=colSum[2],linewidth=.5, alpha=0.8) +
             facet_wrap(~Var,scales="free") +
-            labs(title = titleG,subtitle = subtitleG); #print(sm_plot_list[[sdmname]])
-          ggsave(sprintf("%s%s/%s/nlRQ1/%s_%s_nlRQ1_sm_%s_%s_%s.tiff",
-                         wdgraph,speciesMP$SPCourt[sp],
-                         analysis,etude,speciesMP$SPCourt[sp],
-                         saison[sa,2],yt,x1t),
-                 plot = sm_plot_list[[sdmname]], width = 12, height = 6, dpi=600)
+            labs(title = titleG,subtitle = subtitleG)
+          # ggsave(sprintf("%s%s/%s/nlRQ1/%s_%s_nlRQ1_sm_%s_%s_%s.tiff",
+          #                wdgraph,speciesMP$SPCourt[sp],
+          #                analysis,etude,speciesMP$SPCourt[sp],
+          #                saison[sa,2],yt,x1t),
+          #        plot = sm_plot_list[[sdmname]], 
+          #        width = 12, height = 6, dpi=400)
           # QQPLOT RESIDUALS OF RQ MODEL
           qqres_plot_list[[sdmname]] <- ggplot(rqResid_t, 
                                                aes(sample=residuals, 
@@ -317,14 +308,15 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
             facet_wrap(~tau) +
             Scalc_rq() +
             theme(legend.position="bottom")+
-            labs(title=titleG,
-                 subtitle=paste("Residuals for ",subtitleG,sep=""),
-                 color="Quantile"); #print(qqres_plot_list[[sdmname]])
-          ggsave(sprintf("%s%s/%s/nlRQ1/%s_%s_nlRQ1Resid_%s_%s_%s.tiff",
-                         wdgraph,speciesMP$SPCourt[sp],
-                         analysis,etude,speciesMP$SPCourt[sp],
-                         saison[sa,2],yt,x1t),
-                 plot = qqres_plot_list[[sdmname]], width = 12, height = 8, dpi=600)
+            labs(title=paste("Residuals for ",titleG,sep=""),
+                   subtitle=subtitleG,
+                   color="Quantile")
+            # ggsave(sprintf("%s%s/%s/RQ1/%s_%s_RQ1Resid_%s_%s_%s.tiff",
+            #                wdgraph,speciesMP$SPCourt[sp],
+            #                analysis,etude,speciesMP$SPCourt[sp],
+            #                saison[sa,2],yt,x1t),
+            #        plot = qqres_plot_list[[sdmname]], 
+            #        width = 12, height = 8, dpi=400)
           
           # RQ GRAPHS
           dp_plot_list[[sdmname]] <- ggplot(dfrq, aes(x=x1, y=y)) + 
@@ -334,7 +326,7 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
             stat_function(fun=gaussf,color=colIC,
                           linetype = "dotted",size=1,args=lci) +
             labs(title=titleG,
-                 x=paste(x1l," (",pred_red[k,3],")",sep=""),
+                 x=x1l,
                  y=yl,
                  color=zt)
           for (t in 1:length(taus)){ # required to have diff color for rq lines
@@ -350,11 +342,12 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
                        colour=colRQ[t],size=4,fontface=2,hjust=0, 
                        label = paste(taus[t]))
           } # print(dp_plot_list[[sdmname]])
-          ggsave(sprintf("%s%s/%s/nlRQ1/%s_%s_nlRQ1_%s_%s_%s.tiff",
-                         wdgraph,speciesMP$SPCourt[sp],
-                         analysis,etude,speciesMP$SPCourt[sp],
-                         saison[sa,2],yt,x1t),
-                 plot = dp_plot_list[[sdmname]], width = 8, height = 8, dpi=600)
+          # ggsave(sprintf("%s%s/%s/nlRQ1/%s_%s_nlRQ1_%s_%s_%s.tiff",
+          #                wdgraph,speciesMP$SPCourt[sp],
+          #                analysis,etude,speciesMP$SPCourt[sp],
+          #                saison[sa,2],yt,x1t),
+          #        plot = dp_plot_list[[sdmname]], 
+          #        width = 8, height = 8, dpi=400)
           # ----
  
           # TWO FACTORS LOOP ----
@@ -393,7 +386,7 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
             
             xt<-paste("Gaussian",x1t,"&",x2t,sep=' ')
             xl<-paste("Gaussian",x1l,"&",x2l,sep=' ')
-            subtitleG <- sprintf("%s vs %s",yl,xl)
+            subtitleG <- sprintf("%s vs %s & %s",yl,x1l,x2l)
             
             # RQ calculation with error management
             modelq_t <-vector("list", length(taus))
@@ -492,12 +485,12 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
               geom_line(col=colSum[2],linewidth=.5, alpha=0.8) +
               facet_wrap(~Var,scales="free") +
               labs(title = titleG,subtitle = subtitleG); #sm_plot_list
-            ggsave(sprintf("%s%s/%s/nlRQ2/%s_%s_nlRQ2_sm_%s_%s_%s_%s.tiff",
-                           wdgraph,speciesMP$SPCourt[sp],
-                           analysis,etude,speciesMP$SPCourt[sp],
-                           saison[sa,2],yt,x1t,x2t),
-                   plot = sm_plot_list[[sdmname]], 
-                   width = 12, height = 6, dpi=600)
+            # ggsave(sprintf("%s%s/%s/nlRQ2/%s_%s_nlRQ2_sm_%s_%s_%s_%s.tiff",
+            #                wdgraph,speciesMP$SPCourt[sp],
+            #                analysis,etude,speciesMP$SPCourt[sp],
+            #                saison[sa,2],yt,x1t,x2t),
+            #        plot = sm_plot_list[[sdmname]], 
+            #        width = 12, height = 6, dpi=400)
             # QQPLOT RESIDUALS OF RQ MODEL
             qqres_plot_list[[sdmname]] <- ggplot(rqResid_t, 
                                                  aes(sample=residuals, 
@@ -506,15 +499,15 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
               facet_wrap(~tau) +
               Scalc_rq() +
               theme(legend.position="bottom")+
-              labs(title=titleG,
-                   subtitle=paste("Residuals for ",subtitleG,sep=""),
-                   color="Quantile"); #qqres_plot_list
-            ggsave(sprintf("%s%s/%s/nlRQ2/%s_%s_nlRQ2Resid_%s_%s_%s_%s.tiff",
-                           wdgraph,speciesMP$SPCourt[sp],
-                           analysis,etude,speciesMP$SPCourt[sp],
-                           saison[sa,2],yt,x1t,x2t),
-                   plot = qqres_plot_list[[sdmname]], 
-                   width = 12, height = 8, dpi=600)
+              labs(title=paste("Residuals for ",titleG,sep=""),
+                   subtitle=subtitleG,
+                   color="Quantile")
+            # ggsave(sprintf("%s%s/%s/RQ1/%s_%s_RQ1Resid_%s_%s_%s.tiff",
+            #                wdgraph,speciesMP$SPCourt[sp],
+            #                analysis,etude,speciesMP$SPCourt[sp],
+            #                saison[sa,2],yt,x1t),
+            #        plot = qqres_plot_list[[sdmname]], 
+            #        width = 12, height = 8, dpi=400)
             
             # RQ GRAPHS
             # 2D static graphic : RASTER
@@ -535,7 +528,8 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
                            wdgraph,speciesMP$SPCourt[sp],
                            analysis,etude,speciesMP$SPCourt[sp],
                            saison[sa,2],yt,x1t,x2t),
-                   plot = dp2dF_plot_list[[sdmname]], width = 10, height = 7, dpi=600)
+                   plot = dp2dF_plot_list[[sdmname]], 
+                   width = 10, height = 7, dpi=400)
             
             # Experimental points on 3D graphic
             # define standard layout scene
@@ -583,35 +577,29 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
                 Scalf_rq2d()#; print(dp2dF_plot_list[[sdmname]])
  
               dp3d_plot_t[[t]] <- plot_ly(showlegend=F, 
-                                   scene=paste("scene",t,sep="")) %>% 
-                add_surface(x = gridx1x2mat[["x"]], 
-                            y = gridx1x2mat[["y"]], 
+                                   scene=paste0("scene",t)) %>% 
+                add_surface(x = gridx1x2mat[["x"]], y = gridx1x2mat[["y"]], 
                             z = RqMod_mat,
                             opacity = 0.9, 
                             colorscale = list(c(0,1),c(blank,colRQ[t])),
                             colorbar=list(title=list(
                               text=paste("SDM-NEO\n",reponse[rep,3],"\nTau=",
                                          taus[t],sep="")))) %>%
-                add_trace(x = rqsup$x1, 
-                          y = rqsup$x2, 
-                          z = rqsup$y, 
+                add_trace(x = rqsup$x1, y = rqsup$x2, z = rqsup$y, 
                           mode = "markers", type = "scatter3d",
                           marker = list(size = 2, color = colOutliers, 
                                         opacity = 0.5, symbol = "diamond")) %>%
-                add_trace(x = rqinf$x1, 
-                          y = rqinf$x2, 
-                          z = rqinf$y, 
+                add_trace(x = rqinf$x1, y = rqinf$x2, z = rqinf$y, 
                           mode = "markers", type = "scatter3d",
                           marker = list(size = 2, color = colInliers, 
                                         opacity = 0.5, symbol = "circle")) %>%
-                add_surface(x = ~gridx1x2mat[["x"]], 
-                            y = ~gridx1x2mat[["y"]],
-                            z = ~Zinit,
-                            opacity = 0.4,
-                            colorscale = list(c(0,1),c(blank,colIC)),
-                            colorbar=list(title=list(
-                              text="Initial conditions"),
-                              limits=c(0,max(Zinit)))) %>%
+                # add_surface(x = ~gridx1x2mat[["x"]], y = ~gridx1x2mat[["y"]],
+                #             z = ~Zinit,
+                #             opacity = 0.4,
+                #             colorscale = list(c(0,1),c(blank,colIC)),
+                #             colorbar=list(title=list(
+                #               text="Initial conditions"),
+                #               limits=c(0,max(Zinit)))) %>%
                 layout(title = titleG, scene = myscene)#; print(dp3d_plot_t[[t]])
               
               dp3dS_plot_list[[sdmname]] <- dp3dS_plot_list[[sdmname]] %>% 
@@ -623,23 +611,31 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
             } # taus
             dp2d_plot_list[[sdmname]] <- dp2d_plot_t
             dp3d_plot_list[[sdmname]] <- dp3d_plot_t
-
-            # scene <- list.append(myscene,domain=list(x=c(0,0.33),y=c(0,0.5)))
-            # scene2 <- list.append(myscene,domain=list(x=c(0.34,0.66),y=c(0,0.5)))
-            # scene3 <- list.append(myscene,domain=list(x=c(0.67,1),y=c(0,0.5)))
-            # scene4 <- list.append(myscene,domain=list(x=c(0,0.33),y=c(0.5,1)))
-            # scene5 <- list.append(myscene,domain=list(x=c(0.34,0.66),y=c(0.5,1)))
-            # scene6 <- list.append(myscene,domain=list(x=c(0.67,1),y=c(0.5,1)))
-            # dp3dF_plot_list[[sdmname]] <- plotly::subplot(dp3d_plot_t, 
-            #                       shareX = TRUE, shareY = TRUE, nrows = 2) %>%
-            #   layout(scene = scene, scene2 = scene2, scene3 = scene3, 
-            #          scene4 = scene4, scene5 = scene5, scene6 = scene6)
-            # saveWidget(dp3dF_plot_list,
-            #            sprintf("%s%s/%s/nlRQ2/%s_%s_nlRQ23dFacet_%s_%s_%s_%s.html",
-            #                    wdgraphEx,speciesMP$SPCourt[sp],
-            #                    analysis,etude,speciesMP$SPCourt[sp],
-            #                    saison[sa,2],yt,x1t,x2t),
-            #            selfcontained = F, libdir = "lib")
+            
+            nnrow<-2
+            nncol<-ceiling(length(taus)/nnrow)
+            nly <- seq(from=0,to=1,length.out=nnrow+1)
+            nlx <- seq(from=0,to=1,length.out=nncol+1)
+            nlx<-matrix(rep(cbind(nlx[1:nncol],nlx[2:(nncol+1)]),nncol),
+                        ncol = 2,byrow = TRUE)
+            nly<-cbind(rep(nly[1:nnrow],rep(nnrow,nnrow)),
+                       rep(nly[2:(nnrow+1)],rep(nnrow,nnrow)))
+            
+            scene1 <- list.append(myscene,domain=list(x=nlx[1,],y=nly[1,]))
+            scene2 <- list.append(myscene,domain=list(x=nlx[2,],y=nly[2,]))
+            scene3 <- list.append(myscene,domain=list(x=nlx[3,],y=nly[3,]))
+            scene4 <- list.append(myscene,domain=list(x=nlx[4,],y=nly[4,]))
+            # scene5 <- list.append(myscene,domain=list(x=nlx[5,],y=nly[5,]))
+            # scene6 <- list.append(myscene,domain=list(x=nlx[6,],y=nly[6,]))
+            dp3dF_plot_list[[sdmname]] <- plotly::subplot(dp3d_plot_t) %>%
+              layout(scene = scene1, scene2 = scene2, 
+                     scene3 = scene3, scene4 = scene4) #, scene5 = scene5, scene6 = scene6
+            saveWidget(dp3dF_plot_list[[sdmname]],
+                       sprintf("%s%s/%s/nlRQ2/%s_%s_nlRQ23dFacet_%s_%s_%s_%s.html",
+                               wdgraph,speciesMP$SPCourt[sp],
+                               analysis,etude,speciesMP$SPCourt[sp],
+                               saison[sa,2],yt,x1t,x2t),
+                       selfcontained = F, libdir = "lib")
             
             # 3D plot with all taus models surface
             dp3dS_plot_list[[sdmname]] <- dp3dS_plot_list[[sdmname]] %>% 
@@ -657,17 +653,122 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
                           opacity = 0.4,
                           colorscale = list(c(0,1),c(blank,colIC)),
                           colorbar=list(title=list(text="Initial conditions"),
-                                        limits=c(0,max(Zinit)))) %>%
-              hide_colorbar()
+                                        limits=c(0,max(Zinit)))) #%>%
+              # hide_colorbar()
             saveWidget(dp3dS_plot_list[[sdmname]],
                        sprintf("%s%s/%s/nlRQ2/%s_%s_nlRQ23dStack_%s_%s_%s_%s.html",
-                               wdgraphEx,speciesMP$SPCourt[sp],
+                               wdgraph,speciesMP$SPCourt[sp],
                                analysis,etude,speciesMP$SPCourt[sp],
                                saison[sa,2],yt,x1t,x2t),
                        selfcontained = F, libdir = "lib")
             
           } # two factors loop ----
         } # explo
+        # FACET ALL MODEL
+        dp_plot <- dp_plot_list[grep(sprintf("_%g%g%g",sp,sa,rep),
+                                     names(dp_plot_list))]
+        dp_plot <- lapply(dp_plot, function(x){
+          x + theme(plot.title = element_blank(),
+                    axis.title.y = element_blank(),
+                    text = element_text(size = 12))})
+        dp_plot <- ggarrange(plotlist = dp_plot,
+                               ncol=3, nrow=length(names(dp_plot))/3,
+                               labels="AUTO",legend="bottom",
+                               common.legend = TRUE)
+        dp_plot <- annotate_figure(dp_plot,
+                top = text_grob(titleG, size=18),
+                left = text_grob(yt, rot = 90)) +
+        bgcolor("white")
+        ggsave(sprintf("%s%s/%s/nlRQ1/%s_%s_nlRQ1_%s_%s.tiff",
+                     wdgraph,speciesMP$SPCourt[sp],
+                     analysis,etude,speciesMP$SPCourt[sp],
+                     saison[sa,2],yt),
+             plot = dp_plot,
+             width = 16, height = 8, dpi=400)
+        # FACET RESIDUALS
+        dp_plot <- qqres_plot_list[grep(sprintf("1_%g%g%g",sp,sa,rep),
+                                     names(qqres_plot_list))]
+        dp_plot <- lapply(dp_plot, function(x){
+          x + theme(plot.title = element_blank(),
+                    axis.title.y = element_blank(),
+                    text = element_text(size = 12))})
+        dp_plot <- ggarrange(plotlist = dp_plot,
+                               ncol=3, nrow=length(names(dp_plot))/3,
+                               labels="AUTO",legend="bottom",
+                               common.legend = TRUE)
+        dp_plot <- annotate_figure(dp_plot,
+                top = text_grob(titleG, size=18),
+                left = text_grob(yt, rot = 90)) +
+        bgcolor("white")
+        ggsave(sprintf("%s%s/%s/nlRQ1/%s_%s_nlRQ1Resid_%s_%s.tiff",
+                     wdgraph,speciesMP$SPCourt[sp],
+                     analysis,etude,speciesMP$SPCourt[sp],
+                     saison[sa,2],yt),
+             plot = dp_plot,
+             width = 18, height = 12, dpi=400)
+        
+        dp_plot <- qqres_plot_list[grep(sprintf("2_%g%g%g",sp,sa,rep),
+                                     names(qqres_plot_list))]
+        dp_plot <- lapply(dp_plot, function(x){
+          x + theme(plot.title = element_blank(),
+                    axis.title.y = element_blank(),
+                    text = element_text(size = 12))})
+        dp_plot <- ggarrange(plotlist = dp_plot,
+                               ncol=3, nrow=length(names(dp_plot))/3,
+                               labels="AUTO",legend="bottom",
+                               common.legend = TRUE)
+        dp_plot <- annotate_figure(dp_plot,
+                top = text_grob(titleG, size=18),
+                left = text_grob(yt, rot = 90)) +
+        bgcolor("white")
+        ggsave(sprintf("%s%s/%s/nlRQ2/%s_%s_nlRQ2Resid_%s_%s.tiff",
+                     wdgraph,speciesMP$SPCourt[sp],
+                     analysis,etude,speciesMP$SPCourt[sp],
+                     saison[sa,2],yt),
+             plot = dp_plot,
+             width = 18, height = 12, dpi=400)
+        # FACET SUMMARY
+        dp_plot <- sm_plot_list[grep(sprintf("1_%g%g%g",sp,sa,rep),
+                                     names(sm_plot_list))]
+        dp_plot <- lapply(dp_plot, function(x){
+          x + theme(plot.title = element_blank(),
+                    axis.title.y = element_blank(),
+                    text = element_text(size = 12))})
+        dp_plot <- ggarrange(plotlist = dp_plot,
+                               ncol=3, nrow=length(names(dp_plot))/3,
+                               labels="AUTO",legend="bottom",
+                               common.legend = TRUE)
+        dp_plot <- annotate_figure(dp_plot,
+                top = text_grob(titleG, size=18),
+                left = text_grob(yt, rot = 90)) +
+        bgcolor("white")
+        ggsave(sprintf("%s%s/%s/nlRQ1/%s_%s_nlRQ1_sm_%s_%s.tiff",
+                     wdgraph,speciesMP$SPCourt[sp],
+                     analysis,etude,speciesMP$SPCourt[sp],
+                     saison[sa,2],yt),
+             plot = dp_plot,
+             width = 18, height = 12, dpi=400)
+        
+        dp_plot <- sm_plot_list[grep(sprintf("2_%g%g%g",sp,sa,rep),
+                                     names(sm_plot_list))]
+        dp_plot <- lapply(dp_plot, function(x){
+          x + theme(plot.title = element_blank(),
+                    axis.title.y = element_blank(),
+                    text = element_text(size = 12))})
+        dp_plot <- ggarrange(plotlist = dp_plot,
+                               ncol=3, nrow=length(names(dp_plot))/3,
+                               labels="AUTO",legend="bottom",
+                               common.legend = TRUE)
+        dp_plot <- annotate_figure(dp_plot,
+                top = text_grob(titleG, size=18),
+                left = text_grob(yt, rot = 90)) +
+        bgcolor("white")
+        ggsave(sprintf("%s%s/%s/nlRQ2/%s_%s_nlRQ2_sm_%s_%s.tiff",
+                     wdgraph,speciesMP$SPCourt[sp],
+                     analysis,etude,speciesMP$SPCourt[sp],
+                     saison[sa,2],yt),
+             plot = dp_plot,
+             width = 18, height = 12, dpi=400)
       } # reponse
     } # saison
   } # species
@@ -676,20 +777,21 @@ if (choixttt==1 | choixttt==12 | choixttt==13 | choixttt==123){
   smrq_l <- smrq_t_list %>% map_dfr(., ~.)
   sdmlist_name <- unique(smrq_l$sdmname)
   # Graphic representation of model performance
-  dp_plot_list[[sdmname]]<- smrq_l %>% #filter(!str_detect(mode, "4var")) %>%
+  AIC_plot<- smrq_l %>% 
     mutate(model_desc=str_remove(predict,"Gaussian "))%>% 
     group_by(tau) %>%
     ggplot(aes(x=reorder(model_desc,-AIC),y=AIC,color = factor(tau),shape=reponse))+
     geom_point(alpha=0.8, size= 5) +
     scale_color_manual(values=colRQ) +
-    labs(title="Quantile Regression AIC scores : Linear",
+    labs(title="Quantile Regression AIC scores : Gaussian Non-linear",
          x="Model",y="AIC",color="Quantile",shape="Biologic") +
     theme(axis.text = element_text(size=10,face="bold")) +
-    coord_flip(); dp_plot_list[[sdmname]]
+    coord_flip(); AIC_plot
   ggsave(sprintf("%s%s/%s/%s_%s_nlRQ_AIC_scores.tiff",
                wdgraph,speciesMP$SPCourt[sp],
                analysis,etude,speciesMP$SPCourt[sp]), 
-         plot = dp_plot_list[[sdmname]], width = 16, height = 8, dpi=600)
+         plot = AIC_plot, 
+         width = 16, height = 8, dpi=400)
   
   # Sauvegarde des outputs ----
   rm(list=c("smrq_tmp","smrq","rqsup","rqinf","rqlim","RqMod_mat",
@@ -709,10 +811,10 @@ Rdata are saved in `rdataout`. An excel file collects data in `r binderout` , wi
 
 ```{r}
 #| label: finalsave_xls
-wb <- loadWorkbook(binderout) # addWorksheet(wb, sheetName = "rql")
-writeData(wb, sheet = "nlRQ_coeff", x = smrq_l,
-          startCol = 1, startRow = 1,withFilter = FALSE)
-saveWorkbook(wb,file=binderout, overwrite = TRUE)
+# wb <- loadWorkbook(binderout) # addWorksheet(wb, sheetName = "rql")
+# writeData(wb, sheet = "nlRQ_coeff", x = smrq_l,
+#           startCol = 1, startRow = 1,withFilter = FALSE)
+# saveWorkbook(wb,file=binderout, overwrite = TRUE)
 
 ```
 

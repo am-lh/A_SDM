@@ -11,13 +11,6 @@ format:
     self-contained: true
     code-fold: false
     html-math-method: katex # displays equations
-  pdf:
-    code-line-numbers: true
-    geometry: 
-      - top=20mm
-      - left=20mm
-  docx: 
-    reference-doc: default
 
 bibliography: references.bib
 
@@ -56,12 +49,12 @@ library(knitr)
 #| label: workenvir
 
 rm(list=ls())
-# tsk <- "A_SDM_NEO/"
-wdpath <- "../" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
-wdwork <- paste(wdpath,"Matrices/",sep="")
-wdgraph <- paste(wdpath,"Graphiques/",sep="")
-wdres <- paste(wdpath,"Resultats/",sep="")
-# setwd(paste(wdpath,"Scripts/",sep=""))
+
+wdsource <- "Sources/Faune/CSLN/"
+wdmat <- "Matrices/"
+wdgraph <- "Graphiques/"
+wdres <- "Resultats/"
+
 ```
 
 ### Graphic charter
@@ -116,7 +109,7 @@ bargraph_sd <- function(df,x,y,sd,fil,face,xlab,ylab,title,palette){
 ```{r}
 #| label: externdata
 
-rdatain <- sprintf("%sCSLN_Mars_Zone_BDD.RData",wdwork)
+rdatain <- sprintf("%sCSLN_Mars_Zone_BDD.RData",wdmat)
 load(rdatain)
 ```
 
@@ -125,7 +118,7 @@ load(rdatain)
 ```{r}
 #| label: outfiles
 
-rdataout <- sprintf("%sCSLN_Mars_Zone_BDD.RData",wdwork)
+rdataout <- sprintf("%sCSLN_Mars_Zone_BDD.RData",wdmat)
 
 ```
 

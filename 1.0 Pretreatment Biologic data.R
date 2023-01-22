@@ -15,15 +15,25 @@ options(scipen=999) # Prevents scientific display of numbers
 
 #________________________________________________________________
 # WORKING ENVIRONMENT AND LOADING OF BASIC DATA ----
-# tsk <- "A_SDM_NEO/"
-wdtask <- "./" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
-wdsource <- paste(wdtask,"Sources/Faune/CSLN/",sep="")
-wdwork <- paste(wdtask,"Matrices/",sep="")
-wdgraph <- paste(wdtask,"Graphiques/",sep="")
-wdres <- paste(wdtask,"Resultats/",sep="")
-setwd(wdtask)
-# If exists
-# load(file = paste(wdwork,"CSLN_Mars_BDD",".RData", sep=""))
+# # tsk <- "A_SDM_NEO/"
+# wdtask <- "./" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
+# wdsource <- paste(wdtask,"Sources/Faune/CSLN/",sep="")
+# wdmat <- paste(wdtask,"Matrices/",sep="")
+# wdgraph <- paste(wdtask,"Graphiques/",sep="")
+# wdres <- paste(wdtask,"Resultats/",sep="")
+# setwd(wdtask)
+# # If exists
+# # load(file = paste(wdmat,"CSLN_Mars_BDD",".RData", sep=""))
+# 
+# pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
+# wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
+# wdscript <- paste(pc,"Melting Pot/BDD/Scripts/",sep="")
+# wdmsr <- (paste(wdscript,"MSR/MSR.R",sep=""))
+
+wdsource <- "Sources/Faune/CSLN/"
+wdmat <- "Matrices/"
+wdgraph <- "Graphiques/"
+wdres <- "Resultats/"
 
 pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
@@ -45,7 +55,7 @@ predictMNT <- data.frame(pvar=c("moyenneMu","modeMu","medianeMu","siltsArgiles",
 fauna_file <- paste(wdsource,"CSLN_Biology_source.xlsx",sep="")
 CSLN_raw <- as.data.frame(read_excel(fauna_file,sheet = "Biology_station", na = ""))
 granulo <- as.data.frame(read_excel(fauna_file,sheet = "Granulo", na = ""))
-BioturbP <- as.data.frame(read_excel(paste(wdtask,"Sources/Faune/","Bioturbation _Potential.xlsx",sep=""),sheet = "Bioturbation _Potential", na = "")) 
+BioturbP <- as.data.frame(read_excel(paste("Sources/Faune/","Bioturbation _Potential.xlsx",sep=""),sheet = "Bioturbation _Potential", na = "")) 
 speciesList <-BioturbP %>% select(SPCourt,ScientificName_accepted) %>% rename(Taxon_SNa=ScientificName_accepted)
 speciesMP <- speciesList %>% filter(SPCourt %in% c("CERED","CORVO","HEDDI","MACBA","PERUL","SCRPL"))
 speciesBonus <-speciesList %>% 
@@ -252,7 +262,7 @@ CSLN_mud <- CSLN %>%
   filter(grepl("Mudflat", Zone)) # focus on mudflat only
 
 #_BREAK_SAVE_________________________________________________----
-# save.image(file = paste(wdwork,"CSLN_Mars_BDD",".RData", sep=""))
+# save.image(file = paste(wdmat,"CSLN_Mars_BDD",".RData", sep=""))
 # load(file = "C:/Users/lehuen201/Nextcloud/Melting Pot/BDD/A_SDM_NEO/Matrices/CSLN_Mars_BDD.RData")
 
 #________________________________________________________________
@@ -334,7 +344,7 @@ CSLN_cont_name<-data.frame(code=row.names(CSLN_cont_mat))  %>%
   # unite("ZTPA",Zone,Tidal_level,Period,Annee,sep = "_",remove = FALSE)# %>%
   # unite("ZTPS",Zone,Tidal_level,Period,Season,sep = "_",remove = FALSE)
 
-# save.image(file = paste(wdwork,"CSLN_Mars_BDD",".RData", sep=""))
+# save.image(file = paste(wdmat,"CSLN_Mars_BDD",".RData", sep=""))
   
 # _______________________________________________________________
 # OUTPUT SAVE ----
@@ -349,7 +359,7 @@ CSLN_cont_name<-data.frame(code=row.names(CSLN_cont_mat))  %>%
   writeData(wb, sheet = "Species", x = speciesList, startCol = 1, startRow = 1,withFilter = FALSE)
   saveWorkbook(wb,file=paste(wdres,"CSLN_BDD",".xlsx", sep=""), overwrite = TRUE)
 
-  save.image(file = paste(wdwork,"CSLN_Mars_BDD",".RData", sep=""))
+  save.image(file = paste(wdmat,"CSLN_Mars_BDD",".RData", sep=""))
   
   write.csv(CSLN_Stations,file=paste(wdres,"CSLN_Stations", ".csv",sep=""), na = "",row.names = FALSE)
   

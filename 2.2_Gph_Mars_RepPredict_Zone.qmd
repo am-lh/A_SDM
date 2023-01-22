@@ -11,13 +11,6 @@ format:
     self-contained: true
     code-fold: false
     html-math-method: katex # displays equations
-  pdf:
-    code-line-numbers: true
-    geometry: 
-      - top=20mm
-      - left=20mm
-  docx: 
-    reference-doc: default
 
 bibliography: references.bib
 
@@ -43,7 +36,7 @@ execute:
 #| code-summary: "Packages"
 
 library(tidyverse); library(beepr) 
-library(ggExtra); library(gridExtra) # ;ggMarginal; grid.arrange # for the scatterhist home made only
+library(ggExtra); # grid.arrange to be replaced
 library(ggpubr); # ggscatterhist
 library(GGally); library(RColorBrewer); library(wesanderson)
 library(knitr)
@@ -55,11 +48,12 @@ library(knitr)
 #| label: workenvir
 
 rm(list=ls())
-wdpath <- "../" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
-wdwork <- paste(wdpath,"Matrices/",sep="")
-wdgraph <- paste(wdpath,"Graphiques/",sep="")
-wdres <- paste(wdpath,"Resultats/",sep="")
-# setwd(wdpath)
+
+wdsource <- "Sources/Faune/CSLN/"
+wdmat <- "Matrices/"
+wdgraph <- "Graphiques/"
+wdres <- "Resultats/"
+
 ```
 
 ### Graphic charter
@@ -80,27 +74,6 @@ Scale_fill <- function(x) {scale_fill_manual(values=colDarj(x))}
 
 ```{r}
 #| label: functmade
-
-# Scatter plot colored by groups ("Species")
-ggscatterhist<-function (df, x = x, y = y,color = z,
-                         title=title, ylab = ylab, xlab = xlab,
-                         palette = palette,legend = legend){
-    pmain <- ggplot(df, aes(x = .data[[x]], y = .data[[y]], color = .data[[z]]))+
-                    geom_point()+
-                    labs(title=title,x=xlab, y=ylab) +
-                    scale_fill_manual(values=palette)+
-                    theme(legend.position=legend,legend.title = element_blank())+
-                    theme_bw()
-    pmain<-ggMarginal(pmain, groupColour = TRUE, groupFill = TRUE)
-      # xbox <- axis_canvas(pmain, axis = "x", coord_flip = TRUE) +
-      #   geom_density(df, aes_string(x = x, color = z)) 
-      # ybox <- axis_canvas(pmain, axis = "y") +
-      #   geom_density(df, aes_string(x =  y, color = z)) +
-      #   coord_flip()
-      # p1 <- insert_xaxis_grob(pmain, xbox, grid::unit(2, "in"), position = "top")
-      # p2 <- insert_yaxis_grob(p1, ybox, grid::unit(2, "in"), position = "right")
-      # ggdraw(p2)
-}
 
 # ggpairs custom colors on corr
 corr_col <- function(data, mapping, method="p", use="pairwise", ...){
@@ -131,7 +104,7 @@ corr_col <- function(data, mapping, method="p", use="pairwise", ...){
 ```{r}
 #| label: externdata
 
-rdatain <- sprintf("%sCSLN_Mars_Zone_BDD.RData",wdwork)
+rdatain <- sprintf("%sCSLN_Mars_Zone_BDD.RData",wdmat)
 load(rdatain)
 ```
 
@@ -140,7 +113,7 @@ load(rdatain)
 ```{r}
 #| label: outfiles
 
-rdataout <- sprintf("%sCSLN_Mars_Zone_BDD.RData",wdwork)
+rdataout <- sprintf("%sCSLN_Mars_Zone_BDD.RData",wdmat)
 
 ```
 
@@ -223,7 +196,7 @@ for (pre in pred){ # pre=1
 }
 if (length(pred)>1 ){
     titreG <- paste("Mars3D Data Density", " - ", prgm, sep="")
-    nncol = 3; nnrow=ceiling(nrow(predict)/nncol)
+    nncol <- 3; nnrow<-ceiling(nrow(predict)/nncol)
     dp <- ggarrange(plotlist=mlist, ncol=nncol, nrow=nnrow, labels="AUTO",legend="bottom",common.legend = TRUE)#
     dp <- annotate_figure(dp, top = text_grob(titreG, face = "bold", size = 14))+bgcolor("white"); dp
     ggsave(paste(wdgraph,etude,"_GphR_Mars3D","_Density",".png",sep=""), plot = dp, width = 12, height = 12)
@@ -263,7 +236,7 @@ if (length(pred)>1 ){
         }
         if (length(pred)>1 ){
             titreG <- paste(predict$Couche[pre]," Data for ",speciesMP$Taxon_SNa[sp]," in ",saison[sa,2], " - ", prgm, sep="")
-            nncol = 3; nnrow=ceiling(nrow(predict)/CSLN_unique$Zone)
+            nncol <- 3; nnrow<-ceiling(nrow(predict)/CSLN_unique$Zone)
             dp <- grid.arrange(grobs=mlist, ncol=CSLN_unique$Zone)
             # dp <- ggarrange(plotlist=mlist, ncol=nncol, nrow=nnrow, labels="AUTO",legend="bottom",common.legend = TRUE) #
             # METTRE LA GESTION DE LA LEGENDE DES COULEURS A TROUVER
@@ -303,7 +276,7 @@ for (pre in 1:nrow(predictMNT)){ #
 }
 if (nrow(predictMNT)>1 ){
   titreG <- paste("MNT Data Density", " - ", prgm, sep="")
-  nncol = 3; nnrow=ceiling(nrow(predictMNT)/nncol)
+  nncol <- 3; nnrow<-ceiling(nrow(predictMNT)/nncol)
   dp <- ggarrange(plotlist=mlist, ncol=nncol, nrow=nnrow, labels="AUTO",legend="bottom",common.legend = TRUE)#
   dp <- annotate_figure(dp, top = text_grob(titreG, face = "bold", size = 14))+bgcolor("white") ; dp
   ggsave(paste(wdgraph,etude,"_GphR_","MNT","_Density",".png",sep=""), plot = dp, width = 12, height = 6)
