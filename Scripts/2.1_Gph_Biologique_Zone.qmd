@@ -1,28 +1,18 @@
 ---
 title: "CREATION DE GRAPHIQUES DESCRIPTIFS DES DONNEES PROGRAMME REPONSES PREDICTEURS"
 author: "Amélie Lehuen"
-date: "2022-12-14"
 description: "add info on script"
-toc: true # table of content at beginning of document
-number-sections: true
-highlight-style: pygments
-format: 
-  html: 
-    self-contained: true
-    code-fold: false
-    html-math-method: katex # displays equations
-
-bibliography: references.bib
-
-editor: visual
+date: "`r format(Sys.time(), '%B %Y')`"
+editor: source
 execute:
   eval: true
   echo: false
   message: false
   warning: false
   output: true
-  include: true
-  cache: false 
+  include: false
+editor_options: 
+  chunk_output_type: console
 ---
 
 # CREATION DE GRAPHIQUES DESCRIPTIFS DES DONNEES PROGRAMME REPONSES PREDICTEURS
@@ -50,10 +40,10 @@ library(knitr)
 
 rm(list=ls())
 
-wdsource <- "Sources/Faune/CSLN/"
+wdsource <- "Data/Faune/CSLN/"
 wdmat <- "Matrices/"
-wdgraph <- "Graphiques/"
-wdres <- "Resultats/"
+wdgraph <- "Plots/"
+wdres <- "Results/"
 
 ```
 
@@ -158,7 +148,7 @@ dp<-CSLN %>% count(SP,SPCourt,Taxon_SNa) %>% group_by(SP) %>%
               theme_bw()
 print(dp)
 ggsave(sprintf("%s%s_Species_Occr_List20.tiff",wdgraph,etude), 
-       plot = dp, width = 10, height = 8, dpi=600)
+       plot = dp, width = 10, height = 8, dpi=400)
 
 ```
 
@@ -283,7 +273,7 @@ bp <- annotate_figure(bp,top = text_grob(titre, face = "bold", size = 14)) + #,b
 print(bp)
  
 ggsave(sprintf("%s%s %s.tiff",wdgraph,etude,titre), 
-       plot = bp, width = 10, height = 8, dpi=600)
+       plot = bp, width = 10, height = 8, dpi=400)
 
 # # GENERAL BILAN
 # CSLN_mud_sm <- CSLN_mud %>%
@@ -307,7 +297,7 @@ bp<-boxplot_amlh(CSLN_sm,CSLN_sm$Period,CSLN_sm$SR
                  colDarj(CSLN_unique$Zone))
 print(bp)
 ggsave(sprintf("%s%s %s.tiff",wdgraph,etude,titre),
-       plot = bp, width = 12, height = 6, dpi=600)
+       plot = bp, width = 12, height = 6, dpi=400)
 bp1<-bp + 
   labs(title="Specific Richness",x="",y="") + 
   theme(legend.position='none')
@@ -319,7 +309,7 @@ bp<-boxplot_amlh(CSLN_sm,CSLN_sm$Period,CSLN_sm$Pielou,
                  colDarj(CSLN_unique$Zone))
 print(bp) 
 ggsave(sprintf("%s%s %s.tiff",wdgraph,etude,titre), 
-       plot = bp, width = 12, height = 6, dpi=600)
+       plot = bp, width = 12, height = 6, dpi=400)
 bp2<-bp + 
   labs(title="Index of Equitability",x="",y="") + 
   theme(legend.position='none')
@@ -333,7 +323,7 @@ bp<-boxplot_amlh(CSLN_sm,CSLN_sm$Period,CSLN_sm$Biomass_t,
                 ylim(0,750)
 print(bp) 
 ggsave(sprintf("%s%s %s.tiff",wdgraph,etude,titre),
-       plot = bp, width = 12, height = 6, dpi=600)
+       plot = bp, width = 12, height = 6, dpi=400)
 bp3<-bp + 
   labs(title="Total Biomass (gAFDW/m2)",x="",y="") + 
   theme(legend.position='none')
@@ -346,7 +336,7 @@ bp<-boxplot_amlh(CSLN_sm,CSLN_sm$Period,CSLN_sm$MSRtot_t,
                  colDarj(CSLN_unique$Zone))
 print(bp) 
 ggsave(sprintf("%s%s %s.tiff",wdgraph,etude,titre),
-       plot = bp, width = 12, height = 6, dpi=600)
+       plot = bp, width = 12, height = 6, dpi=400)
 bp4<-bp + 
   labs(title="Total MSRtot (mW/m2)",x="",y="") + 
   theme(legend.position='none')
@@ -360,7 +350,7 @@ bp <- annotate_figure(bp,top = text_grob(titre, face = "bold", size = 14),
   bgcolor("white")
 print(bp)
 ggsave(sprintf("%s%s %s.tiff",wdgraph,etude,titre),
-       plot = bp, width = 15, height = 15, dpi=600)
+       plot = bp, width = 15, height = 15, dpi=400)
 
 
 ```
@@ -392,7 +382,7 @@ bp <-bargraph_sd(df,df$Period,df$SR_m,df$SR_sd,
                                    vjust=0.4,hjust=1))
 print(bp)
 ggsave(sprintf("%s%s %s.tiff",wdgraph,etude,titre), 
-       plot = bp, width = 12, height = 6, dpi=600)
+       plot = bp, width = 12, height = 6, dpi=400)
 bp1<-bp + 
   labs(title="Specific Richness",y="") + 
   theme(legend.position='none')
@@ -407,7 +397,7 @@ bp <-bargraph_sd(df,df$Period,df$Biomass_t_m,df$Biomass_t_sd,
                                  vjust=0.4,hjust=1))
 print(bp)
 ggsave(sprintf("%s%s %s.tiff",wdgraph,etude,titre),
-       plot = bp, width = 12, height = 6, dpi=600)
+       plot = bp, width = 12, height = 6, dpi=400)
 bp2<-bp + 
   labs(title="Total Biomass (gAFDW/m2)",y="") + 
   theme(legend.position='none')
@@ -422,7 +412,7 @@ bp <-bargraph_sd(df,df$Period,df$Pielou_m,df$Pielou_sd,
                                  vjust=0.4,hjust=1))
 print(bp)
 ggsave(sprintf("%s%s %s.tiff",wdgraph,etude,titre),
-       plot = bp, width = 12, height = 6, dpi=600)
+       plot = bp, width = 12, height = 6, dpi=400)
 bp3<-bp + 
   labs(title="Index of Equitability",y="") + 
   theme(legend.position='none')
@@ -437,7 +427,7 @@ bp <-bargraph_sd(df,df$Period,df$MSRtot_t_m,df$MSRtot_t_sd,
                                  vjust=0.4,hjust=1))
 print(bp)
 ggsave(sprintf("%s%s %s.tiff",wdgraph,etude,titre),
-       plot = bp, width = 12, height = 6, dpi=600)
+       plot = bp, width = 12, height = 6, dpi=400)
 bp4<-bp + 
   labs(title="Total MSRtot (mW/m2)",y="") + 
   theme(legend.position='none')
@@ -451,7 +441,7 @@ bp <- annotate_figure(bp,top = text_grob(titre, face = "bold", size = 14),
   bgcolor("white")
 print(bp)
 ggsave(sprintf("%s%s %s.tiff",wdgraph,etude,titre), 
-       plot = bp, width = 15, height = 15, dpi=600)
+       plot = bp, width = 15, height = 15, dpi=400)
 
 
 ```
@@ -474,7 +464,7 @@ bp<-ggplot(CSLN_mud_spm) +
   Scale_fill(CSLN_unique$Annee)
 print(bp)
 ggsave(sprintf("%s%s %s.tiff",wdgraph,etude,titre), 
-       plot = bp, width = 10, height = 10, dpi=600)
+       plot = bp, width = 10, height = 10, dpi=400)
 
 
 ```
@@ -505,7 +495,7 @@ for (sp in spe){ #sp=1
     ggsave(sprintf("%s%s/%s_Bxp_%s_%s.tiff",
                    wdgraph,speciesMP$SPCourt[sp],etude,
                    speciesMP$SPCourt[sp],y), 
-           plot = bp, width = 12, height = 6, dpi=600)
+           plot = bp, width = 12, height = 6, dpi=400)
     bp <- bp + 
       labs(title=sprintf("%s (%s)",reponse[rep,2],reponse[rep,3]), y="") +
       theme(legend.position='none')
@@ -527,7 +517,7 @@ for (sp in spe){ #sp=1
     ggsave(sprintf("%s%s/%s_Bxp_%s_Ans.tiff",
                    wdgraph,speciesMP$SPCourt[sp],
                    etude,speciesMP$SPCourt[sp]),
-           plot = bp, width = 16, height = 6, dpi=600)
+           plot = bp, width = 16, height = 6, dpi=400)
   }}
 
 ```
@@ -546,7 +536,7 @@ Boxplot des Densites moy par annee pour 1 esp avec facet
 #     scale_y_continuous(trans = "log10") + annotation_logticks(sides="lr") + 
 #     theme(axis.text.x=element_text(angle=-90, vjust=0.4,hjust=1)) +
 #     Scale_fill(CSLN_unique$Annee); bp
-#   ggsave(paste(wdgraph,speciesMP[sp,1],"/",etude,"_Bxp1Zone_",speciesMP[sp,1],"_","Density_indm2",".png",sep=""), plot = bp, width = 12, height = 6, dpi=600)
+#   ggsave(paste(wdgraph,speciesMP[sp,1],"/",etude,"_Bxp1Zone_",speciesMP[sp,1],"_","Density_indm2",".png",sep=""), plot = bp, width = 12, height = 6, dpi=400)
 # }
 
 ```
@@ -565,5 +555,27 @@ Rdata are saved in `rdataout`.
 
 beepr::beep(2)
 ```
+
+# Supplementary data
+
+## Software details
+
+::: {.callout-tip collapse="true"}
+## Expand for R Session Info
+
+```{r, echo = FALSE}
+#| include: true
+
+library(sessioninfo)
+pkg_sesh <- session_info(pkgs = "attached")
+quarto_version <- system("quarto --version", intern = TRUE)
+pkg_sesh$platform$quarto <- paste(
+  system("quarto --version", intern = TRUE),
+  "@",
+  quarto::quarto_path()
+  )
+pkg_sesh
+```
+:::
 
 # References {.unnumbered}

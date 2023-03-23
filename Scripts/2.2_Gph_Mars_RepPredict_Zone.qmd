@@ -1,28 +1,18 @@
 ---
 title: "CREATION DE GRAPHIQUES DESCRIPTIFS DES DONNEES PROGRAMME REPONSES PREDICTEURS"
 author: "Amélie Lehuen"
-date: "2022-12-14"
 description: "add info on script"
-toc: true # table of content at beginning of document
-number-sections: true
-highlight-style: pygments
-format: 
-  html: 
-    self-contained: true
-    code-fold: false
-    html-math-method: katex # displays equations
-
-bibliography: references.bib
-
-editor: visual
+date: "`r format(Sys.time(), '%B %Y')`"
+editor: source
 execute:
   eval: true
   echo: false
   message: false
   warning: false
   output: true
-  include: true
-  cache: false #create cache of results of chunks
+  include: false
+editor_options: 
+  chunk_output_type: console
 ---
 
 # CREATION DE GRAPHIQUES DESCRIPTIFS DES DONNEES PROGRAMME REPONSES PREDICTEURS
@@ -49,10 +39,10 @@ library(knitr)
 
 rm(list=ls())
 
-wdsource <- "Sources/Faune/CSLN/"
+wdsource <- "Data/Faune/CSLN/"
 wdmat <- "Matrices/"
-wdgraph <- "Graphiques/"
-wdres <- "Resultats/"
+wdgraph <- "Plots/"
+wdres <- "Results/"
 
 ```
 
@@ -153,7 +143,7 @@ for (sp in spe){ # sp=1
       #       strip.text.x = element_text(size=12,face="bold"),
       #       strip.text.y = element_text(size=10,face="bold"))
     ggsave(paste(wdgraph,speciesMP$SPCourt[sp],"/",etude,"_MatRP_",speciesMP$SPCourt[sp],saison[sa,1],".png",sep=""), 
-           plot = tp, width = 16, height = 9, dpi=600)
+           plot = tp, width = 16, height = 9, dpi=400)
     # Simple correlation matrix ----
     
     # library(ggcorrplot)
@@ -377,10 +367,34 @@ Rdata are saved in `rdataout`.
 
 ```
 
+○
+
 ```{r}
 #| label: finalsave_r
 
 beepr::beep(2)
 ```
+
+# Supplementary data
+
+## Software details
+
+::: {.callout-tip collapse="true"}
+## Expand for R Session Info
+
+```{r, echo = FALSE}
+#| include: true
+
+library(sessioninfo)
+pkg_sesh <- session_info(pkgs = "attached")
+quarto_version <- system("quarto --version", intern = TRUE)
+pkg_sesh$platform$quarto <- paste(
+  system("quarto --version", intern = TRUE),
+  "@",
+  quarto::quarto_path()
+  )
+pkg_sesh
+```
+:::
 
 # References {.unnumbered}

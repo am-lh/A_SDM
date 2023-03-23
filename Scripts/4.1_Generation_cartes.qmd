@@ -1,35 +1,18 @@
 ---
 title: "CREATION DE CARTES DU LIEU D'ETUDE ET DES RESULTATS"
 author: "Amélie Lehuen"
-date: "2022-12-14"
 description: "add info on script"
-toc: true # table of content at beginning of document
-number-sections: true
-highlight-style: pygments
-format: 
-  html: 
-    self-contained: true
-    code-fold: false
-    html-math-method: katex # displays equations
-  pdf:
-    code-line-numbers: true
-    geometry: 
-      - top=20mm
-      - left=20mm
-  docx: 
-    reference-doc: default
-
-bibliography: references.bib
-
-editor: visual
+date: "`r format(Sys.time(), '%B %Y')`"
+editor: source
 execute:
   eval: true
   echo: false
   message: false
   warning: false
   output: true
-  include: true
-  cache: false #create cache of results of chunks
+  include: false
+editor_options: 
+  chunk_output_type: console
 ---
 
 # CREATION DE CARTES DU LIEU D'ETUDE ET DES RESULTATS

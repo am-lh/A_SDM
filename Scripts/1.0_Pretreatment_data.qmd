@@ -1,20 +1,9 @@
 ---
 title: "TREATMENT OF BIOLOGIC DATA FROM CSLN BEFORE SDM TREATMENT"
 author: "Amélie Lehuen"
-date: "2022-12-14"
 description: "add info on script"
-toc: true
-number-sections: true
-highlight-style: pygments
-format: 
-  html: 
-    self-contained: true
-    code-fold: false
-    html-math-method: katex # displays equations
-
-bibliography: references.bib
-
-editor: visual
+date: "`r format(Sys.time(), '%B %Y')`"
+editor: source
 execute:
   eval: true
   echo: false
@@ -22,7 +11,8 @@ execute:
   warning: false
   output: true
   include: false
-  cache: false 
+editor_options: 
+  chunk_output_type: console
 ---
 
 # TREATMENT OF BIOLOGIC DATA FROM CSLN BEFORE SDM TREATMENT
@@ -33,15 +23,22 @@ execute:
 
 ```{r}
 #| label: load-packages
-#| code-summary: "Packages"
-#| include: false
-
+library(conflicted)
+library(knitr)
 library(readxl) ; library(openxlsx) # Edition d'un fichier Excel
+library(beepr) 
 library(tidyverse) #The toolbox indispensable
 library(vegan) # environmental data processing diversity for Shannon
 # GIS Packages
 library(sf); library(sfheaders); # st_as_sf ; sf_to_df
-library(knitr)
+
+conflict_prefer("transpose", "purrr")
+conflict_prefer("filter", "dplyr")
+conflict_prefer("select", "dplyr")
+conflict_prefer("summarise", "dplyr")
+conflict_prefer("melt", "reshape2")
+conflict_prefer("layout", "plotly")
+
 options(scipen=999) # Prevents scientific display of numbers
 ```
 
@@ -51,10 +48,11 @@ options(scipen=999) # Prevents scientific display of numbers
 #| label: workenvir
 
 rm(list=ls())
-wdsource <- "Sources/Faune/CSLN/"
-wdwork <- "Matrices/"
-wdgraph <- "Graphiques/"
-wdres <- "Resultats/"
+wdsource <- "Data/Faune/CSLN/"
+wdmat <- "Matrices/"
+wdgraph <- "C:/Users/lehuen201/Back Up AMLH/Melting Potes/BDD/A_SDM_NEO/Plots/" #"Plots/"
+wdres <- "Results/"
+wdproj<-getwd()
 
 pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
@@ -77,7 +75,6 @@ wdmsr <- (paste(wdscript,"MSR/MSR.R",sep=""))
 
 ```{r}
 #| label: externdata_fauna
-#| warning: false
 
 fauna_file <- sprintf("%sCSLN_Biology_source.xlsx",wdsource)
 CSLN_raw <- as.data.frame(read_excel(
@@ -85,8 +82,8 @@ CSLN_raw <- as.data.frame(read_excel(
 granulo <- as.data.frame(read_excel(
   fauna_file,sheet = "Granulo", na = ""))
 BioturbP <- as.data.frame(read_excel(
-  sprintf("%sSources/Faune/Bioturbation _Potential.xlsx",wdtask),
-  sheet = "Bioturbation _Potential", na = ""))
+  sprintf("%s/Data/Faune/Bioturbation_Potential.xlsx",wdproj),
+  sheet = "Bioturbation_Potential", na = ""))
 # summary(CSLN_raw)
 
 ```
@@ -95,7 +92,6 @@ BioturbP <- as.data.frame(read_excel(
 
 ```{r}
 #| label: externdata_mars
-#| warning: false
 
 mars_file <- sprintf("%sES_Ncf_BDD.xlsx",wdres)
 Varnames <- as.data.frame(read_excel(
@@ -115,7 +111,6 @@ saison[1,1] <- "" # Remplacement du NaN pour l'annee
 
 ```{r}
 #| label: externdata_gis
-#| warning: false
 
 ES_Areas <- sprintf("%sLayers made/ES_Areas_WGS.shp",wdGIS)
 ES_Areas <- st_read(ES_Areas,quiet=TRUE,crs=4326) %>%
@@ -148,9 +143,9 @@ Mars_dat_sf <- st_read(Mars_dat_sf,quiet=TRUE,crs=4326) %>%
 #| label: outfiles
 
 binderout <- sprintf("%sCSLN_BDD.xlsx", wdres)
-rdataout <- sprintf("%sCSLN_Mars_BDD.RData",wdwork)
+rdataout <- sprintf("%sCSLN_Mars_BDD.RData",wdmat)
 # if exists
-load(rdataout)
+# load(rdataout)
 
 ```
 
@@ -194,7 +189,6 @@ anMars <- unique(Mars_csv$Annee) # used for RQ scripts
 
 ```{r}
 #| label: calculation_1
-#| include : false # necessary to avoid fluffy doc
 
 CSLN <- CSLN_raw %>% 
   rename(Taxon_SNa=ScientificName_accepted)%>%
@@ -262,7 +256,6 @@ MIEUX DEFINIR LES UNITES DU CALCUL BPc ET SON USAGE DENSITE? ABONDANCE?
 
 ```{r}
 #| label: calculation_2
-#| include : false # necessary to avoid fluffy doc
 
 CSLN <-  CSLN %>% 
   left_join(BioturbP %>% 
@@ -277,7 +270,6 @@ CSLN$BPc <- sqrt(CSLN$Biomass_gAFDWm2/
 
 ```{r}
 #| label: calculation_3
-#| include : false # necessary to avoid fluffy doc
 
 # Deleting unused columns
 suppr_col <- c("Source","Site","Campagne","Jour","id_station","Taxon", #"Station_originelle",
@@ -310,7 +302,6 @@ CSLN <- CSLN %>%
 
 ```{r}
 #| label: calculation_4
-#| include : false # necessary to avoid fluffy doc
 
 # CONVERSION OF FAUNA DATA INTO GEOGRAPHIC TABLE
 CSLN_sf <- st_as_sf(CSLN, coords=c("longitude","latitude"),
@@ -364,18 +355,17 @@ Made with yearly med temperature for the moment
 
 ```{r}
 #| label: calculation_5
-#| include : false # necessary to avoid fluffy doc
 
 CSLN_Mars$MSR_mW <- NA
-setwd(wdscript) # when the package is done, with repertory in it, no more needed
+setwd(paste0(wdscript,"MSR")) # when the package is done, with repertory in it, no more needed
 source(wdmsr)
-for (i in which(!is.na(CSLN_Mars$temp_m) & CSLN_Mars$SP!="OTHER")){
+for (i in which(!is.na(CSLN_Mars$temp_m) & CSLN_Mars$SP!="OTHER")){ # i=1
   CSLN_Mars$MSR_mW[i] <- msr(CSLN_Mars$Density_indm2[i],
                            CSLN_Mars$Biomass_gAFDWm2[i],
                            CSLN_Mars$AphiaID_accepted[i],
                            CSLN_Mars$temp_m[i],1,"w")*1000 #Mean MSR (mW/ind)
 }
-# setwd(wdtask) # when the package is done, with repertory in it, no more needed
+setwd(wdproj) # when the package is done, with repertory in it, no more needed
 CSLN_Mars$MSRtot <- CSLN_Mars$MSR_mW*CSLN_Mars$Density_indm2
 
 ```
@@ -384,7 +374,6 @@ CSLN_Mars$MSRtot <- CSLN_Mars$MSR_mW*CSLN_Mars$Density_indm2
 
 ```{r}
 #| label: calculation_6
-#| include : false # necessary to avoid fluffy doc
 
 CSLN_Mars <- CSLN_Mars %>% 
   select(-all_of(c("AphiaID_accepted","sfg_id","point_id",
@@ -434,7 +423,6 @@ CSLN_pur <- CSLN_Mars # CSLN_Mars <- CSLN_pur #summary(CSLN_pur) # Save before m
 
 ```{r}
 #| label: calculation_7
-#| include : false # necessary to avoid fluffy doc
 
 CSLN <- CSLN_Mars %>%
   filter(!Zone  %in% c("Channel","Bay")) %>% # at minimum
@@ -450,8 +438,8 @@ CSLN_mud <- CSLN %>%
 
 ```{r}
 #_BREAK_SAVE_________________________________________________----
-# save.image(file = paste(wdwork,"CSLN_Mars_BDD",".RData", sep=""))
-# load(file = "C:/Users/lehuen201/Nextcloud/Melting Pot/BDD/A_SDM_NEO/Matrices/CSLN_Mars_BDD.RData")
+# save.image(file = paste0(wdmat,"CSLN_Mars_BDD.RData"))
+# load(file = "/Matrices/CSLN_Mars_BDD.RData")
 
 ```
 
@@ -459,7 +447,6 @@ CSLN_mud <- CSLN %>%
 
 ```{r}
 #| label: calculation_8
-#| include : false # necessary to avoid fluffy doc
 
 CSLN_mud_BTA <- CSLN_mud %>% # maxime
   filter(Taxon_SNa %in% speciesList$Taxon_SNa) %>%
@@ -497,7 +484,6 @@ CSLN_mud_spm <- CSLN_mud %>%
 
 ```{r}
 #| label: calculation_9
-#| include : false # necessary to avoid fluffy doc
 
 CSLN_sm <- CSLN_mud %>%
   select(Zone,Tidal_level,Period,
@@ -520,7 +506,6 @@ SPCourt alone lead to duplicate lines for pivot_wider, keep Taxon = OK
 
 ```{r}
 #| label: calculation_10
-#| include : false # necessary to avoid fluffy doc
 
 CSLN_cont <- CSLN_mud %>% 
   select(Zone,Tidal_level,Period, # Annee,Season,
@@ -548,7 +533,6 @@ Pielou's index of equitability (J ): normalization of the Shannon-Wiener index (
 
 ```{r}
 #| label: calculation_11
-#| include : false # necessary to avoid fluffy doc
 
 CSLN_sm$Shannon<-diversity(CSLN_cont_mat,index="shannon")
 CSLN_sm$Pielou<-CSLN_sm$Shannon/log2(CSLN_sm$SR)
@@ -568,8 +552,60 @@ CSLN_cont_name<-data.frame(code=row.names(CSLN_cont_mat))  %>%
   # unite("ZTPA",Zone,Tidal_level,Period,Annee,sep = "_",remove = FALSE)# %>%
   # unite("ZTPS",Zone,Tidal_level,Period,Season,sep = "_",remove = FALSE)
 
-# save.image(file = paste(wdwork,"CSLN_Mars_BDD",".RData", sep=""))
+# save.image(file = paste(wdmat,"CSLN_Mars_BDD",".RData", sep=""))
 
+```
+
+# SDM preparations
+```{r}
+Var_choosen<-c("flow_mxd","inunt","sal_dtd","temp_m","mudrate_m","tenfon_mxd")
+Mod_chosen<-list(c("flow_mxd","inunt"),
+                  c("mudrate_m","tenfon_mxd"),
+                  c("sal_dtd","temp_m"),
+                  c("inunt","temp_m"))
+taus <- c(0.5,0.9,0.95,0.975) # c(0.5,0.85,0.9,0.95,0.975,0.99) #c(1:19/20,0.975,0.99)
+taus_l<-setNames(as.list(taus),sprintf("%0.3f",taus))
+
+reponse<-reponse %>%
+  filter(rvar %in% c("Biomass_gAFDWm2","Density_indm2")) %>%
+  rowid_to_column("id") %>% 
+  mutate(whole=sprintf("%s (%s)",rdescr,runit)) %>% 
+  as.list %>% 
+  transpose(.) %>% 
+  setNames(c("Biomass","Density"))
+
+pred_red <- predict %>% 
+  subset(Var %in% Var_choosen) %>% 
+  arrange(match(Var,Var_choosen)) %>%
+  rowid_to_column("id") %>%
+  mutate(whole=sprintf("%s (%s)",Desc,Unit)) %>% 
+  as.list
+
+pred_red_comb<-map(as.list(c(1:2)), \(idx)
+  {map(pred_red,
+      ~combn(.,idx, simplify = FALSE)) %>% transpose(.)}  ) %>% 
+  setNames(paste0("x",1:2))
+
+pred_red_comb<-map2(pred_red_comb,
+                    map_depth(pred_red_comb,2,
+                              ~paste0(.x$id,collapse="")),
+                    ~setNames(.x,.y ) )
+
+pred_red_comb_sel<-map(pred_red_comb,
+      ~map(Mod_chosen, \(mod) keep(.x,~identical(.x$Var, mod)) ) ) %>% 
+  map(., compact) %>% compact %>% 
+  map(.,list_flatten) %>% 
+  list_flatten(.,name_spec= "{inner}")
+
+Mars_SDM<-Mars_dat_sf %>% 
+  select(c(NINJ,Lon,Lat,Zone,Tidal_level,Period,Annee,pred_red$Var))
+```
+
+Attention, this can take a while...
+```{r}
+Mars_SDM_per<- Mars_SDM %>% 
+               group_by(across(NINJ:Period)) %>% 
+               dplyr::summarise(across(is.numeric,~mean(.x,na.rm=TRUE)))
 ```
 
 # Final actions and save
@@ -587,7 +623,7 @@ Rdata are saved in `r rdataout`. An excel file collects data in `r binderout` , 
 
 ```{r}
 #| label: finalsave_xlsx
-#| eval; false
+#| eval: false
 wb <- loadWorkbook(paste(wdres,"CSLN_BDD",".xlsx", sep=""))
 writeData(wb, sheet = "CSLN", x = CSLN, 
           startCol = 1, startRow = 1,withFilter = FALSE)
@@ -613,9 +649,32 @@ write.csv(CSLN_Stations,file=paste(wdres,"CSLN_Stations", ".csv",sep=""), na = "
 
 ```{r}
 #| label: finalsave_r
-#| eval; false
-save.image(file = rdataout)
+#| eval: false
+save(list=(ls()),
+     file = paste0(rdataout))
 beepr::beep(2)
 ```
+
+# Supplementary data
+
+## Software details
+
+::: {.callout-tip collapse="true"}
+## Expand for R Session Info
+
+```{r, echo = FALSE}
+#| include: true
+
+library(sessioninfo)
+pkg_sesh <- session_info(pkgs = "attached")
+quarto_version <- system("quarto --version", intern = TRUE)
+pkg_sesh$platform$quarto <- paste(
+  system("quarto --version", intern = TRUE),
+  "@",
+  quarto::quarto_path()
+  )
+pkg_sesh
+```
+:::
 
 # References {.unnumbered}

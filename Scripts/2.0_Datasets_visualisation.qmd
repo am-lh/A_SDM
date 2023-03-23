@@ -1,0 +1,465 @@
+---
+title: "TREATMENT OF BIOLOGIC DATA FROM CSLN BEFORE SDM TREATMENT"
+author: "Amélie Lehuen"
+description: "add info on script"
+date: "`r format(Sys.time(), '%B %Y')`"
+editor: source
+execute:
+  eval: true
+  echo: false
+  message: false
+  warning: false
+  output: true
+  include: false
+editor_options: 
+  chunk_output_type: console
+---
+
+# TREATMENT OF BIOLOGIC DATA FROM CSLN BEFORE SDM TREATMENT
+
+## Script preparation
+
+### Packages
+
+```{r}
+#| label: load-packages
+
+library(readxl) ; library(openxlsx) # Edition d'un fichier Excel
+library(knitr)
+library(tidyverse) #The tooltm_box indispensable
+library(reshape2); library(rlist) # the one; melt; list.append
+library(data.table)
+library(rstatix); library(Hmisc)  # corr and pvalue calculation
+
+library(ggpubr); #library(GGally); # stat_compare_means ;
+library(scales); library(RColorBrewer); library(wesanderson); library(grafify); library(colorspace); library(ggsci)# show_col and colors colors colors!
+library(patchwork)
+library(ggridges)
+# GIS Packages
+library(sf); library(sfheaders); # st_as_sf ; sf_to_df
+library(tmap); library(tmaptools)
+library(htmlwidgets) # library(leaflet) # saveWidget ; for interactive maps
+library(introdataviz) # geom_split_violin # devtools::install_github("psyteachr/introdataviz")
+
+conflict_prefer("transpose", "purrr")
+conflict_prefer("filter", "dplyr")
+conflict_prefer("select", "dplyr")
+conflict_prefer("summarise", "dplyr")
+conflict_prefer("melt", "reshape2")
+conflict_prefer("layout", "plotly")
+
+options(scipen=999) # Prevents scientific display of numbers
+```
+
+### Working Environment
+
+```{r}
+#| label: workenvir
+
+rm(list=ls())
+wdsource <- "Data/Faune/CSLN/"
+wdmat <- "Matrices/"
+wdgraph <- "C:/Users/lehuen201/Back Up AMLH/Melting Potes/BDD/A_SDM_NEO/Plots/" #"Plots/"
+wdres <- "Results/"
+wdproj<-getwd()
+pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
+wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
+
+```
+
+### Definition of the graphic charter
+
+```{r}
+#| label: graphchart
+theme_set(theme_bw(base_size = 14)) # theme_gray() theme_bw() theme_light()
+colDarj <- function(x) {wes_palette("Darjeeling2",x, type = "continuous")}
+colZiss <- function(x) {wes_palette("Zissou1",x, type = "continuous")}
+colSpec <- colorRampPalette(brewer.pal(8, "Spectral")); # show_col(colSpec(2))
+colDark <- colorRampPalette(brewer.pal(8, "Dark2"));
+# Scale_col <- function(x) {scale_colour_manual(values=colDarj(x))}
+# Scale_fill <- function(x) {scale_fill_manual(values=colDarj(x))}
+
+pal_cspx <- function(x) {divergingx_hcl(x,palette = "Zissou 1")};
+colBin<-c(pal_cspx(6)[3],pal_cspx(6)[5]); 
+colRQ<-pal_cspx(4); blank<-alpha("#dae8ed",0.1); # show_col(colBin)
+Scalc_rq<- function() {scale_colour_manual(values=colRQ)}
+Scalf_rq2d <- function() {scale_fill_gradientn(colours=colRQ)} 
+pal_cspx <- function(x) {divergingx_hcl(x,palette = "Zissou 1")}; # show_col(pal_cspx(6)) # colorspace
+Scale_brew <- function()
+  {scale_colour_brewer(palette="Spectral",aesthetics=c("colour","fill"))}
+Scale_co <- function() 
+  {scale_colour_manual(palette=colorRampPalette(brewer.pal(11, "Spectral")))}
+Scale_fi <- function() 
+  {scale_fill_manual(palette=colorRampPalette(brewer.pal(11, "Spectral")))}
+
+pal_ggscc <- pal_material("teal"); # show_col(pal_ggscc(9)) # ggsci
+colSum <- c(pal_ggscc(9)[3],pal_ggscc(9)[7],pal_ggscc(9)[1]) # show_col(colSum)
+colInliers<-pal_material("teal")(10)[5] ; colOutliers = pal_material("deep-orange")(10)[5] # show_col(colOutliers)
+Scalc_misc <- function() {scale_color_discrete_diverging(palette = "Blue-Red 3")}
+Scale_map<- function() {scale_fill_distiller(palette = "Spectral")}
+```
+
+### Home made functions
+
+```{r}
+#| label: functmade
+
+```
+## Load of External data and Basic Variables
+### External data
+
+```{r}
+#| label: externdata
+
+rdatain <- sprintf("%sCSLN_Mars_BDD.RData",wdmat)
+load(rdatain)
+```
+
+### Output binder and data
+
+```{r}
+#| label: outfiles
+
+rdataout <- sprintf("%sCSLN_Mars_plot",wdmat)
+# if exists
+# load(rdataout)
+
+```
+
+### Basic variables
+
+```{r}
+#| label: basicvar
+
+etude <- "CSLN_Mars"
+espece <- "CERED"
+analysis <- "RQ Linear"
+sp <- which(speciesMP$SPCourt == espece)
+sai <- which(saison$M_Def == "Year") #Year Winter Summer
+
+```
+
+## Study area
+
+The Seine estuary has been studied regarding several historically known areas that have either habitat or communities differences. These areas are mainly mudflats and subtidal areas, are represented in @fig-map.
+
+```{r}
+#| label: prefig-map
+
+# Extract data of interest
+tm_areas <- ES_Areas %>% 
+  dplyr::filter(!Zone  %in% c("Bay", "Ilot Oiseaux")) %>%
+  st_transform(4326)
+
+# Zoom tm_boxes
+tm_boxestuary<-bb(tm_areas)
+tm_box_mud <- ES_Areas %>%  
+  dplyr::filter(grepl("Mudflat",ES_Areas$Zone)) %>%
+  st_transform(4326) %>% bb(ext=1.4)
+tm_boxchannel<-bb(c(xmin=-2.5, ymin=49.0, xmax=1.5, ymax=51.0) )
+tm_boxchannel<-bb(tm_boxestuary, ext=12)
+
+# Extract Open street map background based on data
+# osm_df <- read_osm(tm_box_mud, ext=1, type= "osm") #stamen-watercolor osm
+# osm_df_wat_bay <- read_osm(tm_boxchannel, ext=1, type= "stamen-watercolor")
+# osm_df_wat_estu <- read_osm(tm_boxestuary, ext=1, type= "stamen-watercolor")
+# save(osm_df,osm_df_wat_bay,osm_df_wat_estu, file=sprintf("SIG/OSM_extraction.RData"))
+load(sprintf("SIG/OSM_extraction.RData"))
+
+# create a map of context with red rect of area of interest
+tm_bay<-
+  tm_shape(osm_df_wat_bay) +  
+    tm_rgb(saturation = .6, alpha= 0.8) +
+  tm_shape(st_as_sfc(tm_boxestuary)) + 
+    tm_borders("red", lwd = 2) +
+  tm_layout(legend.show= FALSE) 
+tm_estu<-tm_shape(osm_df_wat_estu) +  
+    tm_rgb(saturation = .6, alpha= 0.8) +
+  tm_shape(st_as_sfc(tm_box_mud)) + 
+    tm_borders("red", lwd = 2) +
+  tm_shape(tm_areas) +  
+    tm_fill(col = "Zone", title="Areas", palette = "Set2", alpha = 0.7) +
+  tm_layout(legend.show= FALSE)
+
+# Create main map
+tmap_mode("plot") # "plot" "view"
+tm_Bio<-
+  tm_shape(osm_df) +  
+    tm_rgb(saturation = .6, alpha= 0.8) +
+  tm_shape(tm_areas) +  
+    tm_fill(col = "Zone", title="Areas", palette = "Set2", alpha = 0.6) +
+    # tm_text("Zone", size = .8, col= "black") +
+    tm_borders("grey", lwd = 1.5) +
+  tm_shape(CSLN_sf) +
+    tm_dots(col="grey30", size=0.1, alpha = 0.5) +
+  tm_scale_bar(position = c("LEFT", "BOTTOM"), width = 0.15) + #SCALE
+  tm_compass(type = "8star",position = c("LEFT", "TOP"), size = 3) +  #NORTH COMPASS
+  tm_layout(legend.position= c("LEFT","center"),
+            legend.bg.color="white",legend.bg.alpha=0.6)
+
+# arrange maps insets thanks to patchwork !
+tm_Bio_g<-tmap_grob(tm_Bio)
+tm_bay_g<-tmap_grob(tm_bay)
+tm_estu_g<-tmap_grob(tm_estu)
+design <- c(
+  area(t= 1, b= 4, l= 1, r= 6),
+  area(t= 2, b= 2, l= 6, r= 6),
+  area(t= 3, b= 3, l= 6, r= 6) )
+tm_study_map<- wrap_plots(tm_Bio_g,tm_bay_g,tm_estu_g,design = design)
+
+ggsave(filename= sprintf("%sfig-map.tiff",wdgraph), 
+       tm_study_map, dpi=600, height = 8) #, width = 12
+```
+
+```{r}
+#| label: map_html
+#| eval: false
+
+# tmap_mode("view") # "plot" "view"
+# tm_Bio<-
+#   tm_basemap(leaflet::providers$OpenStreetMap.HOT) +
+#   tm_shape(df) +
+#   tm_fill(col = "Zone", palette = "Accent", alpha = 0.7) +
+#   tm_borders("grey", lwd = 1) +
+#   tm_shape(df_stations) +
+#   tm_dots(col="grey30",size=0.001, alpha = 0.5) +
+#   tm_layout(legend.outside = TRUE)
+# # tmlf_Bio<-tmap_leaflet(tm_Bio) # conversion to leaflet object, quicker??
+# tm_Bio
+# tmap_save(tm_Bio, filename = "Estuary_map.html")
+
+```
+
+# Results
+
+```{r}
+#| label: data_set_description
+
+data_descr <- function (dataset,vars) {
+    # dataset=Mars_SDM %>% st_drop_geometry %>% filter(!Zone %in% c("Bay","Octeville"))
+      # vars ="inunt"
+  descr<-list(geog=list(stat.test=NULL,plot=NULL),
+              time=list(stat.test=NULL,plot=NULL))
+
+  descr$geog$stat.test <- dataset %>% 
+    group_by(Zone) %>% 
+    wilcox_test(formula(paste0(vars," ~ Period"))) %>% 
+    add_xy_position(x = "Period",group = "Zone",
+                    dodge = 0,step.increase = 0.05) %>%
+    filter(p.adj.signif!="ns")
+  descr$geog$plot <- ggplot(dataset) + 
+    # geom_boxplot(aes(x=Period, y = .data[[vars]], fill = Period)) +
+    # geom_density_ridges(aes(y = Period , fill=Period,
+    #                       x=.data[[vars]]), alpha=0.3) +
+    geom_flat_violin(aes(x=Period, fill = Period,
+                     y = .data[[vars]] ),
+                     alpha = 0.5) +
+    stat_summary(aes(x=Period, fill = Period,
+                     y = .data[[vars]], color = Period),
+                 fun.data = mean_se, show.legend = FALSE) +
+    stat_pvalue_manual(descr$geog$stat.test,label = "p.adj.signif",
+                       tip.length = 0.02, coord.flip = TRUE) +
+    coord_flip() +
+    facet_wrap( ~ Zone, 
+               nrow = 1, #scales = "free_y", 
+               labeller = label_wrap_gen(width = 10)) + 
+    labs(y = vars, x="") +
+    Scale_brew() +
+    theme(legend.position="bottom")#,
+      # axis.text.x = element_blank(), axis.ticks = element_blank())
+
+  descr$time$stat.test <- dataset %>% 
+    group_by(Period) %>%
+    wilcox_test(formula(paste0(vars," ~ Zone"))) %>% 
+    add_xy_position(x = "Zone",group = "Period",
+                    dodge = 0,step.increase = 0.05) %>%
+    filter(p.adj.signif!="ns")
+
+  descr$time$plot <- ggplot(dataset) + 
+    # geom_boxplot(aes(x=Zone, y = .data[[vars]], fill = Zone)) +
+    geom_flat_violin(aes(x=Zone, fill = Zone,
+                     y = .data[[vars]] ),
+                     alpha = 0.5) +
+    stat_summary(aes(x=Zone, fill = Zone,
+                     y = .data[[vars]], color = Zone), 
+                 fun.data = mean_se, show.legend = FALSE) +
+    stat_pvalue_manual(descr$time$stat.test,label = "p.adj.signif", 
+                       tip.length = 0.02, coord.flip = TRUE) +
+    coord_flip() +
+    facet_wrap( ~ Period, 
+               nrow = 1, #scales = "free_y", 
+               labeller = label_wrap_gen(width = 10)) + 
+    labs(y = vars, x="") +
+    Scale_brew() +
+    guides(fill=guide_legend(nrow=2,byrow=TRUE)) +
+    theme(legend.position="bottom")
+  
+  return(descr)
+}
+
+```
+
+## Biological data set description
+
+::: column-screen-inset-right
+
+```{r}
+#| label: biom_distr_b
+CSLN_df <- CSLN %>%
+  filter(grepl("Mudflat", Zone)) %>% # focus on mudflat only
+  filter(SPCourt %in% c(espece)) %>%
+  filter(!is.na(Biomass_gAFDWm2)) %>%
+  mutate(across(where(is.factor), fct_drop)) %>% # recode predict when filter has remove levels
+  group_by(idStationUnique,Zone,Tidal_level,Period,Annee) %>% 
+  summarise(iZTPAS = sum(Biomass_gAFDWm2, na.rm =TRUE)) %>% 
+  group_by(Zone,Period,Tidal_level,Annee) %>% #,Season
+  summarise(Biomass_gAFDWm2 = mean(iZTPAS, na.rm =TRUE)) %>% 
+  mutate(Period=factor(Period, 
+                      labels = str_replace_all(unique(Period),"-"," - ")))
+
+pl_des_b <- data_descr(CSLN_df,"Biomass_gAFDWm2")
+```
+
+```{r}
+#| label: biom_distr_d
+CSLN_df <- CSLN %>%
+  filter(grepl("Mudflat", Zone)) %>% # focus on mudflat only
+  filter(SPCourt %in% c(espece)) %>%
+  filter(!is.na(Density_indm2)) %>%
+  mutate(across(where(is.factor), fct_drop)) %>% # recode predict when filter has remove levels
+  group_by(idStationUnique,Zone,Tidal_level,Period,Annee) %>% 
+  summarise(iZTPAS = mean(Density_indm2, na.rm =TRUE)) %>% 
+  group_by(Zone,Period,Tidal_level,Annee) %>% #,Season
+  summarise(Density_indm2 = mean(iZTPAS, na.rm =TRUE)) %>% 
+  mutate(Period=factor(Period, 
+                      labels = str_replace_all(unique(Period),"-"," - ")))
+
+pl_des_d <- data_descr(CSLN_df,"Density_indm2")
+
+# pl_des_b_gt <- ggarrange(pl_des_b$geog$plot,pl_des_b$time$plot, ncol=1, nrow=2,
+#                 labels="AUTO", legend="bottom",
+#                 common.legend = FALSE)
+# pl_des_b_gt <- annotate_figure(pl_des_b) + #top = text_grob(title, face = "bold", size = 14)
+#       bgcolor("white")
+
+pl_des_b_gt <- pl_des_b$geog$plot / pl_des_b$time$plot & 
+    theme(legend.position="bottom",
+          text=element_text(size=12)) &
+    plot_annotation(tag_levels = c('A'))
+pl_des_d_gt <- pl_des_d$geog$plot / pl_des_d$time$plot  & 
+    theme(legend.position="bottom",
+          text=element_text(size=12)) &
+    plot_annotation(tag_levels = c('A'))
+
+ggsave(sprintf("%sfig-cered_struc_biom.tiff",wdgraph),
+       plot = pl_des_b_gt, width = 12, height = 8, dpi=600)
+ggsave(sprintf("%sfig-cered_struc_dens.tiff",wdgraph),
+       plot = pl_des_d_gt, width = 12, height = 8, dpi=600)
+```
+:::
+
+## HMS data set description
+
+```{r}
+#| label: pl_mars_corr
+#| include: true
+
+# ggpairs custom colors on corr
+corr_col <- function(data, mapping, method="p", use="pairwise", ...){
+  # grab data
+  x <- eval_data_col(data, mapping$x)
+  y <- eval_data_col(data, mapping$y)
+  # calculate correlation
+  corr <- cor(x, y, method=method, use=use)
+  # calculate colour based on correlation value
+  colFn <- colorRampPalette(c(colSpec(2)[1], "white", colSpec(2)[2]), interpolate ='spline')
+  fill <- colFn(100)[findInterval(corr, seq(-1, 1, length=100))]
+  ggally_text(
+    label = as.character(round(corr, 2)),
+    mapping = aes(),
+    xP = 0.5, yP = 0.5,
+    ...) + #  ggally_cor(data = data, mapping = mapping, ...) + 
+    theme_void() +
+    theme(panel.background = element_rect(fill=fill))
+
+} #wrap(cor_func,method = 'spearman', symbol = "Corr:\n")
+
+
+df <- CSLN_mud %>%
+  filter(SPCourt == espece) %>%
+  select(paste(predict[,1],saison[sai,1],sep=""),
+         map(reponse,~.x$rvar) %>% unlist(., use.names=FALSE))
+
+pl_mars_corr <- ggpairs(df, labeller=label_wrap_gen(width = 10,multi_line = TRUE),# title=titreG,
+              progress=FALSE,
+              upper = list(continuous = corr_col),
+              lower = list(continuous=
+                             wrap("smooth", size = .3,
+                                  alpha = 0.4, color = "aquamarine4"))) +
+      theme(axis.text = element_text(size=8),
+            strip.text.y = element_text(size=8))
+
+ggsave(sprintf("%sfig-pl_mars_corr.tiff",wdgraph),
+       plot = pl_mars_corr, width = 16, height = 9, dpi=600)
+
+```
+
+```{r}
+#| label: hms_distr
+
+pl_mars <- 
+  map(setNames(as.list(Var_choosen),Var_choosen), \(vars)
+          data_descr(Mars_SDM %>%
+                       st_drop_geometry %>%
+                       filter(!Zone %in% c("Bay","Octeville")),
+                     vars) )
+
+pl_mars_gt <- map(pl_mars,
+                  ~{.x$geog$plot / .x$time$plot  & 
+    theme(legend.position="bottom",
+          text=element_text(size=12)) &
+    plot_annotation(tag_levels = c('A')) } )
+
+iwalk(pl_mars_gt,
+  ~ggsave(sprintf("%sfig-hms_struc_%s.tiff",wdgraph,.y),
+       plot = .x, width = 12, height = 8, dpi=600) )
+
+```
+
+# Final actions and save
+
+Rdata are saved in `rdataout`. An excel file collects data in `r binderout` , with sheets for :
+
+-   data : contains whatever
+
+```{r}
+#| label: finalsave_r
+#| 
+save(list=(ls()[grep("^tm_|^pl_", ls())]),
+     file = paste0(rdataout,".RData"))
+beepr::beep(2)
+```
+
+# Supplementary data
+
+## Software details
+
+::: {.callout-tip collapse="true"}
+## Expand for R Session Info
+
+```{r, echo = FALSE}
+#| include: true
+
+library(sessioninfo)
+pkg_sesh <- session_info(pkgs = "attached")
+quarto_version <- system("quarto --version", intern = TRUE)
+pkg_sesh$platform$quarto <- paste(
+  system("quarto --version", intern = TRUE),
+  "@",
+  quarto::quarto_path()
+  )
+pkg_sesh
+```
+:::
+
+# References {.unnumbered}

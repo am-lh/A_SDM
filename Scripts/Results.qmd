@@ -1,0 +1,1016 @@
+---
+title: "MELTING POTES"
+author: "Amélie Lehuen"
+description: "Task A : SDM-NEO Data analysis"
+date: "`r format(Sys.time(), '%B %Y')`"
+editor: source
+execute:
+  eval: true
+  echo: false
+  message: false
+  warning: false
+  output: true
+  include: false
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+#| label: load-packages
+#| code-summary: "Packages"
+
+library(knitr)
+library(readxl) ; library(openxlsx)
+library(beepr); library(clipr)
+library(tidyverse); library(data.table)
+library(broom); library(purrr) # tidy,glance,augment
+library(lubridate)
+library(rstatix); library(Hmisc)  # corr and pvalue calculation
+
+# SIG
+library(sf); library(sfheaders)
+library(rnaturalearth) # library(raster)
+library(tmap)
+library(tmaptools) # tmap_mode; for static and interactive maps
+library(ggspatial)
+
+# Graphics packages
+library(scales) ; library(grafify)
+library(RColorBrewer) ; library(wesanderson); library(colorspace)
+library(ggpubr);library(GGally)#; library(patchwork)
+library(patchwork)
+library(metR)
+library(rayshader)
+library(introdataviz) # geom_split_violin # devtools::install_github("psyteachr/introdataviz")
+library(ggridges) # geom_density_ridges
+library(ggforce)
+
+sf_use_s2(FALSE)
+tmap_mode("view") # "plot" "view"
+Sys.setlocale("LC_TIME", "English")
+```
+
+```{r}
+#| label: workenvir
+
+rm(list=ls())
+wdsource <- "Data/Faune/CSLN/"
+wdmat <- "Matrices/"
+wdgraph <- "Plots/"
+wdres <- "Results/"
+
+pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
+wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
+wdscript <- paste(pc,"Melting Pot/BDD/Scripts/",sep="")
+wdmsr <- (paste(wdscript,"MSR/MSR.R",sep=""))
+
+```
+
+```{r}
+#| label: graphchart
+
+theme_set(theme_bw(base_size = 14))
+colDarj <- function(x) {wes_palette("Darjeeling2",x, type = "continuous")}
+colZiss <- function(x) {wes_palette("Zissou1",x, type = "continuous")}
+colSpec <- colorRampPalette(brewer.pal(8, "Spectral")); # show_col(colSpec(2))
+colDark <- colorRampPalette(brewer.pal(8, "Dark2"));
+Scale_col <- function(x) {scale_colour_manual(values=colDarj(x))}
+Scale_fill <- function(x) {scale_fill_manual(values=colDarj(x))}
+Scale_brew <- function() {scale_colour_brewer(palette="Spectral",aesthetics=c("colour","fill"))}
+Scale_co <- function() 
+  {scale_colour_manual(palette=colorRampPalette(brewer.pal(11, "Spectral")))}
+Scale_fi <- function() 
+  {scale_fill_manual(palette=colorRampPalette(brewer.pal(11, "Spectral")))}
+
+
+pal_cspx <- function(x) {divergingx_hcl(x,palette = "Zissou 1")};
+colBin<-c(pal_cspx(6)[3],pal_cspx(6)[5]); 
+colRQ<-pal_cspx(4); blank<-alpha("#dae8ed",0.1); # show_col(colBin)
+Scalc_rq<- function() {scale_colour_manual(values=colRQ)}
+Scalf_rq2d <- function() {scale_fill_gradientn(colours=colRQ)} 
+
+```
+
+```{r}
+#| label: func
+
+loadRData <- function(fileName){
+#loads an RData file, and returns it
+    load(here::here(fileName))
+    mget(ls()[ls() != "fileName"])
+}
+
+# Function for corr ad pvalue table x is a matrix containing the data
+# method : correlation method. "pearson"" or "spearman"" is supported
+# removeTriangle : remove upper or lower triangle
+# results :  if "html" or "latex"
+# the results will be displayed in html or latex format
+corstars <-function(x, method=c("pearson", "spearman"), 
+                    removeTriangle=c("upper", "lower"),
+                     result=c("none", "html", "latex")){
+    #Compute correlation matrix
+    require(Hmisc)
+    x <- as.matrix(x)
+    correlation_matrix<-rcorr(x, type=method[1])
+    R <- correlation_matrix$r # Matrix of correlation coeficients
+    p <- correlation_matrix$P # Matrix of p-value 
+    
+    ## Define notions for significance levels; spacing is important.
+    mystars <- ifelse(p < .0001, "****", 
+                      ifelse(p < .001, "***", 
+                             ifelse(p < .01, "**", 
+                                    ifelse(p < .05, "*", " "))))
+    
+    ## trunctuate the correlation matrix to two decimal
+    R <- format(round(cbind(rep(-1.11, ncol(x)), R), 2))[,-1]
+    
+    ## build a new matrix that includes the correlations with their apropriate stars
+    Rnew <- matrix(paste(R, mystars, sep=""), ncol=ncol(x))
+    diag(Rnew) <- paste(diag(R), " ", sep="")
+    rownames(Rnew) <- colnames(x)
+    colnames(Rnew) <- paste(colnames(x), "", sep="")
+    
+    ## remove upper/lower triangle of correlation matrix
+    if(removeTriangle[1]=="upper"){
+      Rnew <- as.matrix(Rnew)
+      Rnew[upper.tri(Rnew, diag = TRUE)] <- ""
+    }
+    else if(removeTriangle[1]=="lower"){
+      Rnew <- as.matrix(Rnew)
+      Rnew[lower.tri(Rnew, diag = TRUE)] <- ""
+    }
+    
+    ## remove last column and return the correlation matrix
+    Rnew <- as.data.frame(Rnew)
+    Rnew <- cbind(Rnew[1:length(Rnew)-1])
+    if (result[1]=="none") return(Rnew)
+    else{
+      if(result[1]=="html") print(xtable(Rnew), type="html")
+      else print(xtable(Rnew), type="latex") 
+    }
+} 
+```
+
+```{r}
+#| label: externdata
+
+rdatain  <- sprintf("%sCSLN_Mars_RQ_BDD.RData",wdmat)
+rqdata<-loadRData(rdatain)
+rdatain  <- sprintf("%sCSLN_Mars_RQnli_BDD.RData",wdmat)
+nlrqdata<-loadRData(rdatain)
+rdatain  <- sprintf("%sCSLN_Mars_RQbsp_BDD.RData",wdmat)
+rqbsdata<-loadRData(rdatain)
+rdatain  <- sprintf("%sCSLN_Mars_BDD.RData",wdmat)
+load(rdatain) #load(here::here(rdatain))
+rdatain  <- sprintf("%sCSLN_Mars_plot.RData",wdmat)
+load(rdatain)
+# rdatain  <- sprintf("%sCSLN_Mars_RQ.RData",wdmat)
+# load(rdatain) # ca devrait etre dans la sdm pprep mis en fin de 1.0
+
+```
+
+```{r}
+#| label: outfiles
+binderout <- sprintf("%sA_SDM_NEO_Results.xlsx",wdres)
+rdataout  <- sprintf("%sA_SDM_NEO_Results.RData",wdmat)
+# if exists
+# load(rdataout)
+```
+
+```{r}
+#| label: basicvar
+
+etude <- "CSLN_Mars"
+espece <- "CERED"
+sp <- which(speciesMP$SPCourt == espece)
+sai <- which(saison$M_Def == "Year")
+
+# pred_red <- rqdata$pred_red
+# taus <- rqdata$taus
+
+model_types<- data.frame(rbind(c(analysis="RQ Linear",code="RQ2int_",bdd="rqdata"),
+                    c(analysis="RQ Nonlinear",code="RQ2nli_",bdd="nlrqdata"),
+                    c(analysis="RQ BSpline",code="RQ2bsp_",bdd="rqbsdata")))
+Mod_chosen<-list(c("flow_mxd","inunt"),
+                  c("mudrate_m","tenfon_mxd"),
+                  c("sal_dtd","temp_m"),
+                  c("inunt","temp_m"))
+
+sdmname_l<- map(seq(length(reponse)),
+                    ~sprintf("%g%g%g%s",sp,sai,.x,names(pred_red_comb_sel)) ) %>% 
+  bind_cols() %>% 
+  as.matrix
+
+factors<-predict
+```
+
+# Materials and Methods
+
+::: column-screen-inset-right
+All data treatment has been conducted with `r R.version.string` except for MARS3D pre-treatment on Matlab 2019a. Significance levels are tagged for p \< .0001 with "\*\*\*\*", p \< .001 with "\*\*\*", p \< .01 with "\*\*", p \< .05 with "\*".
+
+## Study area
+
+<!-- ::: {.content-visible unless-format="html"} -->
+
+The Seine estuary has been studied regarding several historically known areas that have either habitat or communities differences. These areas are mainly mudflats and subtidal areas, are represented in @fig-map.
+
+```{r}
+#| label: fig-map
+#| include: true
+#| fig-cap: "Maps of data sets locations"
+#| fig-width: 14
+#| fig-height: 10
+
+tm_study_map
+
+# ggsave(filename= sprintf("%sfig-map.tiff",wdgraph), 
+#        study_map, dpi=600, height = 8) #, width = 12
+```
+
+<!-- ::: -->
+
+<!-- # ::: {.content-visible when-format="html"} -->
+
+<!-- The Seine estuary has been studied regarding several historically known areas that have either habitat or communities differences. These areas are mainly mudflats and subtidal areas, are represented in @fig-map_htlm. -->
+
+```{r}
+#| label: fig-map_html
+#| eval: false
+#| fig-cap: "Maps of habitats areas defined for the study"
+
+# tmap_mode("view") # "plot" "view"
+# tmap_save(tm_Bio, filename = "Estuary_map.html")
+
+```
+
+<!-- ::: -->
+
+## Biological model
+
+## Datasets
+
+### Biologic data
+
+```{r}
+#| label: biostats_1
+
+rawnb <-count(CSLN_raw) %>%
+  pull() %>% 
+  formatC(., format="f", big.mark=",", digits=0)
+cleannb <-count(CSLN) %>% 
+  pull() %>% 
+  formatC(., format="f", big.mark=",", digits=0)
+yearsrange <- CSLN %>% 
+  mutate(Annee = as.numeric(levels(Annee))[Annee]) %>% # reconvert factors
+  arrange(Annee) %>% 
+  slice(c(1,n())) %>% 
+  pull(Annee) %>%
+  paste(collapse = " to ")
+moisyear <- CSLN %>% group_by(Annee,Station_originelle) %>% 
+  summarise(nbcamp=n_distinct(Mois)) %>% 
+  group_by(nbcamp) %>%
+  summarise(nbstat=n_distinct(Station_originelle)) %>% 
+  arrange(desc(nbstat)) %>%
+  slice(1:2) %>% #slice(c(1,n())) %>%
+  pull(nbcamp) %>%
+  paste(collapse = " to ")
+nbstattot <- CSLN %>% 
+  summarise(n_distinct(Station_originelle)) %>% 
+  pull()
+nbstatyr <- CSLN %>% group_by(Annee) %>% 
+  summarise(nbstat=n_distinct(Station_originelle)) %>%
+  summarise(nbstat=round(mean(nbstat),0)) %>% 
+  pull()
+period <- CSLN %>% group_by(Mois) %>% 
+  mutate(Mois = month.abb[as.numeric(levels(Mois))[Mois]]) %>%
+  summarise(nbstat=n_distinct(Station_originelle)) %>%
+  arrange(desc(nbstat)) %>% 
+  slice(1:3) %>% 
+  pull(Mois) %>% 
+  paste(collapse = ", ")
+recbef2000 <- CSLN_Mars %>% 
+  filter(!Zone  %in% c("Channel","Bay")) %>% # at minimum
+  filter(Period == "1996-1999") %>%
+  filter(!SPCourt %in% c("SEMBA","AMPIM","AUSMO",
+                         "BALCR","MYTED","BIVAL","ANNEL")) %>%
+  # filter(SPCourt %in% c(espece)) %>% 
+  # summarise(n_distinct(idStationUnique)) %>% 
+  count() %>% 
+  pull()
+richspe <- CSLN %>% 
+  summarise(nbstat=n_distinct(Taxon_SNa)) %>% 
+  pull()
+
+```
+
+The raw data (n= `r rawnb`) has been harmonised and grouped to obtain a single database of `r cleannb` observations, and `r nbstattot` sampling stations in total (with some variation in coordinates from year to year), with an average of `r nbstatyr` stations per campaign, occurred mainly in the months of `r period`. Along the all period covered by the dataset, from `r yearsrange` (before 2000 has been discarded, too few observations n=`r recbef2000`), with `r moisyear` sampling campaigns per year, a series of 5-years periods has been defined, 2000-2005 the building of 'Port 2000' with high disruption in the estuary area; 2006-2010; 2011-2015; 2016-2019. `r richspe` different species has been founded in all the observations.
+
+### HMS data
+
+```{r}
+#| label: abiostats_1
+
+marsweb <- Mars_csv %>% 
+  summarise(nbstat=n_distinct(NINJ)) %>% 
+  pull() %>% 
+  formatC(., format="f", big.mark=",", digits=0)
+marsxy <- Mars_csv %>% select(NINJ) %>% 
+  separate(NINJ, c("Y", "X"),sep="_") %>%
+  mutate(X=as.numeric(X), Y=as.numeric(Y)) %>% 
+  summarise(across(.cols=everything(),~(max(.x)-min(.x)))) %>% # sapply(., max)
+  unite(fus,Y,X,sep=" by ") %>%
+  pull(fus)
+marslonlat <- Mars_csv %>% 
+  select(Lon,Lat) %>%
+  summarise(across(.cols=everything(),
+                   ~(sprintf("%g to %g",
+                             round(min(.x),4),
+                             round(max(.x),4))))) %>%
+  unite(fus,Lon,Lat,sep=" and Latitude ") %>%
+  pull(fus)
+  
+marsmaillenb <-CSLN_Mars %>% 
+  select(NINJ) %>% 
+  drop_na() %>% 
+  summarise(nbstat=n_distinct(NINJ)) %>% 
+  pull() %>% 
+  formatC(., format="f", big.mark=",", digits=0)
+marsmailledet <- CSLN_Mars %>% 
+  select(NINJ,Tidal_level) %>% 
+  drop_na() %>% 
+  group_by(Tidal_level) %>% 
+  summarise(nbstat=n_distinct(NINJ)) %>% 
+  unite(Tidalnb,Tidal_level,nbstat,sep=" (n= ") %>% 
+  pull() %>% 
+  paste(collapse = "), ")
+```
+
+All Seine Bay MARS3D model is calculated in a grid of `r formatC(700*112, format="f", big.mark=",", digits=0)` mesh (700 by 112), focused on the Seine Estuary with a grid of 'only' `r marsweb` mesh (`r marsxy`), with the coordinates of Longitude `r marslonlat`. Mars mesh corresponding to the stations localisation in the biologic dataset are at total `r marsmaillenb` with the distinction in the position in the tidal area as `r marsmailledet`).
+
+### Predictors calculation and selection
+
+```{r}
+#| label: globcorr
+
+df <- CSLN_mud %>% 
+  filter(SPCourt == espece) %>%
+  select(paste(factors[,1],saison[sai,1],sep=""),
+         map(reponse,~.x$rvar) %>% unlist(., use.names=FALSE) )
+
+dfcornew <- corstars(df, result="none",removeTriangle="") %>% 
+  mutate(variable=rownames(.)) %>% 
+  relocate(variable)
+# dftest<-dfcornew %>% mutate(across(.cols = everything(), str_replace_all, ".*\\s", ""))
+
+```
+
+All variables have been observed and a correlation study has been conducted to select the more pertinent factors and avoid autocorrelation between factors.
+
+-   **Mud content** \[`r factors[14,3]`\] is chosen over Sediment total conc \[`r factors[13,3]`\] to link with other references (Corr = `r dfcornew %>% filter(variable %in% "mudrate_m") %>% select(Csed_m) %>% pull()`).
+-   **Current Speed daily max** \[`r factors[2,3]`\] is chosen over Current_Speed \[`r factors[1,3]`\] to reflect hydrodynamics occurring on mudflats (Corr = `r dfcornew %>% filter(variable %in% "flow_mxd") %>% select(flow_m) %>% pull()`).
+-   **Inundation time** \[`r factors[3,3]`\] is chosen rather than True bathymetry \[`r factors[9,3]`\], to be more informative on tidal position (Corr = `r dfcornew %>% filter(variable %in% "bathy") %>% select(inunt) %>% pull()`).
+-   **Salinity daily range** \[`r factors[5,3]`\] is preferred to Salinity \[`r factors[4,3]`\] to emphasize more the tidal influence (Corr = `r dfcornew %>% filter(variable %in% "sal_dtd") %>% select(sal_m) %>% pull()`).
+-   **Temperature** \[`r factors[6,3]`\] is picked upon Temperature daily range \[`r factors[7,3]`\] for its accessibility (Corr = `r dfcornew %>% filter(variable %in% "temp_dtd") %>% select(temp_m) %>% pull()`) and the range being reflected by the Inundation time (Corr = `r dfcornew %>% filter(variable %in% "temp_dtd") %>% select(inunt) %>% pull()`).
+-   **Bed shear stress** \[`r factors[11,3]`\] is preferred to MES mud \[`r factors[8,3]`\] to focus on erosion phenomena more than MTZ processes (Corr = `r dfcornew %>% filter(variable %in% "MESmud_m") %>% select(tenfon_m) %>% pull()`).
+-   **Bed shear stress daily max** is poorly correlated to Bed shear stress \[`r factors[12,3]`\] (Corr = `r dfcornew %>% filter(variable %in% "tenfon_mxd") %>% select(tenfon_m) %>% pull()`) but the former is preferred to indicate the extreme local conditions that can lead to erosion of sediment.
+-   Yearly sediment budget \[`r factors[10,3]`\] is not correlated to any other variable but its distribution makes it not relevant.
+
+## Models adjustments
+
+### Quantile regression
+
+### Scenarios of interest
+
+Models are built with two abiotic factors to increase their reliability. The couples tested are selected to apply them depending on data available and the focus on abiotic conditions, which can be in particular impacted by the global climate change:
+
+1.  Current Speed daily max \[`r factors[2,3]`\] and Inundation time \[`r factors[3,3]`\]: to compare results with [@cozzoli2014], and these variables are easily retrieved with some high frequency measurement (COASTHF) . They have also an interest because they contain information on the position in the tidal area that could evolve with sea level rise and the hydrological conditions impact by the river flowrate change due to climate change even though they have a significant correlation (Corr = `r dfcornew %>% filter(variable %in% "flow_mxd") %>% select(inunt) %>% pull()`)
+2.  Mud content \[`r factors[14,3]`\] and Bed shear stress \[`r factors[11,3]`\]: Those variables are determinant in a building of an erosion model such as MARS3D (Corr = `r dfcornew %>% filter(variable %in% "mudrate_m") %>% select(tenfon_m) %>% pull()`).
+3.  Temperature \[`r factors[6,3]`\] and Salinity daily range \[`r factors[5,3]`\]: These factors are easily measurable on high frequency also (Somlit). They are both bearing the climate change for the global temperature change and the evolution of the river regime that would impact the salinity profile of the estuary (Corr = `r dfcornew %>% filter(variable %in% "temp_m") %>% select(sal_dtd) %>% pull()`). Temperature has also an impact on the fauna metabolism, thus its activity.
+4.  Temperature \[`r factors[6,3]`\] and Inundation time \[`r factors[3,3]`\]: (Corr = `r dfcornew %>% filter(variable %in% "temp_m") %>% select(inunt) %>% pull()`).
+
+```{r}
+#| label: fig-corrmatrix
+#| include: true
+#| fig-cap: "Here is the matrix plot" 
+#| fig-width: 14
+#| fig-height: 10
+
+pl_mars_corr
+
+# ggsave(sprintf("%sfig-corrmatrix.tiff",wdgraph),
+#        plot = pl_mars_corr, width = 16, height = 9, dpi=600)
+
+```
+
+### Model Validation
+:::
+
+# Results
+
+## Biological data set description
+
+::: column-screen-inset-right
+```{r}
+#| label: prefig-cered_struc
+
+cerednb <- CSLN %>%
+  filter(SPCourt %in% c(espece)) %>% 
+  summarise(nbstat=n_distinct(idStationUnique)) %>% 
+  pull()
+
+cereddetper <- CSLN %>% 
+  filter(SPCourt %in% c(espece)) %>% 
+  group_by(Period) %>% 
+  summarise(nbstat=n_distinct(idStationUnique)) %>% 
+  unite(Periodnb,Period,nbstat,sep=" (n= ") %>% 
+  pull() %>% 
+  paste(collapse = "), ")
+
+cereddetzon <- CSLN %>% 
+  filter(SPCourt %in% c(espece)) %>% 
+  filter(grepl("Mudflat",.$Zone)) %>%
+  group_by(Zone) %>% 
+  summarise(nbstat=n_distinct(idStationUnique)) %>% 
+  arrange(desc(nbstat)) %>% 
+  unite(Zonenb,Zone,nbstat,sep=" (n= ") %>% 
+  pull() %>% 
+  paste(collapse = "), ")
+```
+
+Biologic data for *C. edule* have a total count of n= `r cerednb` observations. The differences of biomass \[gAFDW/m²\] and density \[ind/m²\] are detailed regarding time and areas (@fig-cered_struc) with their significative differences. The observations are split into periods as `r cereddetper`). Focus for following treatment is made on mudflats only for their biologic relevance for *C. edule* (`r cereddetzon`)).
+
+```{r}
+#| label: fig-cered_struc
+#| include: true
+#| column: page-right
+#| fig-cap: "C. edule population biomass [gAFDW/m²] and density [ind/m²] in the Seine estuary, by Period for each area (A) and by areas for each Period (B) with significant differences"
+#| fig-width: 14
+#| fig-height: 10
+
+# bp_b_gt <- ggarrange(bp_b$geog$plot,bp_b$time$plot, ncol=1, nrow=2,
+#                 labels="AUTO", legend="bottom",
+#                 common.legend = FALSE)
+# bp_b_gt <- annotate_figure(bp_b) + #top = text_grob(title, face = "bold", size = 14)
+#       bgcolor("white")
+
+bp_b_gt <- pl_des_b$geog$plot / pl_des_b$time$plot &
+  plot_annotation(tag_levels = c('A'))
+bp_b_gt
+bp_d_gt <- pl_des_d$geog$plot / pl_des_d$time$plot &
+  plot_annotation(tag_levels = c('A')) 
+bp_d_gt
+
+# ggsave(sprintf("%sfig-cered_struc_biom.tiff",wdgraph),
+#        plot = bp_b_gt, width = 12, height = 8, dpi=600)
+# ggsave(sprintf("%sfig-cered_struc_dens.tiff",wdgraph),
+#        plot = bp_d_gt, width = 12, height = 8, dpi=600)
+```
+:::
+
+## HMS data set description
+
+```{r}
+#| label: fig-hms_struc
+#| include: true
+#| column: page-right
+#| fig-cap: "Mars 3D HMS model physical factors selected for study"
+#| fig-width: 14
+#| fig-height: 10
+
+map(pl_mars_gt, print)
+
+# iwalk(pl_mars_gt,
+#   ~ggsave(sprintf("%sfig-hms_struc_%s.tiff",wdgraph,.y),
+#        plot = .x, width = 12, height = 8, dpi=600) )
+
+```
+
+## Pre-evaluation of methods
+
+::: column-screen-inset-right
+
+### Linear QR type selection
+
+```{r}
+#| label: aic_res
+
+repi<-1
+sdi<-1
+df <- rqdata$rq_Mod_sel_sm %>% 
+  group_by(typetxt) %>% 
+  summarise(AICc_m=round(mean(AICc),2),
+            AICc_sd=round(sd(AICc),2))
+
+```
+
+Using the first factor couple as example, the comparison between linear QR with or without interaction (@fig-add_int) shows there is a difference of result that does not shows on the AIC result (@fig-aic with biomass, simple addition AIC=`r df$AIC_m[1]`+/-`r df$AIC_sd[1]` , with interaction AIC=`r df$AIC_m[2]`+/-`r df$AIC_sd[2]`). The linear model with interaction is preferred for biologic reasons: the fauna reacts to the conjunction of factors.
+
+```{r}
+#| label: fig-aic
+#| include: true
+#| column: page-right
+#| fig-cap: "SDM Linear Quantile Regression AIC comparison with/without interaction for Biomass and Density"
+#| fig-width: 8
+#| fig-height: 8
+
+repi<-1
+sdi<-1
+# titleG <- sprintf("%s and %s",unique(df$factorsor1),unique(df$factorsor2))
+AIC_plot<-rqdata$rq_Mod_sel_sm %>% 
+  group_by(tau) %>%
+  ggplot(aes(x=reponse, #reorder(factors,-AIC),
+             y=AICc,
+             color = factor(tau),
+             shape = type)) +
+  geom_point(size= 5) +
+  scale_shape_manual(values=c(1, 8)) +
+  scale_color_manual(values=colRQ) +
+ # facet_grid(.~reponse) +
+  labs(#title=titleG, 
+       x="Biologic",y="AIC",
+       color="Quantile",shape="Model") +
+  theme(axis.text = element_text(size=10,face="bold")) +
+  coord_flip(); AIC_plot
+  
+ggsave(sprintf("%sfig-aic.tiff",wdgraph),
+       plot = AIC_plot,
+       width = 8, height = 4, dpi=600)
+
+```
+
+```{r}
+#| label: fig-add_int
+#| include: true
+#| column: page-right
+#| fig-cap: "SDM bifactorial Linear Quantile Regression comparison of two calculation models: simple addition of the two factors (A), with interaction of the factors together (B). All negatives results of model are NA and appear in grey."
+#| fig-width: 14
+#| fig-height: 10
+
+repi<-1
+sdi<-1
+titleG <- sprintf("Linear QR comparison addition and interacton")
+p1<-rqdata$pl_rq_sel_2d[[repi]][[sdi]]$all + 
+      labs(title="Addition")
+p2<-rqdata$pl_rq_sel_2d[[repi]][[sdi]]$all + 
+      labs(title="Interaction")
+
+plot_tmp <- ggarrange(
+  p1 + theme(axis.title = element_blank()),
+  p2 + theme(axis.title = element_blank()),
+  ncol=2, nrow=1,
+  labels="AUTO",legend="right",
+  common.legend = TRUE)
+plot_tmp <- annotate_figure(plot_tmp,
+                # top = text_grob(titleG, size=18),
+                left = text_grob(p1$labels$y, rot = 90),
+                bottom = text_grob(p1$labels$x)) +
+        bgcolor("white")
+
+plot_tmp
+ggsave(sprintf("%sfig-add_int.tiff",wdgraph),
+     plot = plot_tmp,
+     width = 16, height = 8, dpi=600)
+```
+
+### Comparison of the three types of model
+
+Still illustrated by the first couples of factors, the three model types are compared (@fig-3mod). The B-Spline methods shows that it covers the data where they are, but with an overfitting that mathematically is correct but does not allow biologic process modelization.
+
+```{r}
+#| label: fig-3mod
+#| include: true
+#| column: page-right
+#| fig-cap: "SDM QR model type comparison: linear with interaction (A), Gaussian non-linear (B) and Cubic B-Splines linear (C). All negatives results of model are NA and appear in grey."
+#| fig-width: 14
+#| fig-height: 10
+
+repi<-1
+sdi<-1
+titleG <- sprintf("Linear QR comparison addition and interacton")
+p1<-rqdata$pl_rq_sel_2d[[repi]][[sdi]]$all + 
+      labs(title="Linear interaction",
+           fill=NULL)
+p2<-nlrqdata$pl_rq_sel_2d[[repi]][[sdi]]$all + 
+      labs(title="Gaussian non-linear",
+           fill=NULL)
+p3<-rqbsdata$pl_rq_sel_2d[[repi]][[sdi]]$all + 
+      labs(title="B-Spline linear",
+           fill=NULL)
+
+plot_tmp <- ggarrange(
+  p1 + theme(axis.title = element_blank(),
+             legend.text = element_text(size=8)) +
+      scale_fill_gradientn(colours=colRQ,limits=c(0,max(
+        max(p1$data$RqMod,na.rm=TRUE),
+        max(p2$data$RqMod,na.rm=TRUE)
+        ))),
+  p2 + theme(axis.title = element_blank(),
+             legend.text = element_text(size=8)) +
+      scale_fill_gradientn(colours=colRQ,limits=c(0,max(
+        max(p1$data$RqMod,na.rm=TRUE),
+        max(p2$data$RqMod,na.rm=TRUE)
+        ))),
+  p3 + theme(axis.title = element_blank(),
+             legend.text = element_text(size=8)) +
+      scale_fill_gradientn(colours=colRQ,limits=c(0,max(
+        max(p1$data$RqMod,na.rm=TRUE),
+        max(p2$data$RqMod,na.rm=TRUE)
+        ))),
+  ncol=3, nrow=1,
+  labels="AUTO",
+  legend="bottom", common.legend = FALSE)
+plot_tmp <- annotate_figure(plot_tmp,
+                # top = text_grob(titleG, size=18),
+                left = text_grob(p1$labels$y, rot = 90),
+                bottom = text_grob(p1$labels$x)) +
+        bgcolor("white")
+
+plot_tmp
+ggsave(sprintf("%sfig-3mod.tiff",wdgraph),
+     plot = plot_tmp,
+     width = 16, height = 8, dpi=600)
+```
+
+### Quantile choice
+
+```{r}
+#| label: quant_choice
+taut <- which(taus %in% c(0.975))  # c(0.5,0.9,0.95,0.975)
+
+```
+
+The quantile is chosen as a compromise between having a high quantile without over representing some high observations. The quantile chosen is \tau = `r taus[taut]`, and is used for all further analyses.
+
+```{r}
+#| label: graphrq
+# Linear RQ Graphics generation
+analysis <- "RQ Linear"
+rqname<- matrix(paste0("RQ2int_",sdmname_l),nrow=4,ncol=2)
+
+plot_rq<-map(as.list(c(1:2)),
+  ~{ keep_at(rqdata$pl_rq_sel_2d,rqname[,.x]) %>%
+      map(., ~pluck(.$one,taut)) %>%
+      setNames(paste0(rqname[,.x],"_",taus[taut])) } ) %>% 
+  setNames(as.list(reponse$rdescr[1:2]))
+
+```
+
+```{r}
+#| label: graphnlrq
+# Nonlinear RQ Graphics generation
+analysis <- "RQ Nonlinear"
+RQ2nliname<- matrix(paste0("RQ2nli_",sdmname_l),nrow=4,ncol=2)
+
+plot_nlrq<-map(as.list(c(1:2)),
+  ~{ keep_at(nlrqdata$pl_rq_sel_2dt,RQ2nliname[,.x]) %>%
+      map(., ~pluck(.,taut)) %>%
+      setNames(paste0(RQ2nliname[,.x],"_",taus[taut])) } ) %>% 
+  setNames(as.list(reponse$rdescr[1:2]))
+
+```
+
+```{r}
+#| label: graphrqbs
+#| eval: false
+# BSplines RQ Graphics generation
+analysis <- "RQ BSpline"
+RQ2bspname<- matrix(paste0("RQ2bsp_",sdmname_l),nrow=4,ncol=2)
+
+plot_rqbs<-map(as.list(c(1:2)),
+  ~{ keep_at(rqbsdata$pl_rq_sel_2dt,RQ2bspname[,.x]) %>%
+      map(., ~pluck(.,taut)) %>%
+      setNames(paste0(RQ2bspname[,.x],"_",taus[taut])) } ) %>% 
+  setNames(as.list(reponse$rdescr[1:2]))
+
+```
+:::
+
+## SDM-NEO
+
+### Comparison of linear and nonlinear QR
+
+::: column-screen-inset-right
+```{r}
+#| label: prefig-graphboard
+# Create a board of plot
+
+plot_rq <- map2(plot_rq,plot_nlrq,
+  ~ map2(.x,.y,
+    ~.x + 
+    scale_fill_gradientn(colours=colRQ,limits=c(0,max(
+      max(.x$data$RqMod,na.rm=TRUE),
+      max(.y$data$RqMod,na.rm=TRUE)))) +
+      theme(plot.margin = unit(c(.1,.1,.1,.1), "null")) ) )
+plot_nlrq <- map2(plot_nlrq,plot_rq,
+  ~ map2(.x,.y,
+    ~.x + 
+    scale_fill_gradientn(colours=colRQ,limits=c(0,max(
+      max(.x$data$RqMod,na.rm=TRUE),
+      max(.y$data$RqMod,na.rm=TRUE)))) +
+    theme(axis.title.y = element_blank(),
+          axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          plot.margin = unit(c(.1,.1,.1,.1), "null")) ) )
+
+board_rq_nlrq <- map2(plot_rq,plot_nlrq,
+  ~ map2(.x,.y,
+      ~ { .x + .y  +
+        plot_layout(guides = 'collect',tag_level = 'new',widths = c()) & 
+        theme(text=element_text(size=10),
+              aspect.ratio=1) 
+        } ) %>% 
+  wrap_plots(nrow=4,ncol=1,tag_level="new") + #plot_layout(widths = c(.1,50,.1,50)) +
+  plot_annotation(title = sprintf("SDM-NEO (tau=%g)",taus[taut]),
+                  tag_levels = c('A', '1')) & 
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.tag = element_text(size = 11,face = "bold")),
+        plot.tag.position = "top")
+
+board_rq_nlrq$Biomass[[1]][[1]]<-board_rq_nlrq$Biomass[[1]][[1]]+labs(title="BLin")
+board_rq_nlrq$Biomass[[1]][[2]]<-board_rq_nlrq$Biomass[[1]][[2]]+labs(title="BGaus")
+board_rq_nlrq$Density[[1]][[1]]<-board_rq_nlrq$Density[[1]][[1]]+labs(title="BLin")
+board_rq_nlrq$Density[[1]][[2]]<-board_rq_nlrq$Density[[1]][[2]]+labs(title="BGaus")
+
+```
+
+The four couples of factors have been treated with the different ways of calculation: either linear with interaction, or non-linear with bifactorial gaussian equation with the biomass as biologic response @fig-graphboard. AIC index has been calculated for each couple, model type and quantile, and is available on plots.
+
+```{r}
+#| label: fig-graphboard_b
+#| include: true
+#| fig-cap: "The four selected factors couples models computed with linear with interaction (left, numbered 1) and nonlinear with gaussian equation (right numbered 2), the biologic response being the biomass in Ash Free Dry Weight per square meter"
+#| fig-height: 10
+
+board_rq_nlrq$Biomass
+
+ggsave(sprintf("%sfig-graphboard_b.tiff",wdgraph),
+       plot = board_rq_nlrq$Biomass, width = 6, height = 12, dpi=600)
+```
+
+The same board of plots with density are in @fig-graphboard2. *can be put in supplementary data*
+
+```{r}
+#| label: fig-graphboard_d
+#| include: true
+#| fig-cap: "Selected factors couples models computed with linear with interaction (left, numbered 1) and nonlinear with gaussian equation (right numbered 2), the biologic response being the density in individuals per square meter"
+#| fig-height: 10
+board_rq_nlrq$Density
+
+ggsave(sprintf("%sfig-graphboard_d.tiff",wdgraph),
+       plot = board_rq_nlrq$Density, width = 6, height = 12, dpi=600)
+```
+:::
+
+#### 3D visualisation NOT WORKING
+
+::: column-screen-inset-right
+```{r}
+#| label: graphrq3d
+#| eval: false
+# Linear RQ Graphics generation
+analysis <- "RQ Linear"
+rqname<- matrix(paste0("RQ2int_",sdmname_l),nrow=4,ncol=2)
+
+plot_rq <- list()  
+for (repi in 1:2) {
+  tmp<-list()
+  for (sdi in 1:nrow(sdmname_l)) { # sdi=1
+    tmp[[sdi]] <- rqdata$pl_rq_sel_3d[[rqname[sdi,repi]]][[taut]]
+  }
+  plot_rq[[repi]]<-tmp
+  
+# PLOTLY FACET
+
+}
+
+```
+
+```{r}
+#| label: graphnlrq3d
+#| eval: false
+# Nonlinear RQ Graphics generation
+analysis <- "RQ Nonlinear"
+RQ2nliname<- matrix(paste0("RQ2nli_",sdmname_l),nrow=4,ncol=2)
+
+plot_nlrq <- list()
+for (repi in 1:2){
+  tmp <- list()
+  for (sdi in 1:nrow(sdmname_l)) { # sdi=1
+      tmp[[sdi]] <- nlrqdata$pl_rq_sel_3d[[RQ2nliname[sdi,repi]]][[taut]]
+  }
+  plot_nlrq[[repi]]<-tmp
+  
+}
+
+```
+
+```{r}
+#| label: graphrqbs3d
+#| eval: false
+# BSplines RQ Graphics generation
+analysis <- "RQ BSpline"
+RQ2bspname<- matrix(paste0("RQ2bsp_",sdmname_l),nrow=4,ncol=2)
+
+plot_rqbs <- list()
+for (repi in 1:2) {
+  tmp <- list()
+  for (sdi in 1:nrow(sdmname_l)) { # sdi=1
+    tmp[[sdi]] <- rqbsdata$pl_rq_sel_3d[[RQ2bspname[sdi,repi]]][[taut]]
+  }
+  plot_rqbs[[repi]]<-tmp
+  
+}
+
+```
+
+```{r}
+#| label: fig-mpg
+#| fig-cap: "Global title."
+#| fig-subcap:
+#|   - "sub title of graph1"
+#|   - "sub title of graph2"
+#| layout-ncol: 2
+#| column: page
+#| include: true
+#| eval: false
+
+titleG <- sprintf("%s in %s (t=%g)",
+                    speciesMP$Taxon_SNa[sp],saison[sai,2],taus[taut])
+repi<-1; sdi<-1
+# for (sdi in 1:length(plot_rq[[repi]])) { # i=2
+#   print(plot_rq[[repi]][[sdi]])
+#   print(plot_nlrq[[repi]][[sdi]])
+# }
+
+#widgetframe::frameWidget(plot_rq[[repi]][[sdi]])
+```
+
+```{r}
+#| label: prefig-graphboard3d
+#| eval: false
+# Create a board of plot
+# 
+# titleG <- sprintf("%s in %s (t=%g)",
+#                     speciesMP$Taxon_SNa[sp],saison[sai,2],taus[taut])
+# plot_t <- list()
+# leti<-c("A","B","C","D")
+# for (repi in 1:2) { # repi=1
+#   tmp<-list()
+#   subtitleG <- sprintf("SDM-NEO %s",reponse[repi,3])
+#   for (i in 1:length(plot_rq[[repi]])) { # i=2
+#     x1l<-pred_red[as.numeric(substr(sdmname_l[i],4,4)),2]
+#     x2l <- pred_red[as.numeric(substr(sdmname_l[i],5,5)),2]
+#     zl<-sprintf("%s (%s)",reponse[repi,2],reponse[repi,3])
+#     
+#     plot_rq[[repi]][[i]] <- plot_rq[[repi]][[i]] 
+#     
+#     plot_nlrq[[repi]][[i]] <- plot_nlrq[[repi]][[i]]
+# 
+# scene <- list(camera = list(eye = list(x = -1.5, y = 1.5, z = 0.3)),
+#               aspectmode='cube',
+#               xaxis = list(title = x1l), 
+#               yaxis = list(title = x2l),
+#               zaxis = list(title = zl),
+#               domain=list(x=c(0,0.5),y=c(0,1)))
+# scene2 <- list(camera = list(eye = list(x = -1.5, y = 1.5, z = 0.3)),
+#                aspectmode='cube',
+#                xaxis = list(title = x1l), 
+#                yaxis = list(title = x2l),
+#                zaxis = list(title = zl),
+#                domain=list(x=c(0.5,1),y=c(0,1)))
+# 
+#     tmp[[i]] <- plotly::subplot(list(plot_rq[[repi]][[i]],plot_nlrq[[repi]][[i]]),
+#                                  shareX = TRUE, shareY = TRUE, nrows = 2) %>%
+#       layout(scene = scene, scene2 = scene2)
+#     saveWidget(dp3dF_plot_list,
+#                sprintf("%s%s/%s/RQ2nli/%s_%s_RQ2nli3dFacet_%s_%s_%s_%s.html",
+#                        wdgraphEx,espece,
+#                        analysis,etude,espece,
+#                        saison[sai,2],yt,x1t,x2t),
+#                selfcontained = F, libdir = "lib")
+#     
+#     tmp[[i]] <- ggarrange(plotlist =
+#                             list(plot_rq[[repi]][[i]],plot_nlrq[[repi]][[i]]), 
+#                          ncol=2, nrow=1,
+#                          labels=paste0(leti[i],1:2), hjust=0, vjust=2,
+#                          legend="right", common.legend = TRUE)
+#     tmp[[i]] <- annotate_figure(tmp[[i]], 
+#                     left = text_grob(plot_rq[[repi]][[i]][["labels"]][["y"]], rot = 90),
+#                     bottom = text_grob(plot_rq[[repi]][[i]][["labels"]][["x"]]))
+#           
+#   }
+#   plot_t[[repi]] <- ggarrange(plotlist = tmp,
+#                          ncol=1, nrow=4,
+#                          labels=NULL,#legend="right",
+#                          common.legend = FALSE)
+#   
+#   # plot_t <- ggarrange(plotlist = c(rbind(plot_rq, plot_nlrq)), 
+#   #                        ncol=2, nrow=length(plot_rq),
+#   #                        labels="AUTO",legend="right",
+#   #                        common.legend = FALSE)
+#   # plot_t <- ggarrange(plotlist = list(plot_rq_t, plot_nlrq_t), 
+#   #                        ncol=2, nrow=1,
+#   #                        labels=NULL,legend="right",
+#   #                        common.legend = FALSE)
+#   
+#   plot_t[[repi]] <- annotate_figure(plot_t[[repi]],
+#                         top = text_grob(titleG, size=18),
+#                         bottom = text_grob(subtitleG, size=18)) +
+#         bgcolor("white")
+#   ggsave(sprintf("%s%s/%s_%s_%s_%s_%s.tiff",
+#                  wdgraph,espece,
+#                  etude,espece,
+#                  reponse[repi,3],saison[sai,2],taus[t]),
+#          plot = plot_t[[repi]], width = 8, height = 12, dpi=600)
+# }
+# 
+# # subtitleG <- sprintf("%s, tau = %g",xl,taus[t])
+# # scene <- list(camera = list(eye = list(x = -1.5, y = 1.5, z = 0.3)), aspectmode='cube',
+# #             xaxis = list(title = x1l), yaxis = list(title = x2l),
+# #             zaxis = list(title = sprintf("%s (%s)",reponse[1,2],reponse[1,3])),
+# #             domain=list(x=c(0,0.5),y=c(0,1)))
+# # scene2 <- list(camera = list(eye = list(x = -1.5, y = 1.5, z = 0.3)), aspectmode='cube',
+# #              xaxis = list(title = x1l), yaxis = list(title = x2l),
+# #              zaxis = list(title = sprintf("%s (%s)",reponse[2,2],reponse[2,3])),
+# #              domain=list(x=c(0.5,1),y=c(0,1)))
+# # dp3dF <- subplot(plot_dp3dlist, shareX = TRUE, shareY = TRUE, nrows = 2) %>%
+# # layout(title = paste(titleG,subtitleG,sep="\n"),
+# #        scene = scene, scene2 = scene2)
+# # saveWidget(dp3dF,sprintf("%s%s/%s/%s_%s_RQ2int3dFacet_%s_%s_%s_%s.html",
+# #                        wdgraphEx,espece,analysis,etude,espece,
+# #                        saison[sai,2],x1t,x2t,taus[t]),
+# #          selfcontained = F, libdir = "lib")
+# # 
+# # rm(list=ls(pattern="scene")); rm(list=ls(pattern="plot"))
+
+```
+
+:::
+
+## SDM-NEO Maps
+
+::: column-screen-inset-right
+```{r}
+
+
+```
+
+:::
+
+# Final actions and save
+
+::: column-screen-inset-right
+Rdata are saved in `rdataout`. An excel file collects data in `r binderout` , with sheets for :
+
+-   data : contains whatever
+
+```{r}
+#| label: finalsave_xsl
+#| eval: false
+
+# wb <- copyWorkbook(loadWorkbook(binderin))
+# # copyworkbook to avoid any pb that can occur on the excel file
+# if (!("AllMeas" %in% names(wb))) {
+#   addWorksheet(wb=wb, sheetName = "AllMeas")}
+# writeData(wb, sheet = "AllMeas", x = data,
+#           startCol = 1, startRow = 1,withFilter = FALSE)
+# 
+# saveWorkbook(wb,file=binderout, overwrite = TRUE)
+
+```
+
+```{r}
+#| label: finalsave_rdata
+
+# rm("rqdata","nlrqdata","rqbsdata")
+save(list=(ls()[!grepl("rq_", ls())]),
+     file = paste0(rdataout,".RData"))
+beepr::beep(2)
+
+```
+:::
+
+# Supplementary data
+
+## Software details
+
+::: {.callout-tip collapse="true"}
+## Expand for R Session Info
+
+```{r, echo = FALSE}
+#| include: true
+
+library(sessioninfo)
+pkg_sesh <- session_info(pkgs = "attached")
+quarto_version <- system("quarto --version", intern = TRUE)
+pkg_sesh$platform$quarto <- paste(
+  system("quarto --version", intern = TRUE),
+  "@",
+  quarto::quarto_path()
+  )
+pkg_sesh
+```
+:::
+
+# References {.unnumbered}

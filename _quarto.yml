@@ -1,0 +1,31 @@
+project:
+  title: "A_SDM_NEO"
+  execute-dir: project
+  output-dir: docs
+date: "`r format(Sys.time(), '%B %Y')`"
+execute:
+  freeze: auto  # re-render only when source changes
+  
+toc: true # table of content at beginning of document
+toc-location: left
+toc-depth: 3
+toc_float: TRUE
+number-sections: true
+highlight-style: pygments
+
+format: 
+  html: 
+    self-contained: true
+    embed-resources: true
+    code-fold: false
+    page-layout: article
+    html-math-method: katex # displays equations
+  docx: 
+    reference-doc: customreference_nonb.docx
+  pdf:
+    code-line-numbers: true
+    geometry: 
+      - top=20mm
+      - left=20mm 
+
+bibliography: references.bib

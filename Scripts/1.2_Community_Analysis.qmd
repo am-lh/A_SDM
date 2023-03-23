@@ -1,20 +1,9 @@
 ---
 title: "TREATMENT OF BIOLOGIC DATA FROM CSLN BEFORE SDM TREATMENT"
 author: "Amélie Lehuen"
-date: "2022-12-14"
 description: "add info on script"
-toc: true # table of content at beginning of document
-number-sections: true
-highlight-style: pygments
-format: 
-  html: 
-    self-contained: true
-    code-fold: false
-    html-math-method: katex # displays equations
-
-bibliography: references.bib
-
-editor: visual
+date: "`r format(Sys.time(), '%B %Y')`"
+editor: source
 execute:
   eval: true
   echo: false
@@ -22,7 +11,8 @@ execute:
   warning: false
   output: true
   include: false
-  cache: false
+editor_options: 
+  chunk_output_type: console
 ---
 
 # TREATMENT OF BIOLOGIC DATA FROM CSLN BEFORE SDM TREATMENT
@@ -63,10 +53,10 @@ library(knitr)
 #| echo: true
 rm(list=ls())
 
-wdsource <- "Sources/Faune/CSLN/"
+wdsource <- "Data/Faune/CSLN/"
 wdmat <- "Matrices/"
-wdgraph <- "Graphiques/"
-wdres <- "Resultats/"
+wdgraph <- "Plots/"
+wdres <- "Results/"
 
 ```
 
@@ -89,7 +79,6 @@ Scale_brew <- function() {scale_colour_brewer(palette="Spectral",aesthetics=c("c
 
 ```{r}
 #| label: functmade
-#| echo: true
 
 ```
 
@@ -99,7 +88,7 @@ Scale_brew <- function() {scale_colour_brewer(palette="Spectral",aesthetics=c("c
 
 ```{r}
 #| label: externdata
-#| echo: true
+binderin <- sprintf("%sCSLN_BDD.xlsx", wdres)
 rdatain <- sprintf("%sCSLN_Mars_BDD.RData",wdmat)
 load(rdatain)
 ```
@@ -108,8 +97,8 @@ load(rdatain)
 
 ```{r}
 #| label: outfiles
-#| echo: true
-binderout <- sprintf("binderout.xlsx")
+
+binderout <- sprintf("%sCSLN_BDD.xlsx", wdres)
 rdataout  <- sprintf("%sCSLN_Mars_Zone_BDD.RData",wdmat)
 # if exists
 # load(rdataout)
@@ -119,7 +108,7 @@ rdataout  <- sprintf("%sCSLN_Mars_Zone_BDD.RData",wdmat)
 
 ```{r}
 #| label: basicvar
-#| echo: true
+
 discarded_run <- c("")
 nelrow <- 2; nelcol <- 1
 ```
@@ -369,7 +358,8 @@ ggd1 <- as.ggdend(ggd1)
 ggd1 <- ggplot(ggd1, horiz = TRUE, labels = TRUE)
 ggd1 <- ggd1 + ggtitle("Simprof on mudflats")
 print(ggd1)
-ggsave(paste(wdgraph,"CSLN_Simprof_Zone",".png",sep=""), plot = ggd1, width = 12, height = 8)
+ggsave(paste(wdgraph,"CSLN_Simprof_Zone",".png",sep=""), 
+       plot = ggd1, width = 12, height = 8, dpi=400)
 
 # Significance of the groups
 ad_CAH <- adonis2(CSLN_simp_mat~groupe.clust,method="bray"); ad_CAH
@@ -466,7 +456,8 @@ bp <- ggplot(data=CSLN_mds_dat) +
           axis.text.y = element_blank(), # remove y-axis text
           axis.ticks = element_blank()) #+theme_bw()
 print(bp)
-ggsave(paste(wdgraph,"nMDS Macrofaune by Zone",".png",sep=""), plot = bp, width = 12, height = 8, dpi=600)
+ggsave(paste(wdgraph,"nMDS Macrofaune by Zone",".png",sep=""), 
+       plot = bp, width = 12, height = 8, dpi=400)
 
 ```
 
@@ -500,21 +491,41 @@ Rdata are saved in `rdataout`. An excel file collects data in `r binderout` , wi
 ```{r}
 #| label: finalsave
 #| eval: false
-wb <- copyWorkbook(loadWorkbook(binderin))
-if (!("AllMeas" %in% names(wb))) {addWorksheet(wb=wb, sheetName = "AllMeas")}
-writeData(wb, sheet = "AllMeas", x = data, startCol = 1, startRow = 1,withFilter = FALSE)
-saveWorkbook(wb,file=binderout, overwrite = TRUE)
 
-save.image(file = rdataout)
-beepr::beep(2)
+# wb <- copyWorkbook(loadWorkbook(binderin))
+# if (!("AllMeas" %in% names(wb))) {addWorksheet(wb=wb, sheetName = "AllMeas")}
+# writeData(wb, sheet = "AllMeas", x = data, startCol = 1, startRow = 1,withFilter = FALSE)
+# saveWorkbook(wb,file=binderout, overwrite = TRUE)
+
 ```
 
 ```{r}
 #| label: finalsave_r
-#| eval: false
 
 save.image(file = rdataout)
 beepr::beep(2)
 ```
+
+# Supplementary data
+
+## Software details
+
+::: {.callout-tip collapse="true"}
+## Expand for R Session Info
+
+```{r, echo = FALSE}
+#| include: true
+
+library(sessioninfo)
+pkg_sesh <- session_info(pkgs = "attached")
+quarto_version <- system("quarto --version", intern = TRUE)
+pkg_sesh$platform$quarto <- paste(
+  system("quarto --version", intern = TRUE),
+  "@",
+  quarto::quarto_path()
+  )
+pkg_sesh
+```
+:::
 
 # References {.unnumbered}
