@@ -2,7 +2,7 @@
 title: "MELTING POTES PROJECT : SDM-NEO MODELS Linear Quantile Regression"
 author: "Amélie Lehuen"
 description: "ANALYSIS WITH KOENKER'S QUANTREG PACKAGE"
-date: "`r format(Sys.time(), '%B %Y')`"
+date: "`r format(Sys.time(), '%d %B %Y')`"
 editor: source
 execute:
   eval: true
@@ -67,6 +67,9 @@ wdres <- "Results/"
 pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
 
+flag_calc<-TRUE # to calculate RQ models and mars results
+flag_calc_mars<-TRUE # to calculate time-consuming mars summary by period
+
 ```
 
 ### Graphic charter
@@ -115,6 +118,8 @@ AICc<-function(modelq){
 
 rdatain <- sprintf("%sCSLN_Mars_BDD.RData",wdmat)
 load(rdatain)
+load(sprintf("SIG/OSM_extraction.RData"))
+
 ```
 
 ### Output save binder and Rdata
@@ -125,7 +130,7 @@ load(rdatain)
 binderout <- sprintf("%sCSLN_BDD.xlsx",wdres)
 rdataout  <- sprintf("%sCSLN_Mars_RQ_BDD",wdmat)
 # if exists
-# load(paste0(rdataout,".RData"))
+load(paste0(rdataout,".RData"))
 ```
 
 ### Basic variables
@@ -139,237 +144,14 @@ analysis <- "RQ Linear"
 sp <- which(speciesMP$SPCourt == espece)
 sai <- which(saison$M_Def == "Year") #Year Winter Summer
 
-# Var_choosen<-c("flow_mxd","inunt","sal_dtd","temp_m","mudrate_m","tenfon_mxd")
-# Mod_chosen<-list(c("flow_mxd","inunt"),
-#                   c("mudrate_m","tenfon_mxd"),
-#                   c("sal_dtd","temp_m"),
-#                   c("inunt","temp_m"))
-# taus <- c(0.5,0.9,0.95,0.975) # c(0.5,0.85,0.9,0.95,0.975,0.99) #c(1:19/20,0.975,0.99)
-# taus_l<-setNames(as.list(taus),sprintf("%0.3f",taus))
 type<-list(add= c("+","add"),int=c("*","int"))
 tauchoice<-0.975
 graphfine<-50 # graph resolution for 2D and 3D graphs surfaces
 
-# reponse<-reponse %>%
-#   filter(rvar %in% c("Biomass_gAFDWm2","Density_indm2")) %>%
-#   rowid_to_column("id") %>% 
-#   mutate(whole=sprintf("%s (%s)",rdescr,runit)) %>% 
-#   as.list %>% 
-#   transpose(.) %>% 
-#   setNames(c("Biomass","Density"))
-# pred_red <- predict %>% 
-#   subset(Var %in% Var_choosen) %>% 
-#   arrange(match(Var,Var_choosen)) %>%
-#   rowid_to_column("id") %>%
-#   mutate(whole=sprintf("%s (%s)",Desc,Unit)) %>% 
-#   as.list
-
-# pred_red_comb<-map(as.list(c(1:4)), \(idx)
-#   {map(pred_red,
-#       ~combn(.,idx, simplify = FALSE)) %>% transpose(.)}  ) %>% 
-#   setNames(paste0("x",1:4))
-# 
-# pred_red_comb<-map2(pred_red_comb,
-#                     map_depth(pred_red_comb,2,
-#                               ~paste0(.x$id,collapse="")),
-#                     ~setNames(.x,.y ) )
-# pred_red_comb_sel<-map(pred_red_comb,
-#       ~map(Mod_chosen, \(mod) keep(.x,~identical(.x$Var, mod)) ) ) %>% 
-#   map(., compact) %>% compact %>% 
-#   map(.,list_flatten) %>% 
-#   list_flatten(.,name_spec= "{inner}")
-
 df <- CSLN_Mars[which(CSLN_Mars$SPCourt == espece),]
 
-Mars_SDM<-Mars_dat_sf %>% 
-  select(c(NINJ,Lon,Lat,Zone,Tidal_level,Period,Annee,pred_red$Var))
-
-Mars_SDM_per<- Mars_SDM %>% 
-               group_by(across(NINJ:Annee)) %>% 
-               dplyr::summarise(across(is.numeric,~mean(.x,na.rm=TRUE)))
-
-```
-
-# SDM Model calculation
-## RQ calculation
-```{r}
-#| label: rq_Mod_calc
-
-rq_Lin <- function(df,biolo,sdmod,taus,typ) {
-  # biolo=reponse[[1]]; typ=type[[2]]
-  # sdmod=pred_red_comb$x1[[1]]
-  typetxt<-paste0("RQ",length(sdmod$id),typ[2])
-  sdmname<-sprintf("%s_%g%g%g%s%s",typetxt,sp,sai,
-                   biolo$id,
-                   paste0(sdmod$id,collapse = ""),
-                   ifelse(length(sdmod$id)==1,"0","") )
-  
-  yt<- biolo$rvar
-  yl<- biolo$whole
-  xt<-paste(sdmod$Var, collapse=typ[1])
-  xl<-paste(sdmod$whole, collapse=paste0(" ",typ[1]," "))
-  dfrq <-df[,c(yt,sdmod$Var)] %>% 
-    drop_na() %>%
-    setnames(old=c(yt,sdmod$Var),
-             new=c("y",paste0("x",1:length(sdmod$Var))) ) %>% 
-    mutate(across(everything(),jitter))
-  formumod<-as.formula(paste("y",paste0("x",1:length(sdmod$Var),collapse=typ[1]),sep=" ~ "))
-
-  # Model grid definition
-  xmod<-map( #x1x2mod
-            map(as.list(names(dfrq %>% select(-y))),
-                ~{ dfrq %>% select(-y) %>% 
-                  summarise(across(everything(),
-                                   list(~min(.x, na.rm = TRUE), ~max(.x, na.rm = TRUE)),
-                                   .names = "{.fn}.{.col}")) %>% 
-                  select(contains(.x)) %>% 
-                  unlist(., use.names=FALSE) } ) %>% 
-              setNames(names(dfrq %>% select(-y))) ,
-            ~seq(.[1],.[2],length.out=graphfine) ) %>% 
-        bind_cols()
-  gridx <- expand.grid(xmod)
-  if(length(sdmod$Var)==2){
-    gridxmat <- mesh(xmod$x1,xmod$x2)
-    } else{ gridxmat<-NULL }
-  mod_grid<-list(xmod=xmod,gridx=gridx,gridxmat=gridxmat)
-
-  tryCatch({
-    modelq0<-rq(y ~ 1, data=dfrq, tau=taus)
-    modelq<-rq(formumod, data=dfrq, tau=taus) 
-    smrq <- summary(modelq, se="boot") %>% 
-      setNames(sprintf("%.3f",taus))
-    meta <- list(type=typ[1],typetxt=typetxt,
-                 Sp=espece,Season=saison[sai,2],
-                 reponse=yt,reponset=yl,
-                 unit=biolo$runit,
-                 predict=xt,predictt=xl,
-                 predictl=sdmod$whole,
-                 predfile=paste(sdmod$Var, collapse="_"))
-    valid <- map(as.list(seq(length(smrq))),
-                ~list(AICc=round(AICc(modelq)[.x],1),
-                     Rone=round((1 - modelq$rho[.x]/modelq0$rho[.x]),5)) ) %>% 
-      setNames(sprintf("%.3f",taus))    
-    
-    smrq_t <- map2(smrq, taus_l,
-              ~{as.data.frame(.x$coefficients) %>%
-                mutate(Var=rownames(.)) %>%
-                relocate(Var) %>%
-                remove_rownames(.) %>%
-                mutate(tau=.y, taust=sprintf("tau= %s",.y),
-                       sdmname=sdmname,
-                       formula=format(modelq$formula),
-                       type=typ[1],typetxt=typetxt,
-                       Sp=espece, Season=saison[sai,2],
-                       reponse=yt, reponset=yl, unit=biolo$runit,
-                       # Predictor1=pred_red[k,1], Predictor2=pred_red[k2,1],
-                       predict=xt, predictt=xl,
-                       predfile=paste(sdmod$Var, collapse="_")) } )
-    smrq_t<-smrq_t %>% map2(valid,., append)
-
-    # Out of limits points calculation
-    rqlim_t <- modelq %>% 
-      predict %>% 
-      as.data.frame %>%
-      rename_all(~sprintf("%.3f",taus)) %>% 
-      mutate(across(everything(), function(x){replace(x, which(x<0), NA)})) %>% 
-      bind_cols(tibble(dfrq)) %>% 
-      melt(id.vars=names(dfrq),
-                    variable.name = "tau",value.name = "RqLim") %>% 
-      mutate(sdmname=sdmname,
-             taust=sprintf("tau= %s",tau),
-             tau=as.numeric(as.character(tau))) %>% 
-      mutate(status=case_when(y>RqLim ~"over",y<=RqLim ~"under" ))
-
-    # Surface model calculation
-    mod_pred_t <- as.data.frame(predict(modelq,newdata=gridx)) %>%
-      rename_all(~sprintf("%.3f",taus)) %>% 
-      mutate(across(everything(), 
-                    function(x){replace(x, which(x<0), NA)})) %>% 
-      bind_cols(gridx) 
-    mod_pred_t <- melt(mod_pred_t,id.vars=names(dfrq %>% select(-y)),
-                    variable.name = "tau",value.name = "RqMod") %>% 
-      mutate(sdmname=sdmname,
-             taust=sprintf("tau= %s",tau),
-             tau=as.numeric(as.character(tau)))
-  },error = function(e) {print(e)})#,finally = {}) # end try catch
-  return(list(sdmname=sdmname, meta=meta,
-              modelq=modelq, smrq=smrq, smrq_t=smrq_t,
-              rqlim_t=rqlim_t, mod_grid=mod_grid, mod_pred_t=mod_pred_t))
-} # end func
-
-# rq_Mod_x1<-
-#   map(reponse, \(biolo)
-#     {map(type[1], \(typ)
-#       {map(pred_red_comb$x1,
-#            ~rq_Lin(df,biolo,.,taus,typ)) } ) } ) %>%
-#   map_depth(.,2, ~setNames(.x,map(.x,~.$sdmname)) ) %>%
-#   map(~list_flatten(.x,name_spec= "{inner}")) # remove the type level of nested lists
-
-rq_Mod_all <-
-  map( reponse, \(biolo)
-    {map( type, \(typ)
-      {map_depth( pred_red_comb[1:2],2, # CHOSEN TO GO LIGHT ON CALCULATION
-            ~rq_Lin(df,biolo,.x,taus,typ)) } ) } ) %>%
-  map_depth(.,3, ~setNames(.x,map(.x,~.$sdmname)) ) %>%
-  map_depth(.,2,~list_flatten(.x,name_spec= "{inner}")) %>%
-  map(.,~list_flatten(.x,name_spec= "{inner}")) %>% 
-  map(.,~discard_at(.,~grepl("^RQ1int",.x)) ) # Suppress RQ1int redundant with add, because not found how to avoid its calculation, okay?
-
-rq_Mod_sel<-map(rq_Mod_all,
-      ~keep_at(.,~ grepl(paste0(names(pred_red_comb_sel),"$",collapse="|"),
-                         .x)) )
-
-```
-
-## Mars calculation of models
-```{r}
-#| label: rq_Mod_mars
-
-rq_Mod_mars <- function(rqMod,MarsSDM,taus) {
-  # biolo=reponse[[1]]; MarsSDM=Mars_SDM
-  # rqMod=rq_Mod_sel[[biolo$rdescr]][[1]]
-  typetxt<-rqMod$meta$typetxt
-  vars<-unlist(strsplit(rqMod$meta$predict,rqMod$meta$type,fixed = TRUE))
-  # sdmname<-rqMod$sdmname
-
-  xmars <- MarsSDM %>% 
-    st_drop_geometry() %>% # as.data.frame() %>% 
-    select(all_of(vars)) %>% 
-    rename_all(~paste0("x",1:length(vars)))
-
-  MarsSDM<-MarsSDM %>% 
-    select(c(NINJ,Lon,Lat,Zone,Tidal_level,Period,Annee,vars)) #%>% 
-  RqModMars <- as.data.frame(predict(rqMod$modelq,newdata=xmars)) %>%
-    rename_all(~sprintf("t%.3f",taus)) %>% 
-    # rename_all(~sprintf("%s_t%.3f",sdmname,taus)) %>% 
-    mutate(across(everything(), function(x){replace(x, which(x<0), NA)}))
-  MarsSDM<-MarsSDM %>% cbind(RqModMars)
-  return(MarsSDM)
-}
-
-rq_Mod_mars_all<-
-  map_depth(rq_Mod_all,2,
-            ~rq_Mod_mars(.x,Mars_SDM,taus))
-
-rq_Mod_mars_sel<-
-  map_depth(rq_Mod_sel,2,
-            ~rq_Mod_mars(.x,Mars_SDM,taus))
-
-```
-
-Summary of values by period for mapping (!! can be very long)
-```{r}
-rq_Mod_mars_sel_per<-
-  map_depth(rq_Mod_mars_sel,2,
-            ~{ .x %>% 
-               group_by(NINJ,Period) %>% 
-               summarise(across(is.numeric,~mean(.x,na.rm=TRUE))) } )
-save(list=(ls()[grep("rq_", ls())]),
-     file = paste0(rdataout,".RData"))
-```
-
-# Model graphs
-```{r}
+# Mars_SDM<-Mars_dat_sf %>% 
+#   select(c(NINJ,Lon,Lat,Zone,Tidal_level,Period,Annee,pred_red$Var))
 
 wdgraph <- "C:/Users/lehuen201/Back Up AMLH/Melting Potes/BDD/A_SDM_NEO/Plots/" #"Plots/"
 graph_path <- sprintf("%s%s/%s/",wdgraph,espece,analysis)
@@ -377,12 +159,210 @@ titleG <- sprintf("%s %s in %s",
                   analysis,speciesMP$Taxon_SNa[sp],saison[sai,2])
 ```
 
+# SDM Model calculation
+## RQ calculation
+```{r}
+#| label: rq_Mod_calc
+if(flag_calc){
+  rq_Lin <- function(df,biolo,sdmod,taus,typ) {
+    # biolo=reponse_l[[1]]; typ=type[[2]]
+    # sdmod=pred_red_comb$x1[[1]]
+    typetxt<-paste0("RQ",length(sdmod$id),typ[2])
+    sdmname<-sprintf("%s_%g%g%g%s%s",typetxt,sp,sai,
+                     biolo$repi,
+                     paste0(sdmod$id,collapse = ""),
+                     ifelse(length(sdmod$id)==1,"0","") )
+    yt<- biolo$rvar
+    yl<- biolo$whole
+    xt<-paste(sdmod$Var, collapse=typ[1])
+    xl<-paste(sdmod$whole, collapse=paste0(" ",typ[1]," "))
+    dfrq <-df[,c(yt,sdmod$Var)] %>% 
+      drop_na() %>%
+      setnames(old=c(yt,sdmod$Var),
+               new=c("y",paste0("x",1:length(sdmod$Var))) ) %>% 
+      mutate(across(everything(),jitter))
+    df_tmp<-df %>% 
+      drop_na(all_of(c(yt,sdmod$Var))) %>%
+      select(all_of(c("Zone","Tidal_level","Period","Season","Annee","Mois","NINJ")))
+    formumod<-as.formula(paste("y",paste0("x",1:length(sdmod$Var),collapse=typ[1]),sep=" ~ "))
+  
+    # Model grid definition
+    xmod<-map( #x1x2mod
+              map(as.list(names(dfrq %>% select(-y))),
+                  ~{ dfrq %>% select(-y) %>% 
+                    summarise(across(everything(),
+                                     list(~min(.x, na.rm = TRUE), ~max(.x, na.rm = TRUE)),
+                                     .names = "{.fn}.{.col}")) %>% 
+                    select(contains(.x)) %>% 
+                    unlist(., use.names=FALSE) } ) %>% 
+                setNames(names(dfrq %>% select(-y))) ,
+              ~seq(.[1],.[2],length.out=graphfine) ) %>% 
+          bind_cols()
+    gridx <- expand.grid(xmod)
+    if(length(sdmod$Var)==2){
+      gridxmat <- mesh(xmod$x1,xmod$x2)
+      } else{ gridxmat<-NULL }
+    mod_grid<-list(xmod=xmod,gridx=gridx,gridxmat=gridxmat)
+    mod_t<-NULL
+    
+    tryCatch({
+      modelq0<-rq(y ~ 1, data=dfrq, tau=taus)
+      modelq<-rq(formumod, data=dfrq, tau=taus) 
+      smrq <- summary(modelq, se="boot") %>% 
+        setNames(sprintf("%.3f",taus))
+      meta <- list(type=typ[1],typetxt=typetxt,
+                   Sp=espece,Season=saison[sai,2],
+                   reponse=yt,reponset=yl,
+                   unit=biolo$runit,
+                   predict=xt,predictt=xl,
+                   predictl=sdmod$whole,
+                   predfile=paste(sdmod$Var, collapse="_"))
+      valid <- map(as.list(seq(length(smrq))),
+                  ~list(AICc=round(AICc(modelq)[.x],1),
+                       Rone=round((1 - modelq$rho[.x]/modelq0$rho[.x]),5)) ) %>% 
+        setNames(sprintf("%.3f",taus))    
+      
+      smrq_t <- map2(smrq, taus_l,
+                ~{as.data.frame(.x$coefficients) %>%
+                  mutate(Var=rownames(.)) %>%
+                  relocate(Var) %>%
+                  remove_rownames(.) %>%
+                  mutate(tau=.y, taust=sprintf("tau= %s",.y),
+                         sdmname=sdmname,
+                         formula=format(modelq$formula),
+                         type=typ[1],typetxt=typetxt,
+                         Sp=espece, Season=saison[sai,2],
+                         reponse=yt, reponset=yl, unit=biolo$runit,
+                         # Predictor1=pred_red[k,1], Predictor2=pred_red[k2,1],
+                         predict=xt, predictt=xl,
+                         predfile=paste(sdmod$Var, collapse="_")) } )
+      smrq_t<-smrq_t %>% map2(valid,., append)
+  
+      # Out of limits points calculation
+      rqlim_t <- modelq %>% 
+        predict %>% 
+        as.data.frame %>%
+        rename_all(~sprintf("%.3f",taus)) %>% 
+        mutate(across(everything(), function(x){replace(x, which(x<0), NA)})) %>% 
+        bind_cols(tibble(dfrq)) %>% 
+        bind_cols(tibble(df_tmp)) %>% 
+       melt(id.vars=c(names(dfrq),names(df_tmp)),
+                      variable.name = "tau",value.name = "RqLim") %>% 
+        mutate(sdmname=sdmname,
+               taust=sprintf("tau= %s",tau),
+               tau=as.numeric(as.character(tau))) %>% 
+        mutate(status=case_when(y>RqLim ~"over",y<=RqLim ~"under" ))
+  
+      # Surface model calculation
+      mod_pred_t <- as.data.frame(predict(modelq,newdata=gridx)) %>%
+        rename_all(~sprintf("%.3f",taus)) %>% 
+        mutate(across(everything(), 
+                      function(x){replace(x, which(x<0), NA)})) %>% 
+        bind_cols(gridx) 
+      mod_pred_t <- melt(mod_pred_t,id.vars=names(dfrq %>% select(-y)),
+                      variable.name = "tau",value.name = "RqMod") %>% 
+        mutate(sdmname=sdmname,
+               taust=sprintf("tau= %s",tau),
+               tau=as.numeric(as.character(tau)))
+
+    mod_t<-list(sdmname=sdmname, meta=meta,
+                modelq=modelq, smrq=smrq, smrq_t=smrq_t,
+                rqlim_t=rqlim_t, mod_grid=mod_grid, mod_pred_t=mod_pred_t)
+    },error = function(e) {print(e)})#,finally = {}) # end try catch
+    return(mod_t)
+  } # end func
+  
+  rq_Mod_all <-
+    map( reponse_l, \(biolo)
+      {map( type, \(typ)
+        {map_depth( pred_red_comb[1:2],2, # CHOSEN TO GO LIGHT ON CALCULATION
+              ~rq_Lin(df,biolo,.x,taus,typ)) } ) } ) %>%
+    map_depth(.,3, ~setNames(.x,map(.x,~.$sdmname)) ) %>%
+    map_depth(.,2,~list_flatten(.x,name_spec= "{inner}")) %>%
+    map(.,~list_flatten(.x,name_spec= "{inner}")) %>% 
+    map(.,compact) %>%  # suppress trycatch errors
+    map(.,~discard_at(.,~grepl("^RQ1int",.x)) ) # Suppress RQ1int redundant with add, because not found how to avoid its calculation, okay?
+  
+  rq_Mod_sel<-map(rq_Mod_all,
+        ~keep_at(.,~ grepl(paste0(names(pred_red_comb_sel),"$",collapse="|"),.x)) )
+  rq_Mod_sel<-map(rq_Mod_sel,
+        ~discard_at(.,~ grepl("add",.x) ) ) # to remove addition that are not usefull and taking too long to calculate
+        
+} # end if flag_calc
+```
+
+## Mars calculation of models
+```{r}
+#| label: rq_Mod_mars
+if(flag_calc){
+  rq_Mod_mars <- function(rqMod,MarsSDM,taus) {
+      # biolo=reponse_l[[1]]; MarsSDM=Mars_SDM_per
+      # rqMod=rq_Mod_sel[[biolo$rdescr]][[1]]
+    typetxt<-rqMod$meta$typetxt
+    vars<-unlist(strsplit(rqMod$meta$predict,rqMod$meta$type,fixed = TRUE))
+    # sdmname<-rqMod$sdmname
+  
+    xmars <- MarsSDM %>% 
+      st_drop_geometry() %>% # as.data.frame() %>% 
+      ungroup %>% 
+      select(all_of(vars)) %>% 
+      rename_all(~paste0("x",1:length(vars)) )
+  
+    MarsSDM<-MarsSDM %>% 
+      select(all_of(c("NINJ","Lon","Lat","Zone","Tidal_level","Period","Annee",vars))) #%>% 
+    RqModMars <- as.data.frame(predict(rqMod$modelq,newdata=xmars)) %>%
+      rename_all(~sprintf("t%.3f",taus)) %>% 
+      # rename_all(~sprintf("%s_t%.3f",sdmname,taus)) %>% 
+      mutate(across(everything(), function(x){replace(x, which(x<0), NA)}))
+    MarsSDM<-MarsSDM %>% cbind(RqModMars)
+    return(MarsSDM)
+  }
+  
+  rq_Mod_mars_all<-
+    map_depth(rq_Mod_all,2,
+              ~rq_Mod_mars(.x,Mars_SDM,taus))
+  
+  rq_Mod_mars_sel<-
+    map_depth(rq_Mod_sel,2,
+              ~rq_Mod_mars(.x,Mars_SDM,taus))
+  
+  rq_Mod_mars_all_per<-
+    map_depth(rq_Mod_all,2,
+              ~rq_Mod_mars(.x,Mars_SDM_per,taus))
+  
+  rq_Mod_mars_sel_per<-
+    map_depth(rq_Mod_sel,2,
+              ~rq_Mod_mars(.x,Mars_SDM_per,taus))
+} # end if flag_calc
+
+```
+
+Summary of values by period for mapping (!! can be very long)
+```{r}
+if(flag_calc){
+  save(list=(ls()[grep("rq_", ls())]),
+       file = paste0(rdataout,".RData")) # save before going heavy
+}  
+if(flag_calc_mars){
+  rq_Mod_mars_sel_per<-
+    map_depth(rq_Mod_mars_sel,2,
+              ~{ .x %>% 
+                 group_by(NINJ,Period) %>% 
+                 summarise(across(where(is.numeric),~mean(.x,na.rm=TRUE))) } )
+  save(list=(ls()[grep("rq_", ls())]),
+       file = paste0(rdataout,".RData")) # save once it's done!
+} # end if flag_calc
+
+```
+
+# Model graphs
+
 ## Summaries graphs
 ```{r}
 #| label: rq_Mod_plot_sum
 
 pl_rq_Mod_sum<-function(rqMod,titleG){
-    # biolo=reponse[[1]]
+    # biolo=reponse_l[[1]]
     # rqMod=rq_Mod_sel[[biolo$rdescr]][[1]]
   typetxt<-substr(rqMod$sdmname, 1, 6) 
   png(file=sprintf("%s/%s/%s_%s_sm.tiff",
@@ -391,6 +371,19 @@ pl_rq_Mod_sum<-function(rqMod,titleG){
   plot(rqMod$smrq, main=c("Beta 0",rqMod$meta$predictt),cex=.7,pch=19,lcol=colSum[1],col=colSum[2:3])
   title(sub = titleG)
   dev.off()
+  
+  # rqMod$smrq_t$lowerbd<- rqMod$smrq_t$Value-rqMod$smrq_t$`Std. Error`
+  # rqMod$smrq_t$upperbd<- rqMod$smrq_t$Value+rqMod$smrq_t$`Std. Error`
+  # ggplot(rqMod$smrq_t,aes(x=tau,y=Value, group = 1)) +
+  #   geom_ribbon(aes(ymin=lowerbd, ymax=upperbd), 
+  #               fill=colSum[3], alpha=0.8) +
+  #   geom_point(col=colSum[2],size=1) +
+  #   geom_line(col=colSum[2],linewidth=.5, alpha=0.8) +
+  #   facet_wrap(~Var,scales="free",labeller = label_wrap_gen(width = 30)) +
+  #   labs(title = titleG) +
+  #   theme(text=element_text(size=8),
+  #         strip.text = element_text(size=6),
+          # strip.background = element_blank())
  }
 
 # pl_rq_all_sum<-
@@ -401,6 +394,11 @@ pl_rq_sel_sum<-
   map_depth(rq_Mod_sel,2,
             ~pl_rq_Mod_sum(.x,titleG))
 
+# walk(pl_rq_sel_sum,
+#   ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_sm.tiff",
+#                     graph_path, substr(.y,1,6), espece, .y),
+#                     plot = .x,
+#                     width = 10, height = 7, dpi=400) ) } )
 ```
 
 ## AIC plot
@@ -425,6 +423,13 @@ pl_rq_Mod_aic<-function(smrql,titleG){
     theme(axis.text = element_text(size=10,face="bold")) +
     coord_flip()
 }
+
+rq_Mod_all_sm<-
+  rq_Mod_all %>% 
+    map_depth(.,2, ~map_dfr(.$smrq_t, ~.) ) %>% 
+    map(., ~map_dfr(., ~.) ) %>% 
+    map_dfr(., ~.) %>% 
+  mutate(Delta_AICc= AICc-min(AICc,na.rm=TRUE))
 
 rq_Mod_sel_sm<-
   rq_Mod_sel %>% 
@@ -456,7 +461,8 @@ pl_rq_aic<-rq_Mod_sel_sm %>%
   labs(#title=titleG, 
        x="Biologic",y="AIC",
        color="Quantile",shape="Type") +
-  theme(axis.text = element_text(size=10,face="bold")) +
+  theme(axis.text = element_text(size=10,face="bold"),
+          strip.background = element_blank()) +
   coord_flip()
 ggsave(sprintf("%s%s_RQ_AIC_scores.tiff",
                  graph_path,espece),
@@ -466,12 +472,11 @@ ggsave(sprintf("%s%s_RQ_AIC_scores.tiff",
 ```
 
 ## Qqplots Residuals graphs
-!!!!!patchwork a finir !!!!!
 ```{r}
 #| label: rq_Mod_plot_res
 
 pl_rq_Mod_res<-function(rqMod,titleG){
-    # biolo=reponse[[1]]
+    # biolo=reponse_l[[1]]
     # rqMod=rq_Mod_sel[[biolo$rdescr]][[1]]
   rqResid <- melt(residuals(rqMod$modelq)) %>% 
     rename(tau=Var2, residuals=value) 
@@ -480,52 +485,34 @@ pl_rq_Mod_res<-function(rqMod,titleG){
     stat_qq() + stat_qq_line() + 
     facet_wrap(~tau) +
     Scalc_rq() +
-    theme(legend.position="bottom")+
+    theme(legend.position="none",
+          strip.background = element_blank())+
     labs(title=paste("Residuals for ",titleG,sep=""),
-         subtitle=subtitleG,
-         color="Quantile")
+         subtitle=subtitleG)
 }
 
-# pl_rq_all_res<-
-#   map(reponse, \(biolo)
-#     {map(rq_Mod_all[[biolo$rdescr]],
-#          ~pl_rq_Mod_res(.x,titleG)) } )
+pl_rq_sel_res<-
+  map_depth(rq_Mod_sel,2,
+         ~pl_rq_Mod_res(.x,titleG)) 
 
-# pl_rq_all_resb<-map(type, \(typ)
-#     {map( map(pl_rq_all_res,
-#               ~keep(.,str_detect(names(.), typ[2])) ),
-#           ~{wrap_plots(., guides="collect") +
-#               plot_annotation(title=titleG,tag_levels = c('A')) &
-#               theme(title = element_blank(),
-#                     legend.position = "none")   } ) } )
+pl_rq_sel_resb<-map(pl_rq_sel_res,
+          ~{wrap_plots(., guides="collect") &
+              plot_annotation(title=titleG,tag_levels = c('A')) &
+              theme(plot.title = element_blank(),
+                    plot.subtitle = element_text(size=12))   } )
 
-# pl_rq_sel_res<-
-#   map(reponse, \(biolo)
-#     {map(rq_Mod_sel[[biolo$rdescr]],
-#          ~pl_rq_Mod_res(.x,titleG)) } )
-
-# 
-# pl_rq_sel_resb<-map(type, \(typ)
-#     {map( map(pl_rq_sel_res,
-#               ~keep(.,str_detect(names(.), typ[2])) ),
-#           ~{wrap_plots(., guides="collect") +
-#               plot_annotation(title=titleG,tag_levels = c('A')) &
-#               theme(title = element_blank(),
-#                     legend.position = "none")   } ) } )
-
-# map(pl_rq_sel_resb,
-#   ~{ggsave(sprintf("%s/residuals.tiff",
-#                    graph_path),
-#      plot = .x, width = 18, height = 12, dpi=400) } )
+iwalk(pl_rq_sel_resb,
+  ~{ggsave(sprintf("%s/%s_residuals.tiff",
+                   graph_path,.y),
+     plot = .x, width = 18, height = 12, dpi=400) } )
 
 ```
 
 ## Curves 1D sdm plots
-make a patchwork to have all in one board
 ```{r}
 
 pl_rq_Mod_1d<-function(rqMod,titleG){
-    # biolo=reponse[[1]]
+    # biolo=reponse_l[[1]]
     # rqMod=rq_Mod_x1[[biolo$rdescr]][[1]]
 
   ggplot() +
@@ -574,7 +561,7 @@ walk(pl_rq_all_1d["all"],
 #| label: rq_Mod_plot_2d
 
 pl_rq_Mod_2d<-function(rqMod,titleG){
-    # biolo=reponse[[1]]
+    # biolo=reponse_l[[1]]
     # rqMod=rq_Mod_sel[[biolo$rdescr]][[1]]
   
   pl_2d<-list(all=NULL, one=NULL)
@@ -593,7 +580,8 @@ pl_rq_Mod_2d<-function(rqMod,titleG){
          fill = paste("SDM-NEO\n",rqMod$meta$unit,sep="")) +
     guides(alpha = "none") +
     Scalf_rq2d() +
-    facet_wrap(taust ~ .)
+    facet_wrap(taust ~ .) +
+    theme(strip.background = element_blank())
   
     # Define surfaces for each tau
     pl_2d$one<- map(taus_l, ~{ #taut=taus_l[[1]]
@@ -620,9 +608,9 @@ pl_rq_Mod_2d<-function(rqMod,titleG){
   return(pl_2d)
 }
 
-# pl_rq_all_2d<- rq_Mod_all %>% 
-#     map(.,~keep_at(.x,grepl("^RQ2",names(.x))) ) %>% 
-#     map_depth(.,2,~pl_rq_Mod_2d(.x,titleG) )
+pl_rq_all_2d<- rq_Mod_all %>%
+    map(.,~keep_at(.x,grepl("^RQ2",names(.x))) ) %>%
+    map_depth(.,2,~pl_rq_Mod_2d(.x,titleG) )
 
 pl_rq_sel_2d<- rq_Mod_sel %>% 
     map(.,~keep_at(.x,grepl("^RQ2",names(.x))) ) %>% 
@@ -640,9 +628,9 @@ walk(pl_rq_sel_2d,
 ```{r}
 #| label: rq_Mod_plot_3d
 
-pl_rq_Mod_3d<-function(rqMod,df,taus,titleG){
-    # biolo=reponse[[1]]
-    # rqMod=rq_Mod_sel[[biolo$rdescr]][[1]]
+pl_rq_Mod_3d<-function(rqMod,taus_l,titleG){
+    # biolo=reponse_l[[1]]
+    # rqMod=rq_Mod_sel[[1]][[1]]
   
   yl<-rqMod$meta$reponset
   xl<-rqMod$meta$predictl
@@ -654,7 +642,7 @@ pl_rq_Mod_3d<-function(rqMod,df,taus,titleG){
   pl_3d<-list(all=NULL, one=NULL)
   
   rqlim <- rqMod$rqlim_t %>% 
-    filter(tau==taus[length(taus)])
+    filter(tau==taus_l[[length(taus_l)]])
   rqsup<-rqlim %>% filter(status=="over")
   rqinf<-rqlim %>% filter(status=="under")
   
@@ -669,18 +657,18 @@ pl_rq_Mod_3d<-function(rqMod,df,taus,titleG){
                 marker = list(size = 3, color = colInliers, 
                               opacity = 0.7, symbol = "circle")) %>%
     layout(title = titleG, scene = myscene)
-  for (t in 1:length(taus)){ # t=4
+  for (t in 1:length(taus_l)){ # t=4
       gridxmat<-rqMod$mod_grid$gridxmat
       RqMod_mat <- rqMod$mod_pred_t %>% 
-        filter(tau==taus[t])
+        filter(tau==taus_l[[t]])
       RqMod_mat <- array(RqMod_mat$RqMod,dim=c(graphfine,graphfine))
       pl_3d$all<-pl_3d$all %>% 
           add_surface(x = gridxmat$x, y = gridxmat$y, z = RqMod_mat,
                       opacity = 0.8, colorscale = list(c(0,1),c(blank,colRQ[t])))
   } # taus
-  
+  unname(taus_l)
   # Define surfaces for each tau
-  pl_3d$one<-imap(as.list(taus), ~{ #taut=as.list(taus)[[1]] t=1
+  pl_3d$one<-map2(taus_l,seq(1:length(taus_l)), ~{ #.x=taus_l[[1]]
     gridxmat<-rqMod$mod_grid$gridxmat
     RqMod_mat <- rqMod$mod_pred_t %>% 
       filter(tau==.x)
@@ -690,7 +678,7 @@ pl_rq_Mod_3d<-function(rqMod,df,taus,titleG){
     rqsup<-rqlim %>% filter(status=="over")
     rqinf<-rqlim %>% filter(status=="under")
       
-    plot_ly(showlegend=F, scene=paste("scene",.y,sep="")) %>% 
+    plot_ly(showlegend=F) %>% #, scene=paste("scene",.y,sep="")
       add_surface(x = gridxmat$x, 
                   y = gridxmat$y, 
                   z = RqMod_mat,
@@ -713,11 +701,11 @@ pl_rq_Mod_3d<-function(rqMod,df,taus,titleG){
 
 # pl_rq_all_3d<- rq_Mod_sel %>% 
 #     map(.,~keep_at(.x,grepl("^RQ2",names(.x))) ) %>% 
-#     map_depth(.,2,~pl_rq_Mod_3d(.x,titleG) )
+#     map_depth(.,2,~pl_rq_Mod_3d(.x,taus_l,titleG) )
 
 pl_rq_sel_3d<- rq_Mod_sel %>% 
     map(.,~keep_at(.x,grepl("^RQ2",names(.x))) ) %>% 
-    map_depth(.,2,~pl_rq_Mod_3d(.x,titleG) )
+    map_depth(.,2,~pl_rq_Mod_3d(.x,taus_l,titleG) )
 
 walk(pl_rq_sel_3d,
   ~{iwalk(., ~ saveWidget(partial_bundle(.x$all),
@@ -727,100 +715,162 @@ walk(pl_rq_sel_3d,
 ```
 
 # GIS results
-```{r}
- # load of background for map
-# osm_df <- read_osm(bb(Mars_SDM), ext=1, type= "osm") #stamen-watercolor osm
-# save(osm_df, file=sprintf("SIG/OSM_extraction.RData"))
-load(sprintf("SIG/OSM_extraction.RData"))
-
-graph_path <- sprintf("%s%s/%s/",wdgraph,espece,analysis)
-titleG <- sprintf("%s %s in %s",
-                  analysis,speciesMP$Taxon_SNa[sp],saison[sai,2])
-
-```
 
 ## Mars SDM stats
 
 ```{r}
 #| label: rq_Mod_mars_stat
 
-st_rq_Mod_map<-function(rqmodmars,rqMod,tauchoice){
-    # biolo=reponse[[1]]
-    # rqmodmars=rq_Mod_mars_sel[[biolo$rdescr]][[1]]
-    # rqMod=rq_Mod_sel[[biolo$rdescr]][[1]]
-  
-  descr<-list(geog=list(stat.test=NULL,plot=NULL),
-              time=list(stat.test=NULL,plot=NULL))
+# st_rq_Mod_map<-function(rqmodmars,rqMod,tauchoice){ ----
+#     # rqmodmars=rq_Mod_mars_sel[[1]][[1]]
+#     # rqMod=rq_Mod_sel[[1]][[1]]
+#   
+#   descr<-list(geog=list(stat.test=NULL,plot=NULL),
+#               time=list(stat.test=NULL,plot=NULL))
+# 
+#   sdmname<-rqMod$sdmname
+#   rqmodmars <- rqmodmars %>% 
+#     st_drop_geometry() %>% 
+#     filter(grepl("Mudflat",.$Zone)) %>%
+#     mutate(Zone=fct_drop(.$Zone)) %>% 
+#     mutate(across(c(Zone,Period),factor))
+#   
+#   descr$geog$stat.test <- rqmodmars %>%
+#     group_by(Zone) %>%
+#     wilcox_test(as.formula(sprintf("t%.3f ~ Period",tauchoice))) %>%
+#     add_xy_position(x = "Period",group = "Zone", #scales = "free", 
+#                     dodge = 0,step.increase = 0.05) %>% #
+#     filter(p.adj.signif!="ns")
+#   
+#   descr$geog$plot <- ggplot(rqmodmars) +
+#     # geom_boxplot(aes(x=Period, y = .data[[vars]], fill = Period)) +
+#     # geom_density_ridges(aes(y = Period , fill=Period,
+#     #                       x=.data[[vars]]), alpha=0.3) +
+#     geom_flat_violin(aes(x=Period, fill = Period,
+#                      y = .data[[sprintf("t%.3f",tauchoice)]] ),
+#                      alpha = 0.5,size = .1) +
+#     stat_summary(aes(x=Period, fill = Period,
+#                      y = .data[[sprintf("t%.3f",tauchoice)]],color = Period),
+#                   size=.3,fun.data = mean_se, show.legend = FALSE) +
+#     stat_pvalue_manual(descr$geog$stat.test,label = "p.adj.signif",
+#                        size = 3,tip.length = 0, coord.flip = TRUE) +
+#     coord_flip() +
+#     facet_wrap( ~ Zone, 
+#                nrow = 1, #scales = "free_y", 
+#                labeller = label_wrap_gen(width = 20)) + 
+#     labs(y=sprintf("%s (%s) t%.3f - %s", 
+#                           rqMod$meta$typetxt, 
+#                           rqMod$meta$unit,tauchoice,
+#                           rqMod$meta$predictt)) +
+#     Scale_brew() +
+#     theme(legend.position="none",
+#             # axis.title=element_text(size=12),
+#           strip.background = element_blank())
+# 
+#   descr$time$stat.test <- rqmodmars %>% 
+#     group_by(Period) %>%
+#     wilcox_test(as.formula(sprintf("t%.3f ~ Zone",tauchoice))) %>%
+#     add_xy_position(x = "Zone",group = "Period", scales = "free", 
+#                     dodge = 0,step.increase = 0.05) %>%
+#     filter(p.adj.signif!="ns")
+#   
+#   descr$time$plot <- ggplot(rqmodmars) +
+#     # geom_boxplot(aes(x=Zone, y = .data[[vars]], fill = Zone)) +
+#     geom_flat_violin(aes(x=Zone, fill = Zone,
+#                      y = .data[[sprintf("t%.3f",tauchoice)]] ),
+#                      alpha = 0.5,size = .1) +
+#     stat_summary(aes(x=Zone, fill = Zone,
+#                      y = .data[[sprintf("t%.3f",tauchoice)]],color = Zone),
+#                  size=.3, fun.data = mean_se, show.legend = FALSE) +
+#     stat_pvalue_manual(descr$time$stat.test,label = "p.adj.signif", 
+#                        size = 3,tip.length = 0, coord.flip = TRUE) +
+#     coord_flip() +
+#     facet_wrap( ~ Period, 
+#                nrow = 1, #scales = "free_y", 
+#                labeller = label_wrap_gen(width = 20)) + 
+#     labs(y=sprintf("%s (%s) t%.3f - %s", 
+#                           rqMod$meta$typetxt, 
+#                           rqMod$meta$unit,tauchoice,
+#                           rqMod$meta$predictt)) +
+#     Scale_brew() +
+#     theme(legend.position="none",
+#             # axis.title=element_text(size=12),
+#           strip.background = element_blank())
+#   
+#   return(descr)
+# }----
 
+st_rq_Mod_map<-function(rqmodmars,rqMod,tauchoice){
+    # rqmodmars=rq_Mod_mars_sel[[1]][[1]]
+    # rqMod=rq_Mod_sel[[1]][[1]]
+  vars<-unlist(strsplit(rqMod$meta$predict,rqMod$meta$type,fixed = TRUE))
+  varsl<-rqMod$meta$predictl
   sdmname<-rqMod$sdmname
+
   rqmodmars <- rqmodmars %>% 
     st_drop_geometry() %>% 
     filter(grepl("Mudflat",.$Zone)) %>%
     mutate(Zone=fct_drop(.$Zone)) %>% 
     mutate(across(c(Zone,Period),factor))
   
-  descr$geog$stat.test <- rqmodmars %>%
-    group_by(Zone) %>%
-    wilcox_test(as.formula(sprintf("t%.3f ~ Period",tauchoice))) %>%
-    add_xy_position(x = "Period",group = "Zone", #scales = "free", 
-                    dodge = 0,step.increase = 0.4) %>% #
-    filter(p.adj.signif!="ns")
-  descr$geog$plot <- ggplot(rqmodmars) +
-    # geom_boxplot(aes(x=Period, y = .data[[vars]], fill = Period)) +
-    # geom_density_ridges(aes(y = Period , fill=Period,
-    #                       x=.data[[vars]]), alpha=0.3) +
-    geom_flat_violin(aes(x=Period, fill = Period,
-                     y = .data[[sprintf("t%.3f",tauchoice)]] ),
-                     alpha = 0.5) +
-    stat_summary(aes(x=Period, fill = Period,
-                     y = .data[[sprintf("t%.3f",tauchoice)]],color = Period),
-                 fun.data = mean_se, show.legend = FALSE) +
-    stat_pvalue_manual(stat.test,label = "p.adj.signif", tip.length = 0.02) +
-    coord_flip() +
-    facet_wrap( ~ Zone, 
-               nrow = 1, #scales = "free_y", 
-               labeller = label_wrap_gen(width = 10)) + 
-    labs(y = rqMod$meta$reponset, x="") +
-    Scale_brew() +
-    guides(fill=guide_legend(nrow=2,byrow=TRUE)) +
-    theme(legend.position="bottom")#,
-      # axis.text.x = element_blank(), axis.ticks = element_blank())
+  descr<-list(pred=NULL,
+              mod=NULL,
+              res=NULL)
 
-  descr$time$stat.test <- rqmodmars %>% 
-    group_by(Period) %>%
-    wilcox_test(as.formula(sprintf("t%.3f ~ Zone",tauchoice))) %>%
-    add_xy_position(x = "Zone",group = "Period", scales = "free", 
-                    dodge = 0,step.increase = 0.4) %>%
-    filter(p.adj.signif!="ns")
+  descr$pred <-map2(as.list(vars), as.list(varsl), ~{
+    rqmodmars %>% 
+    ggplot() + 
+    geom_density_ridges(aes(y = Period , fill=Period,
+                          x=.data[[.x]]), alpha=0.3,size = .1) +
+    facet_grid(. ~ Zone, 
+               # scales = "free_y",
+               labeller = label_wrap_gen(width = 20)) + 
+    labs(x=.y, y="") +
+    Scale_brew() } )
+
+  descr$mod <-rqmodmars %>% 
+    ggplot() + 
+    geom_density_ridges(aes(y = Period , fill=Period,
+                          x=.data[[sprintf("t%.3f",tauchoice)]]), alpha=0.3) +
+    facet_grid(. ~ Zone, 
+               # scales = "free_y",
+               labeller = label_wrap_gen(width = 20)) + 
+    labs(y="",x=sprintf("%s (%s) t%.3f - %s", 
+                          rqMod$meta$typetxt, 
+                          rqMod$meta$unit,tauchoice,
+                          rqMod$meta$predictt)) +
+    Scale_brew()
   
-  descr$time$plot <- ggplot(rqmodmars) +
-    # geom_boxplot(aes(x=Zone, y = .data[[vars]], fill = Zone)) +
-    geom_flat_violin(aes(x=Zone, fill = Zone,
-                     y = .data[[sprintf("t%.3f",tauchoice)]] ),
-                     alpha = 0.5) +
-    stat_summary(aes(x=Zone, fill = Zone,
-                     y = .data[[sprintf("t%.3f",tauchoice)]],color = Zone),
-                 fun.data = mean_se, show.legend = FALSE) +
-    stat_pvalue_manual(stat.test,label = "p.adj.signif", tip.length = 0.02) +
-    coord_flip() +
-    facet_wrap( ~ Period, 
-               nrow = 1, #scales = "free_y", 
-               labeller = label_wrap_gen(width = 10)) + 
-    labs(y = rqMod$meta$reponset, x="") +
-    Scale_brew() +
-    guides(fill=guide_legend(nrow=2,byrow=TRUE)) +
-    theme(legend.position="bottom",
-      axis.text.x = element_blank(), axis.ticks = element_blank())
+  # descr$res <-rqmodmars %>% 
+  #   ggplot() + 
+  #   geom_density_ridges(aes(y = Period , fill=Period,
+  #                         x=.data[[sprintf("t%.3f",tauchoice)]]), alpha=0.3) +
+  #   facet_grid(. ~ Zone, 
+  #              # scales = "free_y",
+  #              labeller = label_wrap_gen(width = 20)) + 
+  #   labs(y="",x=sprintf("%s (%s) t%.3f - %s", 
+  #                         rqMod$meta$typetxt, 
+  #                         rqMod$meta$unit,tauchoice,
+  #                         rqMod$meta$predictt)) +
+  #   Scale_brew()
+ 
+ 
+  wrap_plots(descr$pred, ncol=1) / descr$mod &
+    # plot_layout(guides = "collect") & 
+    theme(legend.position="none",
+          strip.background = element_blank(),
+          text=element_text(size=12)) &
+    plot_annotation(tag_levels = c('A')) 
 }
 
 # pl_rq_mars_all_st<-
-#   map(reponse, \(biolo)
+#   map(reponse_l, \(biolo)
 #       {map2(rq_Mod_mars_all[[biolo$rdescr]],
 #             rq_Mod_all[[biolo$rdescr]],
 #            ~st_rq_Mod_map(.x,.y,tauchoice)) } )
 
 pl_rq_mars_sel_st<-
-  map(reponse, \(biolo)
+  map(reponse_l, \(biolo)
       {map2(rq_Mod_mars_sel[[biolo$rdescr]],
             rq_Mod_sel[[biolo$rdescr]],
            ~st_rq_Mod_map(.x,.y,tauchoice)) } )
@@ -828,8 +878,8 @@ pl_rq_mars_sel_st<-
 walk(pl_rq_mars_sel_st,
   ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_mars_st.tiff",
                     graph_path, substr(.y,1,6), espece, .y),
-                    plot = .x,
-                    width = 10, height = 7, dpi=400) ) } )
+                    plot = .x$geog$plot,
+                    width = 10, height = 4, dpi=400) ) } )
 
 ```
 
@@ -845,9 +895,12 @@ walk(pl_rq_mars_sel_st,
 # option tmap version facet
 tmap_mode("plot") # "plot" "view"
 pl_rq_Mod_map<-function(rqmodmars,rqMod,tauchoice){
-    # biolo=reponse[[1]]
+    # biolo=reponse_l[[1]]
     # rqmodmars=rq_Mod_mars_sel[[biolo$rdescr]][[1]]
     # rqMod=rq_Mod_sel[[biolo$rdescr]][[1]]
+
+  pl_map<-list(all=NULL, one=NULL)
+
   vars<-unlist(strsplit(rqMod$meta$predict,rqMod$meta$type,fixed = TRUE))
   varsl<-rqMod$meta$predictl
   sdmname<-rqMod$sdmname
@@ -859,38 +912,74 @@ pl_rq_Mod_map<-function(rqmodmars,rqMod,tauchoice){
   #   facet_wrap(~Annee) +
   #   labs(x="Latitude",y="Longitude",
   #        fill = sprintf("SDM-NEO\n%s",sdmname)) +
-  #   theme(plot.margin = margin(0.05,0.05,0.05,0.05, "cm")) +
+  #   theme(plot.margin = margin(0.05,0.05,0.05,0.05, "cm"),
+          # strip.background = element_blank()) +
   #   scale_fill_distiller(palette = "Spectral")
   
-  tm_shape(osm_df) +  
+  pl_map$all<-tm_shape(osm_df) +  
     tm_rgb(saturation = .6, alpha= 0.8) +
   # tm_scale_bar(position = c("left", "bottom"), width = 0.15) + #SCALE
   # tm_compass(position = c("left", "top"), size = 2) +          #NORTH COMPASS
   tm_shape(rqmodmars) +
-    tm_fill(col = sprintf("t%.3f",tauchoice), 
-            palette = "-Spectral", alpha = 0.7,
-            legend.is.portrait = FALSE) +
+    tm_fill(col = sprintf("t%.3f",tauchoice),
+            title=sprintf("%s (%s) t%.3f - %s", 
+                          rqMod$meta$typetxt, 
+                          rqMod$meta$unit,tauchoice,
+                          rqMod$meta$predictt),
+            legend.is.portrait = FALSE,
+            palette = "-Spectral", alpha = 0.7) +
     # tm_borders("white", lwd = 0) +
-    tm_facets(by="Period", ncol = 3) +
-  tm_layout(legend.outside = TRUE, 
-            legend.outside.position = "bottom",
-            outer.margins=c(0,0,0,0), inner.margins=c(0,0,0,0),
-            title.size=10)
+    tm_facets(by="Period", nrow = 1) +
+    tm_layout(
+      panel.label.bg.color = 'white',
+      legend.outside = TRUE, 
+      legend.outside.position = "bottom",
+      # legend.outside.size= .3, # mystery how to make it work
+      legend.title.size= .8,
+      legend.text.size= .6,
+      legend.format=list(text.separator="-"),
+      outer.margins=c(0,0,0,0), inner.margins=c(0,0,0,0))
+  
+  peri<-setNames(as.list(levels(rqmodmars$Period)), levels(rqmodmars$Period))
+  # Define map for each Period
+  pl_map$one <- map(peri, ~{
+    tm_shape(osm_df) +  
+      tm_rgb(saturation = .6, alpha= 0.8) +
+    tm_shape(rqmodmars %>% 
+               filter(Period %in% .x)) +
+      tm_fill(col = sprintf("t%.3f",tauchoice), 
+            title=sprintf("%s (%s) t%.3f - %s", 
+                          rqMod$meta$typetxt, 
+                          rqMod$meta$unit,tauchoice,
+                          rqMod$meta$predictt),
+              legend.is.portrait = FALSE,
+              palette = "-Spectral", alpha = 0.7) +
+    tm_layout(main.title= .x,
+              main.title.size= 1,
+              legend.outside = TRUE, 
+              legend.outside.position = "bottom",
+              # legend.outside.size= .3, # mystery how to make it work
+              legend.title.size= .8,
+              legend.text.size= .6,
+              legend.format=list(text.separator="-"),
+              outer.margins=c(0,0,0,0), inner.margins=c(0,0,0,0))
+  } ) # map peri
+  return(pl_map)
  }
 
-
 # pl_rq_all_map<-
-#   map(reponse, \(biolo)
+#   map(reponse_l, \(biolo)
 #     {map2(rq_Mod_mars_all[[biolo$rdescr]],rq_Mod_sel[[biolo$rdescr]],
 #          ~pl_rq_Mod_map(.x,.y,tauchoice)) } )
 
 pl_rq_sel_map<-
-  map(reponse, \(biolo)
-    {map2(rq_Mod_mars_sel_per[[biolo$rdescr]],rq_Mod_sel[[biolo$rdescr]],
+  map(reponse_l, \(biolo)
+    {map2(rq_Mod_mars_sel_per[[biolo$rdescr]],
+          rq_Mod_sel[[biolo$rdescr]],
          ~pl_rq_Mod_map(.x,.y,tauchoice)) } )
 
 walk(pl_rq_sel_map,
-     ~iwalk(., ~tmap_save(.x, dpi=400,
+     ~iwalk(., ~tmap_save(.x$all, dpi=400,
                           filename=sprintf("%s/%s/%s_%s_map.tiff",
                               graph_path, substr(.y,1,6), espece, .y)) ) )
 
@@ -901,7 +990,7 @@ walk(pl_rq_sel_map,
 #| label: rq_Mod_plot_map
 
 pl_rq_Mod_map_gif<-function(rqmodmars,sdmname,tauchoice){
-    # biolo=reponse[[1]]
+    # biolo=reponse_l[[1]]
     # rqmodmars=rq_Mod_mars_sel[[biolo$rdescr]][[1]]
     # sdmname=names(rq_Mod_mars_sel[[biolo$rdescr]])[1]
   
@@ -924,12 +1013,12 @@ pl_rq_Mod_map_gif<-function(rqmodmars,sdmname,tauchoice){
  }
 
 # pl_rq_all_map<-
-#   map(reponse, \(biolo)
+#   map(reponse_l, \(biolo)
 #     {imap(rq_Mod_mars_all[[biolo$rdescr]],
 #          ~pl_rq_Mod_map_gif(.x,.y,tauchoice)) } )
 
 # pl_rq_sel_map<-
-#   map(reponse, \(biolo)
+#   map(reponse_l, \(biolo)
 #     {imap(rq_Mod_mars_sel_per[[biolo$rdescr]],
 #          ~pl_rq_Mod_map_gif(.x,.y,tauchoice)) } )
 

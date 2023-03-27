@@ -23,19 +23,20 @@ editor_options:
 
 ```{r}
 #| label: load-packages
+library(conflicted)
+library(knitr)
 
 library(readxl) ; library(openxlsx) # Edition d'un fichier Excel
-library(knitr)
 library(tidyverse) #The tooltm_box indispensable
 library(reshape2); library(rlist) # the one; melt; list.append
 library(data.table)
 library(rstatix); library(Hmisc)  # corr and pvalue calculation
 
-library(ggpubr); #library(GGally); # stat_compare_means ;
+library(ggpubr); library(GGally); # stat_compare_means ;
 library(scales); library(RColorBrewer); library(wesanderson); library(grafify); library(colorspace); library(ggsci)# show_col and colors colors colors!
 library(patchwork)
 library(ggridges)
-# GIS Packages
+# GIS Packages#
 library(sf); library(sfheaders); # st_as_sf ; sf_to_df
 library(tmap); library(tmaptools)
 library(htmlwidgets) # library(leaflet) # saveWidget ; for interactive maps
@@ -103,6 +104,9 @@ Scale_map<- function() {scale_fill_distiller(palette = "Spectral")}
 
 ```{r}
 #| label: functmade
+replace_outliers <- function(x, coefv=1.5) {
+  replace(x, x %in% boxplot.stats(x, coef = coefv)$out, NA) #mean(x)
+}
 
 ```
 ## Load of External data and Basic Variables
@@ -122,7 +126,7 @@ load(rdatain)
 
 rdataout <- sprintf("%sCSLN_Mars_plot",wdmat)
 # if exists
-# load(rdataout)
+load(paste0(rdataout,".RData"))
 
 ```
 
@@ -133,11 +137,13 @@ rdataout <- sprintf("%sCSLN_Mars_plot",wdmat)
 
 etude <- "CSLN_Mars"
 espece <- "CERED"
-analysis <- "RQ Linear"
+
 sp <- which(speciesMP$SPCourt == espece)
 sai <- which(saison$M_Def == "Year") #Year Winter Summer
 
 ```
+
+# Material and methods
 
 ## Study area
 
@@ -146,6 +152,7 @@ The Seine estuary has been studied regarding several historically known areas th
 ```{r}
 #| label: prefig-map
 
+tmap_mode("plot") # "plot" "view"
 # Extract data of interest
 tm_areas <- ES_Areas %>% 
   dplyr::filter(!Zone  %in% c("Bay", "Ilot Oiseaux")) %>%
@@ -155,15 +162,17 @@ tm_areas <- ES_Areas %>%
 tm_boxestuary<-bb(tm_areas)
 tm_box_mud <- ES_Areas %>%  
   dplyr::filter(grepl("Mudflat",ES_Areas$Zone)) %>%
-  st_transform(4326) %>% bb(ext=1.4)
-tm_boxchannel<-bb(c(xmin=-2.5, ymin=49.0, xmax=1.5, ymax=51.0) )
-tm_boxchannel<-bb(tm_boxestuary, ext=12)
+  st_transform(4326) %>% bb(ext=2)
+# tm_boxchannel<-bb(c(xmin=-2.5, ymin=49.0, xmax=1.5, ymax=51.0) )
+tm_boxchannel<-bb(tm_boxestuary, ext=14)
 
 # Extract Open street map background based on data
-# osm_df <- read_osm(tm_box_mud, ext=1, type= "osm") #stamen-watercolor osm
+
+# osm_df <- read_osm(bb(Mars_SDM), ext=1, type= "osm") #stamen-watercolor osm
+# osm_df_mud <- read_osm(tm_box_mud, ext=1, type= "osm") #stamen-watercolor osm
 # osm_df_wat_bay <- read_osm(tm_boxchannel, ext=1, type= "stamen-watercolor")
 # osm_df_wat_estu <- read_osm(tm_boxestuary, ext=1, type= "stamen-watercolor")
-# save(osm_df,osm_df_wat_bay,osm_df_wat_estu, file=sprintf("SIG/OSM_extraction.RData"))
+# save(osm_df,osm_df_mud,osm_df_wat_bay,osm_df_wat_estu, file=sprintf("SIG/OSM_extraction.RData"))
 load(sprintf("SIG/OSM_extraction.RData"))
 
 # create a map of context with red rect of area of interest
@@ -175,16 +184,15 @@ tm_bay<-
   tm_layout(legend.show= FALSE) 
 tm_estu<-tm_shape(osm_df_wat_estu) +  
     tm_rgb(saturation = .6, alpha= 0.8) +
-  tm_shape(st_as_sfc(tm_box_mud)) + 
-    tm_borders("red", lwd = 2) +
   tm_shape(tm_areas) +  
     tm_fill(col = "Zone", title="Areas", palette = "Set2", alpha = 0.7) +
+  tm_shape(st_as_sfc(tm_box_mud)) + 
+    tm_borders("red", lwd = 2) +
   tm_layout(legend.show= FALSE)
 
 # Create main map
-tmap_mode("plot") # "plot" "view"
 tm_Bio<-
-  tm_shape(osm_df) +  
+  tm_shape(osm_df_mud) +  
     tm_rgb(saturation = .6, alpha= 0.8) +
   tm_shape(tm_areas) +  
     tm_fill(col = "Zone", title="Areas", palette = "Set2", alpha = 0.6) +
@@ -193,40 +201,88 @@ tm_Bio<-
   tm_shape(CSLN_sf) +
     tm_dots(col="grey30", size=0.1, alpha = 0.5) +
   tm_scale_bar(position = c("LEFT", "BOTTOM"), width = 0.15) + #SCALE
-  tm_compass(type = "8star",position = c("LEFT", "TOP"), size = 3) +  #NORTH COMPASS
-  tm_layout(legend.position= c("LEFT","center"),
-            legend.bg.color="white",legend.bg.alpha=0.6)
+  tm_compass(type = "8star",position = c("LEFT", "TOP"), size = 2) +  #NORTH COMPASS
+  tm_layout(#legend.outside = TRUE,
+    legend.position= c("center","BOTTOM"),
+    legend.title.size=.8,legend.text.size=.5,
+    legend.bg.color="white",legend.bg.alpha=0.6)
 
 # arrange maps insets thanks to patchwork !
 tm_Bio_g<-tmap_grob(tm_Bio)
 tm_bay_g<-tmap_grob(tm_bay)
 tm_estu_g<-tmap_grob(tm_estu)
 design <- c(
-  area(t= 1, b= 4, l= 1, r= 6),
-  area(t= 2, b= 2, l= 6, r= 6),
-  area(t= 3, b= 3, l= 6, r= 6) )
+  area(t= 1, b= 14, l= 1, r= 20),
+  area(t= 4, b= 6, l= 18, r= 20),
+  area(t= 8, b= 11, l= 17, r= 20) )
 tm_study_map<- wrap_plots(tm_Bio_g,tm_bay_g,tm_estu_g,design = design)
 
 ggsave(filename= sprintf("%sfig-map.tiff",wdgraph), 
-       tm_study_map, dpi=600, height = 8) #, width = 12
+       tm_study_map, dpi=600, width = 10,  height = 7) #
 ```
 
 ```{r}
 #| label: map_html
 #| eval: false
 
-# tmap_mode("view") # "plot" "view"
-# tm_Bio<-
-#   tm_basemap(leaflet::providers$OpenStreetMap.HOT) +
-#   tm_shape(df) +
-#   tm_fill(col = "Zone", palette = "Accent", alpha = 0.7) +
-#   tm_borders("grey", lwd = 1) +
-#   tm_shape(df_stations) +
-#   tm_dots(col="grey30",size=0.001, alpha = 0.5) +
-#   tm_layout(legend.outside = TRUE)
-# # tmlf_Bio<-tmap_leaflet(tm_Bio) # conversion to leaflet object, quicker??
-# tm_Bio
-# tmap_save(tm_Bio, filename = "Estuary_map.html")
+tmap_mode("view") # "plot" "view"
+tm_study_map_html<-
+  tm_basemap(leaflet::providers$OpenStreetMap.HOT) +
+  tm_shape(tm_areas) +  
+    tm_fill(col = "Zone", palette = "Set2", alpha = 0.6, legend.show = FALSE) +
+    # tm_text("Zone", size = .8, col= "black") +
+    tm_borders("grey", lwd = 1.5) +
+  tm_shape(CSLN_sf) +
+    tm_dots(col="Zone", title="Areas", palette = "Set2", size=0.05, alpha = 0.9) +
+  tm_layout(legend.show=FALSE)
+tm_study_map_html
+tmap_save(tm_study_map_html, filename = "SIG/Estuary_map.html")
+
+```
+
+## Predictors calculation and selection
+
+```{r}
+#| label: pl_mars_corr
+#| include: true
+
+# ggpairs custom colors on corr
+corr_col <- function(data, mapping, method="p", use="pairwise", ...){
+  # grab data
+  x <- eval_data_col(data, mapping$x)
+  y <- eval_data_col(data, mapping$y)
+  # calculate correlation
+  corr <- cor(x, y, method=method, use=use)
+  # calculate colour based on correlation value
+  colFn <- colorRampPalette(c(colSpec(2)[1], "white", colSpec(2)[2]), interpolate ='spline')
+  fill <- colFn(100)[findInterval(corr, seq(-1, 1, length=100))]
+  ggally_text(
+    label = as.character(round(corr, 2)),
+    mapping = aes(),
+    xP = 0.5, yP = 0.5,
+    ...) + #  ggally_cor(data = data, mapping = mapping, ...) + 
+    theme_void() +
+    theme(panel.background = element_rect(fill=fill))
+
+} #wrap(cor_func,method = 'spearman', symbol = "Corr:\n")
+
+
+df <- CSLN_mud %>%
+  filter(SPCourt == espece) %>%
+  select(paste(predict[,1],saison[sai,1],sep=""),
+         map(reponse_l,~.x$rvar) %>% unlist(., use.names=FALSE))
+
+pl_mars_corr <- ggpairs(df, labeller=label_wrap_gen(width = 10,multi_line = TRUE),# title=titreG,
+              progress=FALSE,
+              upper = list(continuous = corr_col),
+              lower = list(continuous=
+                             wrap("smooth", size = .3,
+                                  alpha = 0.4, color = "aquamarine4"))) +
+      theme(axis.text = element_text(size=8),
+            strip.text.y = element_text(size=8))
+
+ggsave(sprintf("%sfig-pl_mars_corr.tiff",wdgraph),
+       plot = pl_mars_corr, width = 16, height = 9, dpi=600)
 
 ```
 
@@ -243,7 +299,7 @@ data_descr <- function (dataset,vars) {
 
   descr$geog$stat.test <- dataset %>% 
     group_by(Zone) %>% 
-    wilcox_test(formula(paste0(vars," ~ Period"))) %>% 
+    wilcox_test(formula(paste0(vars," ~ Period"))) %>%  #wilcox_test  levene_test???
     add_xy_position(x = "Period",group = "Zone",
                     dodge = 0,step.increase = 0.05) %>%
     filter(p.adj.signif!="ns")
@@ -253,20 +309,20 @@ data_descr <- function (dataset,vars) {
     #                       x=.data[[vars]]), alpha=0.3) +
     geom_flat_violin(aes(x=Period, fill = Period,
                      y = .data[[vars]] ),
-                     alpha = 0.5) +
+                     alpha = 0.5,size = .1,show.legend = FALSE) +
     stat_summary(aes(x=Period, fill = Period,
-                     y = .data[[vars]], color = Period),
-                 fun.data = mean_se, show.legend = FALSE) +
+                     y = .data[[vars]], color = Period), 
+                 size=.3, fun.data = mean_se, show.legend = FALSE) +
     stat_pvalue_manual(descr$geog$stat.test,label = "p.adj.signif",
-                       tip.length = 0.02, coord.flip = TRUE) +
+                       size = 3,tip.length = 0, coord.flip = TRUE) +
     coord_flip() +
     facet_wrap( ~ Zone, 
                nrow = 1, #scales = "free_y", 
-               labeller = label_wrap_gen(width = 10)) + 
+               labeller = label_wrap_gen(width = 20)) + 
     labs(y = vars, x="") +
     Scale_brew() +
-    theme(legend.position="bottom")#,
-      # axis.text.x = element_blank(), axis.ticks = element_blank())
+    theme(legend.position="none",
+          strip.background = element_blank())
 
   descr$time$stat.test <- dataset %>% 
     group_by(Period) %>%
@@ -279,20 +335,21 @@ data_descr <- function (dataset,vars) {
     # geom_boxplot(aes(x=Zone, y = .data[[vars]], fill = Zone)) +
     geom_flat_violin(aes(x=Zone, fill = Zone,
                      y = .data[[vars]] ),
-                     alpha = 0.5) +
+                     alpha = 0.5,size = .1,show.legend = FALSE) +
     stat_summary(aes(x=Zone, fill = Zone,
-                     y = .data[[vars]], color = Zone), 
-                 fun.data = mean_se, show.legend = FALSE) +
+                     y = .data[[vars]], color = Zone),  
+                 size=.3, fun.data = mean_se, show.legend = FALSE) +
     stat_pvalue_manual(descr$time$stat.test,label = "p.adj.signif", 
-                       tip.length = 0.02, coord.flip = TRUE) +
+                       size = 3,tip.length = 0, coord.flip = TRUE) +
     coord_flip() +
     facet_wrap( ~ Period, 
                nrow = 1, #scales = "free_y", 
-               labeller = label_wrap_gen(width = 10)) + 
+               labeller = label_wrap_gen(width = 20)) + 
     labs(y = vars, x="") +
     Scale_brew() +
     guides(fill=guide_legend(nrow=2,byrow=TRUE)) +
-    theme(legend.position="bottom")
+    theme(legend.position="none",
+          strip.background = element_blank())
   
   return(descr)
 }
@@ -304,7 +361,7 @@ data_descr <- function (dataset,vars) {
 ::: column-screen-inset-right
 
 ```{r}
-#| label: biom_distr_b
+#| label: biom_distr_bd
 CSLN_df <- CSLN %>%
   filter(grepl("Mudflat", Zone)) %>% # focus on mudflat only
   filter(SPCourt %in% c(espece)) %>%
@@ -318,10 +375,7 @@ CSLN_df <- CSLN %>%
                       labels = str_replace_all(unique(Period),"-"," - ")))
 
 pl_des_b <- data_descr(CSLN_df,"Biomass_gAFDWm2")
-```
 
-```{r}
-#| label: biom_distr_d
 CSLN_df <- CSLN %>%
   filter(grepl("Mudflat", Zone)) %>% # focus on mudflat only
   filter(SPCourt %in% c(espece)) %>%
@@ -352,57 +406,13 @@ pl_des_d_gt <- pl_des_d$geog$plot / pl_des_d$time$plot  &
     plot_annotation(tag_levels = c('A'))
 
 ggsave(sprintf("%sfig-cered_struc_biom.tiff",wdgraph),
-       plot = pl_des_b_gt, width = 12, height = 8, dpi=600)
+       plot = pl_des_b_gt, width = 10, height = 5, dpi=400)
 ggsave(sprintf("%sfig-cered_struc_dens.tiff",wdgraph),
-       plot = pl_des_d_gt, width = 12, height = 8, dpi=600)
+       plot = pl_des_d_gt, width = 10, height = 5, dpi=400)
 ```
 :::
 
 ## HMS data set description
-
-```{r}
-#| label: pl_mars_corr
-#| include: true
-
-# ggpairs custom colors on corr
-corr_col <- function(data, mapping, method="p", use="pairwise", ...){
-  # grab data
-  x <- eval_data_col(data, mapping$x)
-  y <- eval_data_col(data, mapping$y)
-  # calculate correlation
-  corr <- cor(x, y, method=method, use=use)
-  # calculate colour based on correlation value
-  colFn <- colorRampPalette(c(colSpec(2)[1], "white", colSpec(2)[2]), interpolate ='spline')
-  fill <- colFn(100)[findInterval(corr, seq(-1, 1, length=100))]
-  ggally_text(
-    label = as.character(round(corr, 2)),
-    mapping = aes(),
-    xP = 0.5, yP = 0.5,
-    ...) + #  ggally_cor(data = data, mapping = mapping, ...) + 
-    theme_void() +
-    theme(panel.background = element_rect(fill=fill))
-
-} #wrap(cor_func,method = 'spearman', symbol = "Corr:\n")
-
-
-df <- CSLN_mud %>%
-  filter(SPCourt == espece) %>%
-  select(paste(predict[,1],saison[sai,1],sep=""),
-         map(reponse,~.x$rvar) %>% unlist(., use.names=FALSE))
-
-pl_mars_corr <- ggpairs(df, labeller=label_wrap_gen(width = 10,multi_line = TRUE),# title=titreG,
-              progress=FALSE,
-              upper = list(continuous = corr_col),
-              lower = list(continuous=
-                             wrap("smooth", size = .3,
-                                  alpha = 0.4, color = "aquamarine4"))) +
-      theme(axis.text = element_text(size=8),
-            strip.text.y = element_text(size=8))
-
-ggsave(sprintf("%sfig-pl_mars_corr.tiff",wdgraph),
-       plot = pl_mars_corr, width = 16, height = 9, dpi=600)
-
-```
 
 ```{r}
 #| label: hms_distr
@@ -411,7 +421,10 @@ pl_mars <-
   map(setNames(as.list(Var_choosen),Var_choosen), \(vars)
           data_descr(Mars_SDM %>%
                        st_drop_geometry %>%
-                       filter(!Zone %in% c("Bay","Octeville")),
+                       # mutate(across(where(is.numeric), ~replace_outliers(.,2))) %>% 
+                       mutate(across(all_of(c("bathy","tenfon_mxd")), ~replace_outliers(.,1.5))) %>%
+                       filter(!Zone %in% c("Bay","Octeville","Ilot Oiseaux","Cote Fleurie")) %>%
+                       mutate(across(where(is.factor), fct_drop)), # recode predict when filter has remove levels
                      vars) )
 
 pl_mars_gt <- map(pl_mars,
@@ -422,7 +435,7 @@ pl_mars_gt <- map(pl_mars,
 
 iwalk(pl_mars_gt,
   ~ggsave(sprintf("%sfig-hms_struc_%s.tiff",wdgraph,.y),
-       plot = .x, width = 12, height = 8, dpi=600) )
+       plot = .x, width = 10, height = 5, dpi=400) )
 
 ```
 
@@ -434,7 +447,7 @@ Rdata are saved in `rdataout`. An excel file collects data in `r binderout` , wi
 
 ```{r}
 #| label: finalsave_r
-#| 
+
 save(list=(ls()[grep("^tm_|^pl_", ls())]),
      file = paste0(rdataout,".RData"))
 beepr::beep(2)

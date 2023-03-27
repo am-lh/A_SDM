@@ -58,6 +58,9 @@ pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
 wdscript <- paste(pc,"Melting Pot/BDD/Scripts/",sep="")
 wdmsr <- (paste(wdscript,"MSR/MSR.R",sep=""))
+
+flag_calc_mars<-FALSE # to calculate time-consuming mars summary by period
+
 ```
 
 ### Definition of the graphic charter
@@ -68,6 +71,18 @@ wdmsr <- (paste(wdscript,"MSR/MSR.R",sep=""))
 ```
 
 ## Load of External data and Basic Variables
+
+### Output binder and data
+
+```{r}
+#| label: outfiles
+
+binderout <- sprintf("%sCSLN_BDD.xlsx", wdres)
+rdataout <- sprintf("%sCSLN_Mars_BDD.RData",wdmat)
+# if exists
+load(rdataout)
+
+```
 
 ### External data
 
@@ -134,18 +149,6 @@ Mars_dat_sf <- st_read(Mars_dat_sf,quiet=TRUE,crs=4326) %>%
 # Mars_mesh <- st_read(Mars_mesh,quiet=TRUE,crs=4326) %>% st_transform(2154)
 # cadreES_Mars <- Mars_mesh[Mars_mesh$NINJ=="Cadre_ES",] # Keep aside ES frame in shp
 # Mars_mesh <- Mars_mesh[Mars_mesh$NINJ!="Cadre_ES",]# Remove of ES frame in shp
-
-```
-
-### Output binder and data
-
-```{r}
-#| label: outfiles
-
-binderout <- sprintf("%sCSLN_BDD.xlsx", wdres)
-rdataout <- sprintf("%sCSLN_Mars_BDD.RData",wdmat)
-# if exists
-# load(rdataout)
 
 ```
 
@@ -558,18 +561,27 @@ CSLN_cont_name<-data.frame(code=row.names(CSLN_cont_mat))  %>%
 
 # SDM preparations
 ```{r}
-Var_choosen<-c("flow_mxd","inunt","sal_dtd","temp_m","mudrate_m","tenfon_mxd")
+#| label: sdm_prep
+Var_choosen<-c("flow_mxd","inunt","sal_dtd","temp_m","mudrate_m","tenfon_mxd","bathy")
 Mod_chosen<-list(c("flow_mxd","inunt"),
                   c("mudrate_m","tenfon_mxd"),
                   c("sal_dtd","temp_m"),
-                  c("inunt","temp_m"))
+                  c("sal_dtd","bathy"))
 taus <- c(0.5,0.9,0.95,0.975) # c(0.5,0.85,0.9,0.95,0.975,0.99) #c(1:19/20,0.975,0.99)
 taus_l<-setNames(as.list(taus),sprintf("%0.3f",taus))
 
+model_types<- data.frame(rbind(
+  c(analysis="RQ Linear",code="RQ2add",bdd="rqdata"),
+  c(analysis="RQ Linear",code="RQ2int",bdd="rqdata"),
+  c(analysis="RQ Nonlinear",code="RQ2nli",bdd="nlrqdata"),
+  c(analysis="RQ BSpline",code="RQ2bsp",bdd="rqbsdata")))
+
 reponse<-reponse %>%
   filter(rvar %in% c("Biomass_gAFDWm2","Density_indm2")) %>%
-  rowid_to_column("id") %>% 
-  mutate(whole=sprintf("%s (%s)",rdescr,runit)) %>% 
+  rowid_to_column("repi") %>% 
+  mutate(compl=sprintf("%s (%s)",rdescr,runit))
+
+reponse_l<-reponse %>%
   as.list %>% 
   transpose(.) %>% 
   setNames(c("Biomass","Density"))
@@ -581,15 +593,23 @@ pred_red <- predict %>%
   mutate(whole=sprintf("%s (%s)",Desc,Unit)) %>% 
   as.list
 
-pred_red_comb<-map(as.list(c(1:2)), \(idx)
+pred_red_comb<-map(as.list(c(1:2)), \(idx) #idx=2
   {map(pred_red,
       ~combn(.,idx, simplify = FALSE)) %>% transpose(.)}  ) %>% 
-  setNames(paste0("x",1:2))
+  setNames(paste0("x",1:2)) %>% 
+  map2(.,map_depth(.,2, ~paste0(.x$id,
+                           ifelse(length(.x$id)==1,"0",""),
+                           collapse="") ),
+       ~setNames(.x,.y ) ) 
 
-pred_red_comb<-map2(pred_red_comb,
-                    map_depth(pred_red_comb,2,
-                              ~paste0(.x$id,collapse="")),
-                    ~setNames(.x,.y ) )
+pred_red_comb_t<-pred_red_comb %>% 
+  list_flatten(name_spec = "{inner}") %>%
+  map_depth(.,1,
+          ~modify_at(.x,"id",~c(.x,
+                           if(length(.x)==1){0} ) ) ) %>% 
+  map_depth(.,2,~paste0(.x,collapse="__") ) %>% 
+  bind_rows() %>% 
+  mutate(id=sub("__","",id))
 
 pred_red_comb_sel<-map(pred_red_comb,
       ~map(Mod_chosen, \(mod) keep(.x,~identical(.x$Var, mod)) ) ) %>% 
@@ -597,15 +617,42 @@ pred_red_comb_sel<-map(pred_red_comb,
   map(.,list_flatten) %>% 
   list_flatten(.,name_spec= "{inner}")
 
+
+sdm_comb<- tidyr::expand_grid(model_types %>% rowid_to_column("type"),
+                              speciesMP %>% rowid_to_column("sp"),
+                         reponse,
+                         saison %>% 
+                           filter(M_Def %in% c("Year")) %>%
+                           rowid_to_column("sai"),
+                         pred_red_comb_t) %>%
+  unite("type",c(sp,sai,repi,id),sep="", remove = FALSE) %>% 
+  unite("sdmname",c(code,type),sep="_", remove = FALSE) %>% 
+  relocate(sdmname) %>% 
+  separate(Var,c("name_x1","name_x2"), sep="__",remove = FALSE) %>% 
+  separate(Desc,c("Desc_x1","Desc_x2"), sep="__",remove = FALSE) %>% 
+  separate(Unit,c("Unit_x1","Unit_x2"), sep="__",remove = FALSE) %>% 
+  separate(whole,c("whole_x1","whole_x2"), sep="__",remove = FALSE)
+
+sdm_comb_sel<-sdm_comb %>% 
+  filter(sp==1 & sai==1 & id %in% names(pred_red_comb_sel) )
+
+# sdmname_l<- map(seq(length(reponse)),
+#                     ~sprintf("%g%g%g%s",sp,sai,.x,names(pred_red_comb_sel)) ) %>% 
+#   bind_cols() %>% 
+#   as.matrix
+
 Mars_SDM<-Mars_dat_sf %>% 
   select(c(NINJ,Lon,Lat,Zone,Tidal_level,Period,Annee,pred_red$Var))
+
 ```
 
 Attention, this can take a while...
 ```{r}
-Mars_SDM_per<- Mars_SDM %>% 
-               group_by(across(NINJ:Period)) %>% 
-               dplyr::summarise(across(is.numeric,~mean(.x,na.rm=TRUE)))
+if(flag_calc_mars){
+  Mars_SDM_per<- Mars_SDM %>% 
+                 group_by(across(NINJ:Period)) %>% 
+                 dplyr::summarise(across(where(is.numeric),~mean(.x,na.rm=TRUE)))
+}
 ```
 
 # Final actions and save
@@ -650,10 +697,25 @@ write.csv(CSLN_Stations,file=paste(wdres,"CSLN_Stations", ".csv",sep=""), na = "
 ```{r}
 #| label: finalsave_r
 #| eval: false
+
+rm(flag_calc_mars)
 save(list=(ls()),
      file = paste0(rdataout))
 beepr::beep(2)
+
 ```
+
+# Run of all sequence after that (ca pas l'air demarcher comme ça avec les qmd...)
+```{r}
+
+# source("Scripts/2.0_Datasets_visualisation.qmd")
+# source("Scripts/3.1_RegQuant_lineaire.qmd")
+# source("Scripts/3.2_RegQuant_non_lineaire.qmd")
+# source("Scripts/3.3_RegQuant_BSpline.qmd")
+
+```
+
+
 
 # Supplementary data
 
