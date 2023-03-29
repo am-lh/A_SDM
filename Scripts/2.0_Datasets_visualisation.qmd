@@ -268,21 +268,24 @@ corr_col <- function(data, mapping, method="p", use="pairwise", ...){
 
 
 df <- CSLN_mud %>%
-  filter(SPCourt == espece) %>%
+  filter(SPCourt == espece) %>% 
   select(paste(predict[,1],saison[sai,1],sep=""),
-         map(reponse_l,~.x$rvar) %>% unlist(., use.names=FALSE))
+         map(reponse_l,~.x$rvar) %>% unlist(., use.names=FALSE)) %>%
+  select(-c("eptot_dt"))
 
-pl_mars_corr <- ggpairs(df, labeller=label_wrap_gen(width = 10,multi_line = TRUE),# title=titreG,
-              progress=FALSE,
-              upper = list(continuous = corr_col),
-              lower = list(continuous=
-                             wrap("smooth", size = .3,
-                                  alpha = 0.4, color = "aquamarine4"))) +
+pl_mars_corr <- ggpairs(df, 
+                        labeller=label_wrap_gen(width = 10,multi_line = TRUE),
+                        upper = list(continuous = corr_col),
+                        lower = list(continuous=
+                                       wrap("smooth", size = .3,
+                                            alpha = 0.4, color = "aquamarine4")),
+                        columnLabels = c(predict[!predict$Var %in% c("eptot_dt"),2],reponse[,3]),
+                        progress=FALSE) +
       theme(axis.text = element_text(size=8),
             strip.text.y = element_text(size=8))
 
-ggsave(sprintf("%sfig-pl_mars_corr.tiff",wdgraph),
-       plot = pl_mars_corr, width = 16, height = 9, dpi=600)
+ggsave(sprintf("%sfig-mars_corr.tiff",wdgraph),
+       plot = pl_mars_corr, width = 16, height = 9, dpi=400)
 
 ```
 
@@ -294,12 +297,18 @@ ggsave(sprintf("%sfig-pl_mars_corr.tiff",wdgraph),
 data_descr <- function (dataset,vars) {
     # dataset=Mars_SDM %>% st_drop_geometry %>% filter(!Zone %in% c("Bay","Octeville"))
       # vars ="inunt"
+  # dataset= CSLN_df  ; vars ="Biomass_gAFDWm2"
+  
   descr<-list(geog=list(stat.test=NULL,plot=NULL),
               time=list(stat.test=NULL,plot=NULL))
 
+  # dataset %>% 
+  #   levene_test(formula(paste0(vars," ~ Period")))
+  
   descr$geog$stat.test <- dataset %>% 
-    group_by(Zone) %>% 
-    wilcox_test(formula(paste0(vars," ~ Period"))) %>%  #wilcox_test  levene_test???
+    # group_by(Zone) %>% 
+    wilcox_test(formula(paste0(vars," ~ Period"))) %>%
+    # levene_test(formula(paste0(vars," ~ Period"))) %>% 
     add_xy_position(x = "Period",group = "Zone",
                     dodge = 0,step.increase = 0.05) %>%
     filter(p.adj.signif!="ns")
@@ -313,8 +322,8 @@ data_descr <- function (dataset,vars) {
     stat_summary(aes(x=Period, fill = Period,
                      y = .data[[vars]], color = Period), 
                  size=.3, fun.data = mean_se, show.legend = FALSE) +
-    stat_pvalue_manual(descr$geog$stat.test,label = "p.adj.signif",
-                       size = 3,tip.length = 0, coord.flip = TRUE) +
+    # stat_pvalue_manual(descr$geog$stat.test,label = "p.adj.signif",
+    #                    size = 3,tip.length = 0, coord.flip = TRUE) +
     coord_flip() +
     facet_wrap( ~ Zone, 
                nrow = 1, #scales = "free_y", 
@@ -339,8 +348,8 @@ data_descr <- function (dataset,vars) {
     stat_summary(aes(x=Zone, fill = Zone,
                      y = .data[[vars]], color = Zone),  
                  size=.3, fun.data = mean_se, show.legend = FALSE) +
-    stat_pvalue_manual(descr$time$stat.test,label = "p.adj.signif", 
-                       size = 3,tip.length = 0, coord.flip = TRUE) +
+    # stat_pvalue_manual(descr$time$stat.test,label = "p.adj.signif", 
+    #                    size = 3,tip.length = 0, coord.flip = TRUE) +
     coord_flip() +
     facet_wrap( ~ Period, 
                nrow = 1, #scales = "free_y", 
@@ -365,50 +374,25 @@ data_descr <- function (dataset,vars) {
 CSLN_df <- CSLN %>%
   filter(grepl("Mudflat", Zone)) %>% # focus on mudflat only
   filter(SPCourt %in% c(espece)) %>%
-  filter(!is.na(Biomass_gAFDWm2)) %>%
+  drop_na(Biomass_gAFDWm2) %>%
+  drop_na(Density_indm2) %>% 
+  mutate(across(where(is.numeric), ~replace_outliers(.,3))) %>%
   mutate(across(where(is.factor), fct_drop)) %>% # recode predict when filter has remove levels
-  group_by(idStationUnique,Zone,Tidal_level,Period,Annee) %>% 
-  summarise(iZTPAS = sum(Biomass_gAFDWm2, na.rm =TRUE)) %>% 
-  group_by(Zone,Period,Tidal_level,Annee) %>% #,Season
-  summarise(Biomass_gAFDWm2 = mean(iZTPAS, na.rm =TRUE)) %>% 
   mutate(Period=factor(Period, 
                       labels = str_replace_all(unique(Period),"-"," - ")))
 
-pl_des_b <- data_descr(CSLN_df,"Biomass_gAFDWm2")
+pl_des <- map(reponse_l,
+              ~data_descr(CSLN_df,.x$rvar))
+pl_des_gt <- map(pl_des, ~{
+                  .x$geog$plot / .x$time$plot & 
+                    theme(text=element_text(size=12)) &
+                    plot_annotation(tag_levels = c('A'))
+                 } )
 
-CSLN_df <- CSLN %>%
-  filter(grepl("Mudflat", Zone)) %>% # focus on mudflat only
-  filter(SPCourt %in% c(espece)) %>%
-  filter(!is.na(Density_indm2)) %>%
-  mutate(across(where(is.factor), fct_drop)) %>% # recode predict when filter has remove levels
-  group_by(idStationUnique,Zone,Tidal_level,Period,Annee) %>% 
-  summarise(iZTPAS = mean(Density_indm2, na.rm =TRUE)) %>% 
-  group_by(Zone,Period,Tidal_level,Annee) %>% #,Season
-  summarise(Density_indm2 = mean(iZTPAS, na.rm =TRUE)) %>% 
-  mutate(Period=factor(Period, 
-                      labels = str_replace_all(unique(Period),"-"," - ")))
+iwalk(pl_des_gt,
+  ~ggsave(sprintf("%sfig-bio_struc_%s.tiff",wdgraph,.y),
+       plot = .x, width = 14, height = 7, dpi=400) )
 
-pl_des_d <- data_descr(CSLN_df,"Density_indm2")
-
-# pl_des_b_gt <- ggarrange(pl_des_b$geog$plot,pl_des_b$time$plot, ncol=1, nrow=2,
-#                 labels="AUTO", legend="bottom",
-#                 common.legend = FALSE)
-# pl_des_b_gt <- annotate_figure(pl_des_b) + #top = text_grob(title, face = "bold", size = 14)
-#       bgcolor("white")
-
-pl_des_b_gt <- pl_des_b$geog$plot / pl_des_b$time$plot & 
-    theme(legend.position="bottom",
-          text=element_text(size=12)) &
-    plot_annotation(tag_levels = c('A'))
-pl_des_d_gt <- pl_des_d$geog$plot / pl_des_d$time$plot  & 
-    theme(legend.position="bottom",
-          text=element_text(size=12)) &
-    plot_annotation(tag_levels = c('A'))
-
-ggsave(sprintf("%sfig-cered_struc_biom.tiff",wdgraph),
-       plot = pl_des_b_gt, width = 10, height = 5, dpi=400)
-ggsave(sprintf("%sfig-cered_struc_dens.tiff",wdgraph),
-       plot = pl_des_d_gt, width = 10, height = 5, dpi=400)
 ```
 :::
 
@@ -429,13 +413,12 @@ pl_mars <-
 
 pl_mars_gt <- map(pl_mars,
                   ~{.x$geog$plot / .x$time$plot  & 
-    theme(legend.position="bottom",
-          text=element_text(size=12)) &
+    theme(text=element_text(size=12)) &
     plot_annotation(tag_levels = c('A')) } )
 
 iwalk(pl_mars_gt,
   ~ggsave(sprintf("%sfig-hms_struc_%s.tiff",wdgraph,.y),
-       plot = .x, width = 10, height = 5, dpi=400) )
+       plot = .x, width = 14, height = 7, dpi=400) )
 
 ```
 

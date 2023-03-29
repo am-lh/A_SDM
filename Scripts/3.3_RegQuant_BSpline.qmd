@@ -177,7 +177,7 @@ if(flag_calc){
                      ifelse(length(sdmod$id)==1,"0","") )
     
     yt<- biolo$rvar
-    yl<- biolo$whole
+    yl<- biolo$compl
     xt<-paste(sdmod$Var, collapse=typ[1])
     xl<-paste(sdmod$whole, collapse=paste0(" ",typ[1]," "))
     dfrq <-df[,c(yt,sdmod$Var)] %>% 
@@ -185,7 +185,7 @@ if(flag_calc){
       setnames(old=c(yt,sdmod$Var),
                new=c("y",paste0("x",1:length(sdmod$Var))) ) %>% 
       mutate(across(everything(),jitter))
-    df_tmp<-df %>% 
+    dftmp<-df %>% 
       drop_na(all_of(c(yt,sdmod$Var))) %>%
       select(all_of(c("Zone","Tidal_level","Period","Season","Annee","Mois","NINJ")))
     formumod<-as.formula(paste("y",paste0("bs(x",1:length(sdmod$Var),
@@ -251,8 +251,8 @@ if(flag_calc){
         rename_all(~sprintf("%.3f",taus)) %>% 
         mutate(across(everything(), function(x){replace(x, which(x<0), NA)})) %>% 
         bind_cols(tibble(dfrq)) %>% 
-        bind_cols(tibble(df_tmp)) %>% 
-       melt(id.vars=c(names(dfrq),names(df_tmp)),
+        bind_cols(tibble(dftmp)) %>% 
+       melt(id.vars=c(names(dfrq),names(dftmp)),
                       variable.name = "tau",value.name = "RqLim") %>% 
         mutate(sdmname=sdmname,
                taust=sprintf("tau= %s",tau),
@@ -467,6 +467,52 @@ ggsave(sprintf("%s%s_RQ_AIC_scores.tiff",
          plot = pl_rq_aic,
          width = 16, height = 8, dpi=400)
 
+```
+
+## Validation qq plot
+```{r}
+#| label: prefig-qqplot
+
+rq_qq_plot <- function(rqMod) {
+    # rqMod=rq_Mod_sel[[1]][[1]]
+  
+   rqMod$rqlim_t %>% 
+    mutate(taustx=as.character(tau)) %>% 
+    nest(data=-taustx) %>% 
+    mutate(data=map(data, ~{.x %>% 
+                    arrange(.,RqLim) %>% 
+                    mutate(.,points_bin = ntile(RqLim, n=10)) %>% 
+                    group_by(points_bin) %>% 
+                    summarise(Observed = quantile(y, unique(tau), na.rm=TRUE),
+                              Predict = mean(RqLim, na.rm=TRUE),
+                              tau = unique(tau)) %>%
+                    mutate(tau=as.factor(tau)) 
+      })) %>% 
+    unnest(cols=c(data)) %>% 
+    ggplot(aes(x=Observed,y=Predict,col=tau,fill=tau,shape=tau)) +
+      geom_point(size=2) +
+      geom_abline(slope=1,intercept=0) +
+      geom_smooth(method = "lm", formula= y~x, aes(fill = tau), alpha=0.1) +
+      stat_cor(label.x.npc = .7,label.y.npc=.1,show.legend = FALSE) +
+      stat_regline_equation(label.x.npc = .7,label.y.npc=.4,show.legend = FALSE) +
+      labs(title=sprintf("%s (%s)\n%s", 
+                            rqMod$meta$typetxt, 
+                            rqMod$meta$unit,
+                            rqMod$meta$predictt)) +
+      theme(legend.position="bottom",
+            text=element_text(size=10),
+            plot.title=element_text(size=10)) +
+      Scale_brew()
+}
+
+pl_rq_qq_sel<-map_depth(rq_Mod_sel,2,
+    ~ {.x %>% rq_qq_plot} )
+
+walk(pl_rq_qq_sel,
+  ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_rqq.tiff",
+                    graph_path, substr(.y,1,6), espece, .y),
+                    plot = .x,
+                    width = 5, height = 8, dpi=400) ) } )
 ```
 
 ## Qqplots Residuals graphs
@@ -811,15 +857,17 @@ st_rq_Mod_map<-function(rqmodmars,rqMod,tauchoice){
     mutate(Zone=fct_drop(.$Zone)) %>% 
     mutate(across(c(Zone,Period),factor))
   
-  descr<-list(pred=NULL,
-              mod=NULL,
-              res=NULL)
+  biorange<-max(max(rqmodmars %>% select(sprintf("t%.3f",tauchoice)), na.rm=TRUE),
+      max(replace_outliers(rqMod$rqlim_t$y,3), na.rm=TRUE))
+  
+  descr<-list(pred=NULL, mod=NULL, res=NULL)
 
   descr$pred <-map2(as.list(vars), as.list(varsl), ~{
     rqmodmars %>% 
     ggplot() + 
     geom_density_ridges(aes(y = Period , fill=Period,
-                          x=.data[[.x]]), alpha=0.3,size = .1) +
+                          x=.data[[.x]]), 
+                        alpha=0.3, size = .2) +
     facet_grid(. ~ Zone, 
                # scales = "free_y",
                labeller = label_wrap_gen(width = 20)) + 
@@ -829,7 +877,9 @@ st_rq_Mod_map<-function(rqmodmars,rqMod,tauchoice){
   descr$mod <-rqmodmars %>% 
     ggplot() + 
     geom_density_ridges(aes(y = Period , fill=Period,
-                          x=.data[[sprintf("t%.3f",tauchoice)]]), alpha=0.3) +
+                          x=.data[[sprintf("t%.3f",tauchoice)]]), 
+                        alpha=0.3, size = .2) +
+    xlim(c(0,biorange)) +
     facet_grid(. ~ Zone, 
                # scales = "free_y",
                labeller = label_wrap_gen(width = 20)) + 
@@ -839,21 +889,22 @@ st_rq_Mod_map<-function(rqmodmars,rqMod,tauchoice){
                           rqMod$meta$predictt)) +
     Scale_brew()
   
-  # descr$res <-rqmodmars %>% 
-  #   ggplot() + 
-  #   geom_density_ridges(aes(y = Period , fill=Period,
-  #                         x=.data[[sprintf("t%.3f",tauchoice)]]), alpha=0.3) +
-  #   facet_grid(. ~ Zone, 
-  #              # scales = "free_y",
-  #              labeller = label_wrap_gen(width = 20)) + 
-  #   labs(y="",x=sprintf("%s (%s) t%.3f - %s", 
-  #                         rqMod$meta$typetxt, 
-  #                         rqMod$meta$unit,tauchoice,
-  #                         rqMod$meta$predictt)) +
-  #   Scale_brew()
+  descr$res <- rqMod$rqlim_t %>%
+    filter(grepl("Mudflat",.$Zone)) %>%
+    mutate(Zone=fct_drop(.$Zone)) %>% 
+    mutate(across(c(Zone,Period),factor)) %>% 
+    ggplot() +
+    geom_density_ridges(aes(y = Period , fill=Period,
+                          x=y), alpha=0.3, size = .2) +
+    xlim(c(0,biorange)) +
+    facet_grid(. ~ Zone,
+               # scales = "free_y",
+               labeller = label_wrap_gen(width = 20)) +
+    labs(y="",x=rqMod$meta$reponset) +
+    Scale_brew()
  
  
-  wrap_plots(descr$pred, ncol=1) / descr$mod &
+  wrap_plots(descr$pred, ncol=1) / descr$mod / descr$res &
     # plot_layout(guides = "collect") & 
     theme(legend.position="none",
           strip.background = element_blank(),
@@ -876,9 +927,9 @@ pl_rq_mars_sel_st<-
 walk(pl_rq_mars_sel_st,
   ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_mars_st.tiff",
                     graph_path, substr(.y,1,6), espece, .y),
-                    plot = .x$geog$plot,
-                    width = 10, height = 4, dpi=400) ) } )
-
+                    plot = .x,
+                    width = 15, height = 10, dpi=400) )
+    } )
 ```
 
 ## Shapefile save
