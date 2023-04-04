@@ -182,6 +182,11 @@ predictMNT <- data.frame(
            "Light Sands","Medium Sands","Coarse Sands","Gravels"),
   punit=c("µm","µm","µm","%","%","%","%","%"))
 
+tidelevels<-data.frame(
+  level=c("upper intertidal", "medium intertidal", "lower intertidal", "subtidal"),
+  descr=c("[0-25%[ immersion time","[25-75%[ immersion time","[75-100%[ immersion time","100% immersion time")) %>% 
+  mutate(level=ordered(level,c("upper intertidal", "medium intertidal", "lower intertidal", "subtidal")))
+
 anMars <- unique(Mars_csv$Annee) # used for RQ scripts
 
 ```
@@ -232,10 +237,10 @@ Mars_dat_sf$Period[Mars_dat_sf$Annee %in% 2016:2019] <- "2015-2019"
 Mars_dat_sf$Period <- as.factor(Mars_dat_sf$Period)
 # TIDAL_LEVEL CALCULATION : should be in mars matlab script ? ----
 Mars_csv$Tidal_level <- NA
-Mars_csv$Tidal_level[Mars_csv$inunt>=0 & Mars_csv$inunt<0.25] <- "Supratidal"
-Mars_csv$Tidal_level[Mars_csv$inunt>=0.25 & Mars_csv$inunt<0.75] <- "Intertidal"
-Mars_csv$Tidal_level[Mars_csv$inunt>=0.75 & Mars_csv$inunt<1] <- "Infratidal"
-Mars_csv$Tidal_level[Mars_csv$inunt==1] <- "Subtidal"
+Mars_csv$Tidal_level[Mars_csv$inunt>=0 & Mars_csv$inunt<0.25] <- tidelevels$level[1]
+Mars_csv$Tidal_level[Mars_csv$inunt>=0.25 & Mars_csv$inunt<0.75] <- tidelevels$level[2]
+Mars_csv$Tidal_level[Mars_csv$inunt>=0.75 & Mars_csv$inunt<1] <- tidelevels$level[3]
+Mars_csv$Tidal_level[Mars_csv$inunt==1] <- tidelevels$level[4]
 Mars_csv$Tidal_level <- as.factor(Mars_csv$Tidal_level)
 
 Mars_csv_sf <- st_as_sf(Mars_csv, coords=c("Lon","Lat"),
@@ -244,10 +249,10 @@ Mars_csv_sf <- st_as_sf(Mars_csv, coords=c("Lon","Lat"),
 
 # TIDAL_LEVEL CALCULATION : should be in mars matlab script ? ----
 Mars_dat_sf$Tidal_level <- NA
-Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0 & Mars_dat_sf$inunt<0.25] <- "Supratidal"
-Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0.25 & Mars_dat_sf$inunt<0.75] <- "Intertidal"
-Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0.75 & Mars_dat_sf$inunt<1] <- "Infratidal"
-Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt==1] <- "Subtidal"
+Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0 & Mars_dat_sf$inunt<0.25] <- tidelevels$level[1]
+Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0.25 & Mars_dat_sf$inunt<0.75] <- tidelevels$level[2]
+Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0.75 & Mars_dat_sf$inunt<1] <- tidelevels$level[3]
+Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt==1] <- tidelevels$level[4]
 Mars_dat_sf$Tidal_level <- as.factor(Mars_dat_sf$Tidal_level)
 ```
 
@@ -569,6 +574,7 @@ Mod_chosen<-list(c("flow_mxd","inunt"),
                   c("sal_dtd","bathy"))
 taus <- c(0.5,0.9,0.95,0.975) # c(0.5,0.85,0.9,0.95,0.975,0.99) #c(1:19/20,0.975,0.99)
 taus_l<-setNames(as.list(taus),sprintf("%0.3f",taus))
+tauchoice<-0.95
 
 model_types<- data.frame(rbind(
   c(analysis="RQ Linear",code="RQ2add",bdd="rqdata"),
@@ -653,6 +659,16 @@ if(flag_calc_mars){
                  group_by(across(NINJ:Period)) %>% 
                  dplyr::summarise(across(where(is.numeric),~mean(.x,na.rm=TRUE)))
 }
+# correction of tidal levels
+# Mars_SDM_per<-Mars_SDM_per %>% 
+#   mutate(Tidal_level=case_match(Tidal_level,
+#                                 "Supratidal" ~"upper intertidal", 
+#                                 "Intertidal" ~"medium intertidal", 
+#                                 "Infratidal" ~"lower intertidal",
+#                                 "Subtidal" ~"subtidal",
+#                                 .default = Tidal_level) ) %>% 
+#   mutate(Tidal_level=ordered(Tidal_level,tidelevels$level))
+
 ```
 
 # Final actions and save

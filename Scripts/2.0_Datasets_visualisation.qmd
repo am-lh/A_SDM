@@ -223,7 +223,7 @@ ggsave(filename= sprintf("%sfig-map.tiff",wdgraph),
 
 ```{r}
 #| label: map_html
-#| eval: false
+#| include: true
 
 tmap_mode("view") # "plot" "view"
 tm_study_map_html<-
@@ -320,8 +320,10 @@ data_descr <- function (dataset,vars) {
                      y = .data[[vars]] ),
                      alpha = 0.5,size = .1,show.legend = FALSE) +
     stat_summary(aes(x=Period, fill = Period,
-                     y = .data[[vars]], color = Period), 
-                 size=.3, fun.data = mean_se, show.legend = FALSE) +
+                     y = .data[[vars]]),  
+                 size=.4, fun.data = mean_cl_boot, 
+                 shape=21, stroke =.5, linewidth = .5,
+                 inherit.aes = FALSE, show.legend = FALSE) +
     # stat_pvalue_manual(descr$geog$stat.test,label = "p.adj.signif",
     #                    size = 3,tip.length = 0, coord.flip = TRUE) +
     coord_flip() +
@@ -346,8 +348,10 @@ data_descr <- function (dataset,vars) {
                      y = .data[[vars]] ),
                      alpha = 0.5,size = .1,show.legend = FALSE) +
     stat_summary(aes(x=Zone, fill = Zone,
-                     y = .data[[vars]], color = Zone),  
-                 size=.3, fun.data = mean_se, show.legend = FALSE) +
+                     y = .data[[vars]]),  
+                 size=.4, fun.data = mean_cl_boot, 
+                 shape=21, stroke = .5, linewidth = .5,
+                 inherit.aes = FALSE, show.legend = FALSE) +
     # stat_pvalue_manual(descr$time$stat.test,label = "p.adj.signif", 
     #                    size = 3,tip.length = 0, coord.flip = TRUE) +
     coord_flip() +
@@ -401,15 +405,21 @@ iwalk(pl_des_gt,
 ```{r}
 #| label: hms_distr
 
+Mars_tmp<-Mars_SDM %>%
+           st_drop_geometry %>%
+           # mutate(across(where(is.numeric), ~replace_outliers(.,2))) %>% 
+           mutate(across(all_of(c("bathy","tenfon_mxd")), ~replace_outliers(.,1.5))) %>%
+           filter(!Zone %in% c("Bay","Octeville","Ilot Oiseaux","Cote Fleurie")) %>%
+           mutate(across(where(is.factor), fct_drop))
+
 pl_mars <- 
   map(setNames(as.list(Var_choosen),Var_choosen), \(vars)
-          data_descr(Mars_SDM %>%
-                       st_drop_geometry %>%
-                       # mutate(across(where(is.numeric), ~replace_outliers(.,2))) %>% 
-                       mutate(across(all_of(c("bathy","tenfon_mxd")), ~replace_outliers(.,1.5))) %>%
-                       filter(!Zone %in% c("Bay","Octeville","Ilot Oiseaux","Cote Fleurie")) %>%
-                       mutate(across(where(is.factor), fct_drop)), # recode predict when filter has remove levels
+          data_descr(Mars_tmp,
                      vars) )
+
+pl_mars<- map(setNames(as.list(Var_choosen),Var_choosen),  \(vars)
+  map(pl_mars[[vars]], ~{modify_at(.x,"plot", 
+          ~{ .x + ylab(pred_red$whole[which(pred_red$Var == vars)])} )} ) ) 
 
 pl_mars_gt <- map(pl_mars,
                   ~{.x$geog$plot / .x$time$plot  & 
@@ -419,6 +429,141 @@ pl_mars_gt <- map(pl_mars,
 iwalk(pl_mars_gt,
   ~ggsave(sprintf("%sfig-hms_struc_%s.tiff",wdgraph,.y),
        plot = .x, width = 14, height = 7, dpi=400) )
+
+# Done after saving file because of special characters
+pl_mars<-pl_mars %>% 
+  setNames(pred_red$whole)
+
+pl_mars_gt<-pl_mars_gt %>% 
+  setNames(pred_red$whole)
+
+```
+
+```{r}
+#| label: hms_map
+
+tmap_mode("plot") # "plot" "view"
+pl_var_map<-function(data, vars){
+  # data=Mars_tmp
+  # vars=pred_red %>% transpose %>% setNames(.,pred_red$Var); vars=vars[[1]]
+
+  pl_map<-list(all=NULL, one=NULL)
+
+  pl_map$all <- tm_shape(osm_df) +  
+    tm_rgb(saturation = .6, alpha= 0.8) +
+  # tm_scale_bar(position = c("left", "bottom"), width = 0.15) + #SCALE
+  # tm_compass(position = c("left", "top"), size = 2) +          #NORTH COMPASS
+    tm_shape(data) +
+      tm_fill(col = vars$Var, midpoint = NA,
+              style="cont", palette = "-Spectral", alpha = 0.6) +
+    tm_facets(by="Period", nrow = 1) +
+    tm_shape(tm_areas) +  
+      tm_borders(alpha = 0.3, lwd = 2) +
+    tm_layout(
+      main.title=vars$whole,
+      main.title.size= .8,
+      panel.label.bg.color = 'white',
+      panel.label.size=.8,
+      legend.outside = TRUE, 
+      legend.outside.size = .08,
+      legend.title.size= .8,
+      legend.text.size= .6,
+      legend.format=list(text.separator="-"),
+      outer.margins=c(0,0,0,0), inner.margins=c(0,0,0,0))
+  
+  peri<-setNames(as.list(levels(data$Period)), levels(data$Period))
+  # Define map for each Period
+  pl_map$one <- map(peri, ~{
+    tm_shape(osm_df) +  
+      tm_rgb(saturation = .6, alpha= 0.8) +
+    tm_shape(data %>% 
+               filter(Period %in% .x)) +
+      tm_fill(col = vars$Var, 
+              title=.x, midpoint = NA,
+              style="cont", palette = "-Spectral", alpha = 0.6) +
+    tm_shape(tm_areas) +  
+      tm_borders(alpha = 0.3, lwd = 2) +
+    tm_layout(
+              main.title=vars$whole,
+              main.title.size= .8,
+              panel.label.size=.8,
+              legend.outside = TRUE,
+              legend.outside.size = .08,
+              legend.title.size= .8,
+              legend.text.size= .6,
+              legend.format=list(text.separator="-"),
+              outer.margins=c(0,0,0,0), inner.margins=c(0,0,0,0))
+  } ) # map peri
+  return(pl_map)
+ }
+
+Mars_tmp<-Mars_SDM_per %>%
+           # mutate(across(where(is.numeric), ~replace_outliers(.,2))) %>% 
+           # mutate(across(all_of(c("bathy","tenfon_mxd")), ~replace_outliers(.,1.5))) %>%
+           # filter(!Zone %in% c("Bay","Octeville","Ilot Oiseaux","Cote Fleurie")) %>%
+           mutate(across(where(is.factor), fct_drop))
+
+pl_mars_map <-
+    map(pred_red %>% transpose %>% 
+           setNames(.,pred_red$Var),
+        ~pl_var_map(Mars_tmp,.x))
+
+
+iwalk(pl_mars_map, ~tmap_save(.x$all, dpi=400, height=2, asp=0, #width=20,
+                          filename=sprintf("%s/%s_map.tiff",
+                              wdgraph, .y) ) )
+
+tm_mars_gb <- map(pl_mars_map, ~ .x$all + 
+                    tm_layout(main.title.size= .6,
+                              panel.label.size=.6,
+                              legend.title.size= .6,
+                              legend.text.size= .6)) %>%
+    tmap_arrange(., asp=NA, ncol=1,
+                 sync = TRUE, outer.margins=0)
+
+tmap_save(tm_mars_gb, dpi=600,
+              filename= sprintf("%sfig-graphboard_map_mars.tiff",wdgraph) )
+
+```
+
+## Animated GIF Maps plots
+```{r}
+#| label: hms_map_gif
+
+pl_mars_map_gif<-function(data, vars){
+  # data=Mars_tmp
+  # vars=pred_red %>% transpose %>% setNames(.,pred_red$Var); vars=vars[[1]]
+  
+  tmap_mode("view") # "plot" "view"
+  tmp_sf <-
+  tm_basemap(leaflet::providers$OpenStreetMap.HOT) +
+  tm_shape(data) +
+    tm_fill(col =  vars$Var,
+            palette = "-Spectral", alpha = 0.6) +
+    # tm_borders("white", lwd = 0) +
+    tm_facets(along = "Annee") +
+  tm_shape(tm_areas) +  
+    tm_borders(alpha = 0.3, lwd = 2) +
+  tm_layout(legend.outside = TRUE,
+              title.size=10)
+
+  tmap_animation(
+    tmp_sf, filename = sprintf("%s/%s_map.gif",
+                    wdgraph, vars$Var),
+    fps = 1, width = 2000, height = 2000, dpi=600 )
+
+}
+
+# Mars_tmp<-Mars_SDM %>%
+#            # mutate(across(where(is.numeric), ~replace_outliers(.,2))) %>% 
+#            # mutate(across(all_of(c("bathy","tenfon_mxd")), ~replace_outliers(.,1.5))) %>%
+#            # filter(!Zone %in% c("Bay","Octeville","Ilot Oiseaux","Cote Fleurie")) %>%
+#            mutate(across(where(is.factor), fct_drop))
+
+# pl_mars_map_gif <-
+#     map(pred_red %>% transpose %>% 
+#            setNames(.,pred_red$Var),
+#         ~pl_var_map_gif(Mars_tmp,.x))
 
 ```
 
