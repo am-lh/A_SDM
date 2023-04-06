@@ -408,7 +408,7 @@ iwalk(pl_des_gt,
 Mars_tmp<-Mars_SDM %>%
            st_drop_geometry %>%
            # mutate(across(where(is.numeric), ~replace_outliers(.,2))) %>% 
-           mutate(across(all_of(c("bathy","tenfon_mxd")), ~replace_outliers(.,1.5))) %>%
+           mutate(across(all_of(c("bathy","tenfon_mxd","temp_m")), ~replace_outliers(.,1.5))) %>%
            filter(!Zone %in% c("Bay","Octeville","Ilot Oiseaux","Cote Fleurie")) %>%
            mutate(across(where(is.factor), fct_drop))
 
@@ -439,6 +439,68 @@ pl_mars_gt<-pl_mars_gt %>%
 
 ```
 
+
+```{r}
+#| label: hms_stat
+
+pl_var_st_board<-function(data,vars){
+  data=Mars_tmp
+  vars=pred_red
+
+  descr<-list(pred=NULL, all=NULL)
+  descr$pred <-imap(setNames(as.list(vars$Var),vars$whole), ~{
+    data %>% 
+    ggplot() + 
+    geom_density_ridges(aes(y = Period , fill=Period,
+                            height = after_stat(count), # to have a comparative height between periods
+                            x=.data[[.x]]), 
+                        stat="density", alpha=0.3, size = .2) +
+    facet_grid(. ~ Zone, 
+               # scales = "free_y",
+               labeller = label_wrap_gen(width = 20)) + 
+    labs(x=.y, y="") +
+    Scale_brew() } )
+
+  descr$all<-wrap_plots(descr$pred, ncol=1) & 
+    theme(legend.position="none",
+          strip.background = element_blank(),
+          text=element_text(size=10)) &
+    plot_annotation(tag_levels = c('A')) 
+  return(descr)
+}
+
+Mars_tmp<-Mars_SDM_per %>%
+           mutate(across(all_of(c("bathy","tenfon_mxd","temp_m")), ~replace_outliers(.,1.5))) %>%
+           filter(!Zone %in% c("Bay","Octeville","Ilot Oiseaux","Cote Fleurie")) %>%
+           mutate(across(where(is.factor), fct_drop))
+
+# pl_mars_st_board <- Mars_tmp %>% 
+#   st_drop_geometry() %>% 
+#   pivot_longer(cols = !NINJ:Annee) %>% 
+#   mutate(name=factor(name, levels = pred_red$Var, labels = pred_red$whole)) %>% 
+#   ggplot() + 
+#   geom_density_ridges(aes(y = Period , fill=Period,
+#                           height = after_stat(count), # to have a comparative height between periods
+#                           x=value), 
+#                       stat="density", alpha=0.3, size = .2) +
+#   facet_grid(name ~ Zone, 
+#              scales = "free",
+#              labeller = label_wrap_gen(width = 20) ) + 
+#   labs(x="", y="") +
+#   Scale_brew() + 
+#   theme(legend.position="none",
+#         strip.background = element_blank(),
+#         text=element_text(size=10))
+
+pl_mars_st_board <-
+  pl_var_st_board(Mars_tmp,pred_red)
+
+ggsave(sprintf("%s/mars_st_board.tiff", wdgraph),
+                  plot = pl_mars_st_board$all,
+                  width = 10, height = 12, dpi=600)
+
+```
+
 ```{r}
 #| label: hms_map
 
@@ -458,7 +520,7 @@ pl_var_map<-function(data, vars){
               style="cont", palette = "-Spectral", alpha = 0.6) +
     tm_facets(by="Period", nrow = 1) +
     tm_shape(tm_areas) +  
-      tm_borders(alpha = 0.3, lwd = 2) +
+      tm_borders(alpha = 0.3, lwd = 1) +
     tm_layout(
       main.title=vars$whole,
       main.title.size= .8,
@@ -482,7 +544,7 @@ pl_var_map<-function(data, vars){
               title=.x, midpoint = NA,
               style="cont", palette = "-Spectral", alpha = 0.6) +
     tm_shape(tm_areas) +  
-      tm_borders(alpha = 0.3, lwd = 2) +
+      tm_borders(alpha = 0.3, lwd = 1) +
     tm_layout(
               main.title=vars$whole,
               main.title.size= .8,
@@ -499,7 +561,7 @@ pl_var_map<-function(data, vars){
 
 Mars_tmp<-Mars_SDM_per %>%
            # mutate(across(where(is.numeric), ~replace_outliers(.,2))) %>% 
-           # mutate(across(all_of(c("bathy","tenfon_mxd")), ~replace_outliers(.,1.5))) %>%
+           mutate(across(all_of(c("bathy","tenfon_mxd","temp_m")), ~replace_outliers(.,1.5))) %>%
            # filter(!Zone %in% c("Bay","Octeville","Ilot Oiseaux","Cote Fleurie")) %>%
            mutate(across(where(is.factor), fct_drop))
 

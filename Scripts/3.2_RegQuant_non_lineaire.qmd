@@ -33,6 +33,7 @@ library(readxl) ; library(openxlsx); library(beepr) # Edition d'un fichier Excel
 library(tidyverse); library(reshape2); library(rlist) # the one; melt; list.append
 library(data.table)
 library(rstatix); library(Hmisc)  # corr and pvalue calculation
+library(boot)
 
 library(ggpubr); #library(GGally); # stat_compare_means ;
 library(scales); library(RColorBrewer); library(wesanderson); library(grafify); library(colorspace); library(ggsci)# show_col and colors colors colors!
@@ -53,6 +54,8 @@ conflict_prefer("summarise", "dplyr")
 conflict_prefer("melt", "reshape2")
 conflict_prefer("layout", "plotly")
 
+set.seed(123)
+
 ```
 
 ### Working Environment
@@ -67,8 +70,8 @@ wdres <- "Results/"
 pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
 
-flag_calc<-FALSE # to calculate RQ models and mars results and more time-consuming mars summary by period
-flag_calc_mars<-FALSE # to calculate time-consuming mars summary by period
+flag_calc<-TRUE # to calculate RQ models and mars results and more time-consuming mars summary by period
+flag_calc_mars<-TRUE # to calculate time-consuming mars summary by period
 
 ```
 
@@ -111,7 +114,11 @@ AICc<-function(modelq,smrq){
     df<-dim(smrq$coefficients)[1]-1
     aicc<-AIC(modelq)+2*df*(df+1)/(length(modelq$y)-df-1) 
     return(aicc) 
-  } 
+} 
+
+replace_outliers <- function(x, coefv=1.5) {
+  replace(x, x %in% boxplot.stats(x, coef = coefv)$out, NA) #mean(x)
+}
 ```
 
 ## Load of External data and Basic Variables
@@ -219,12 +226,7 @@ if(flag_calc){
       gridxmat <- mesh(xmod$x1,xmod$x2)
       } else{ gridxmat<-NULL }
     mod_grid<-list(xmod=xmod,gridx=gridx,gridxmat=gridxmat)
-    # Zinit<-gauss2d(x1=gridxmat[["x"]],
-    #              x2=gridxmat[["y"]],
-    #              A=lci[[1]],mu1=lci[[2]],
-    #              sigma1=lci[[3]],mu2=lci[[4]],
-    #              sigma2=lci[[5]])
-  
+
     modt<-map(as.list(taus), \(taut) { #taut=taus[[4]]
       tryCatch({
         # nlRQ PARAMETER CONTROL TO AVOID R ABORT WHEN SUMMARY(MODEL) : InitialStepSize=0 (ex=1)
@@ -232,6 +234,27 @@ if(flag_calc){
                          InitialStepSize = 0, 
                          big=1e+20, eps=1e-06, beta=0.97)
         modelq0<-rq(y ~ 1, data=dfrq, tau=taut)
+        
+        # --- BOOTSTRAP OF RQ MODEL TO GET GOOD LCI THAT WILL GO INTO THE VALIDATED MODEL ---- 
+        calc_rq<-function(data,indices, formumod, lci, taut, cc){
+          d <- data[indices,] # d=dfrq
+          tryCatch({
+            fit<-nlrq(formumod, data=d, 
+                       start = lci, tau=taut,
+                       control=cc, method="L-BFGS-B")
+            return(coef(fit)) },
+          error = function(e) NA ) }
+        boot_res <- boot(dfrq, calc_rq, R = 1000, 
+                         formumod=formumod, lci=lci, taut=taut, cc=cc)
+        lci <- boot_res$t %>%
+          as.data.frame() %>% 
+          setNames(names(lci)) %>% 
+          summarise(across(.cols=everything(),list(mean = ~mean(.,na.rm=TRUE), sd = ~sd(.,na.rm=TRUE)))) %>% 
+          rename_with(.,~gsub("_mean","",.x)) %>% 
+          select(names(lci)) %>% 
+          as.list
+        # --- END OF BOOTSTRAP ---- 
+        
         modelq<-nlrq(formumod, data=dfrq, 
                      start = lci, tau=taut,
                      control=cc, method="L-BFGS-B")
@@ -488,11 +511,12 @@ ggsave(sprintf("%s%s_RQ_AIC_scores.tiff",
 
 ```
 
-## Validation qq plot
-```{r}
-#| label: prefig-qqplot
 
-rq_qq_plot <- function(rqMod) {
+## Validation pred/obs plot
+```{r}
+#| label: prefig-poplot_boot
+
+rq_po_plot <- function(rqMod) { # without bootstrap
     # rqMod=rq_Mod_sel[[1]][[1]]
   
    rqMod$rqlim_t %>% 
@@ -507,83 +531,121 @@ rq_qq_plot <- function(rqMod) {
                               tau = unique(tau)) %>%
                     mutate(tau=as.factor(tau)) 
       })) %>% 
-    unnest(cols=c(data)) %>% 
+    unnest(data) %>% 
     ggplot(aes(x=Observed,y=Predict,col=tau,fill=tau,shape=tau)) +
       geom_point(size=2) +
       geom_abline(slope=1,intercept=0) +
       geom_smooth(method = "lm", formula= y~x, aes(fill = tau), alpha=0.05) +
-      stat_cor(aes(label=after_stat(r.label)),
-               label.x.npc = .6,label.y.npc=.3,show.legend = FALSE) +
+      stat_cor(aes(label=after_stat(r.label)), 
+               label.x.npc = "left", label.y.npc = "top", #label.x.npc = .6,label.y.npc=.3,
+               show.legend = FALSE) +
       # stat_regline_equation(label.x.npc = .7,label.y.npc=.4,show.legend = FALSE) +
+      xlim(c(0, max(max(data$Observed,na.rm=TRUE),max(data$Predicted,na.rm=TRUE)) )) +
+      ylim(c(0, max(max(data$Observed,na.rm=TRUE),max(data$Predicted,na.rm=TRUE)) )) +
       labs(title=sprintf("%s (%s)\n%s", 
                             rqMod$meta$typetxt, 
                             rqMod$meta$unit,
                             rqMod$meta$predictt)) +
       theme(legend.position="bottom",
+            aspect.ratio=1,
+            text=element_text(size=10),
+            plot.title=element_text(size=10)) +
+      Scale_brew()
+}
+# pl_rq_po_sel<-map_depth(rq_Mod_sel,2,
+#     ~ {.x %>% rq_po_plot} )
+
+rq_po_plot <- function(data, metas) { # for the bootstrap
+    # data=rq_mod_boot_tmp
+    # metas= rq_Mod_sel[[1]][[1]]$meta
+   data %>% 
+    ggplot(aes(x=Observed, y=Predicted, col=tau, fill=tau, shape=tau)) +
+      # geom_pointrange(data=data,aes(#xmin=Observed-Observed_se,
+      #                   #xmax=Observed+Observed_se,
+      #                   ymin=Predicted-Predicted_se,
+      #                   ymax=Predicted+Predicted_se),
+      #               colour="gray50") +
+      geom_point(size=2) +
+      geom_abline(slope=1,intercept=0) +
+      geom_smooth(method = "lm", formula= y~x, aes(fill = tau), alpha=0.05) +
+      stat_cor(aes(label=after_stat(r.label)), 
+               label.x.npc = "left", label.y.npc = "top",
+               show.legend = FALSE) +
+      # stat_regline_equation(label.x.npc = .7,label.y.npc=.4,show.legend = FALSE) +
+      xlim(c(0, max(max(data$Observed,na.rm=TRUE),max(data$Predicted,na.rm=TRUE)) )) +
+      ylim(c(0, max(max(data$Observed,na.rm=TRUE),max(data$Predicted,na.rm=TRUE)) )) +
+      labs(title=sprintf("%s (%s)\n%s",
+                            metas$typetxt,
+                            metas$unit,
+                            metas$predictt)) +
+      theme(legend.position="bottom",
+            aspect.ratio=1,
             text=element_text(size=10),
             plot.title=element_text(size=10)) +
       Scale_brew()
 }
 
-pl_rq_qq_sel<-map_depth(rq_Mod_sel,2,
-    ~ {.x %>% rq_qq_plot} )
+calc_boot <- function(data, indices, taut) {
+  d <- data[indices,]
+  Observed <- quantile(d$y, taut, na.rm=TRUE) 
+  Predicted <- mean(d$RqLim, na.rm=TRUE)
+  return(c(Observed, Predicted))
+}
 
-walk(pl_rq_qq_sel,
-  ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_rqq.tiff",
+bootstrap_table <- function(data, taut, bin, n_bootstraps) {
+    # data=rq_mod_tmp; taut=0.95; bin=9; n_bootstraps=10
+  subset_data <- data[data$tau == taut & 
+                      data$points_bin == bin,]
+
+  bootstrap_results <- boot(subset_data, calc_boot, R = n_bootstraps, taut=taut)
+  Observed <- bootstrap_results$t[,1]
+  Predicted <- bootstrap_results$t[,2]
+  Observed_ci <- boot.ci(bootstrap_results, type = "basic")$basic[2:3]
+  Predicted_ci <- boot.ci(bootstrap_results, type = "basic")$basic[4:5]
+  
+  results_table <- data.frame(
+    Observed = mean(Observed), Observed_se = sd(Observed), Observed_ci,
+    Predicted = mean(Predicted), Predicted_se = sd(Predicted), Predicted_ci,
+    tau=taut, points_bin=bin)
+
+  return(results_table)
+}
+
+rq_po_plot_boot<- function(rqMod) {
+     # rqMod=rq_Mod_sel[[1]][[1]]
+  # create adequate data table for bootstrap
+  rq_mod_tmp <- rqMod$rqlim_t %>%
+    mutate(taustx=as.character(tau)) %>%
+    drop_na(RqLim) %>% 
+    nest(data=-taustx) %>%
+    mutate(data=map(data, ~{.x %>%
+                    arrange(.,RqLim) %>%
+                    mutate(.,points_bin = ntile(RqLim, n=10)) })) %>% 
+    unnest(data) %>% 
+    select(y, RqLim, tau, points_bin) %>% 
+    group_by(tau, points_bin)
+  
+  as.list(expand_grid(
+    taut=unique(rq_mod_tmp$tau),
+    bins=unique(rq_mod_tmp$points_bin))) %>% 
+    transpose %>%
+    map(~bootstrap_table(data = rq_mod_tmp, 
+                         taut = .x$taut, bin = .x$bins, 
+                         n_bootstraps = 1000)) %>% 
+    bind_rows() %>%
+    mutate(tau=as.factor(tau)) %>% 
+    rq_po_plot(.,metas=rqMod$meta)
+}
+
+pl_rq_po_sel<-map_depth(rq_Mod_sel,2,
+    ~ {.x %>% rq_po_plot_boot} )
+
+walk(pl_rq_po_sel,
+  ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_po.tiff",
                     graph_path, substr(.y,1,6), espece, .y),
                     plot = .x,
                     width = 5, height = 8, dpi=400) ) } )
 
-# # tentative bootstrap -----
-# library(boot)
-# set.seed(1)
-# st_quant<-function(data,indices) {
-#     data[indices,] %>% 
-#     mutate(taustx=as.character(tau)) %>% 
-#     nest(data=-taustx) %>% 
-#     mutate(data=map(data, ~{.x %>% 
-#                     arrange(.,RqLim) %>% 
-#                     mutate(.,points_bin = ntile(RqLim, n=10),
-#                            n=n()) %>% 
-#                     group_by(points_bin) %>% 
-#                     summarise(Observed = quantile(y, unique(tau), na.rm=TRUE),
-#                               Predict = mean(RqLim, na.rm=TRUE),
-#                               tau = unique(tau)) %>%
-#                     mutate(tau=as.factor(tau)) 
-#       }))
-# }
-# library(modelr)
-# out <- rq_Mod_sel$Biomass$RQ2nli_11112$rqlim_t %>%
-#           mutate(taustx=as.character(tau)) %>% 
-#           group_by(taustx) %>% 
-#           nest %>% 
-#           mutate(data=map(data, ~{.x %>% 
-#                   arrange(.,RqLim) %>% 
-#                   mutate(.,points_bin = ntile(RqLim, n=10)) %>% 
-#                   group_by(points_bin) %>% 
-#                   mutate(.,n=n())
-#             })) %>% 
-#          mutate(boot = map(data, ~ modelr::bootstrap(.x, n = 100, id = 'y') #%>%
-#                                  # pull('strap')# %>% 
-#                                  # map_dbl(~ as_tibble(.x) %>% 
-#                                  #          pull('y') %>%
-#                                  #          median) 
-#                            ))
-# 
-# 
-# 
-# results <- boot(data=rq_Mod_sel$Biomass$RQ2nli_11112$rqlim_t,
-#                               statistic=st_quant,
-#                               R=1000)
-# 
-# plot(results, index=1) # intercept
-# plot(results, index=2) # wt
-# plot(results, index=3) # disp
-# boot.ci(results, type="bca", index=1) # intercept
-# boot.ci(results, type="bca", index=2) # wt
-# boot.ci(results, type="bca", index=3) # disp
-# 
-# # ------
 ```
 
 ## Qqplots Residuals graphs
@@ -600,7 +662,7 @@ pl_rq_Mod_res<-function(rqMod,titleG){
     rename(residuals=value)
   subtitleG <- sprintf("%s vs %s",rqMod$meta$reponset,rqMod$meta$predictt)
   ggplot(rqResid, aes(sample=residuals, color=tau)) + 
-    stat_qq() + stat_qq_line() + 
+    stat_qq() + stat_po_line() + 
     facet_wrap(~tau) +
     Scalc_rq() +
     theme(legend.position="none",
@@ -694,7 +756,7 @@ pl_rq_Mod_2d<-function(rqMod,titleG){
                     alpha=0.4,color="gray50",bins = 30) +
     geom_point(data=rqMod$rqlim_t %>% filter(status=="over"),aes(x=x1, y=x2), 
                shape=8, size=1, color=colOutliers, #fill=colOutliers,
-               alpha=.5, na.rm = TRUE) +
+               alpha=.2, na.rm = TRUE) +
     labs(title=titleG,
          x=rqMod$meta$predictl[1],
          y=rqMod$meta$predictl[2],
@@ -720,7 +782,7 @@ pl_rq_Mod_2d<-function(rqMod,titleG){
         geom_point(data=rqMod$rqlim_t %>% filter(status=="over"),
                    aes(x=x1, y=x2), 
                    shape=8, size=1, color=colOutliers, #fill=colOutliers,
-                   alpha=.5, na.rm = TRUE) +
+                   alpha=.2, na.rm = TRUE) +
         labs(title=sprintf("tau = %0.3f",.x),
              x=rqMod$meta$predictl[1],
              y=rqMod$meta$predictl[2],
@@ -940,8 +1002,9 @@ st_rq_Mod_map<-function(rqmodmars,rqMod,tauchoice){
     mutate(across(c(Zone,Period),factor))
   
   biorange<-max(
-    max(replace_outliers(rqmodmars %>% select(sprintf("t%.3f",tauchoice)),3), na.rm=TRUE),
-    max(replace_outliers(rqMod$rqlim_t$y,3), na.rm=TRUE))
+    max(replace_outliers(rqmodmars %>% select(sprintf("t%.3f",tauchoice))), na.rm=TRUE),
+    max(replace_outliers(rqMod$rqlim_t$y), na.rm=TRUE)) %>% 
+    ceiling(.)
   
   descr<-list(pred=NULL, mod=NULL, res=NULL, all=NULL)
 
@@ -1089,7 +1152,7 @@ pl_rq_Mod_map<-function(rqmodmars,rqMod,tauchoice){
               style="cont", palette = "-Spectral", alpha = 0.7) +
     tm_facets(by="Period", nrow = 1) +
     tm_shape(tm_areas) +  
-      tm_borders(alpha = 0.3, lwd = 2) +
+      tm_borders(alpha = 0.3, lwd = 1) +
     tm_layout(
       main.title=sprintf("%s (%s) t%.3f - %s", 
                       rqMod$meta$typetxt, 
@@ -1113,10 +1176,10 @@ pl_rq_Mod_map<-function(rqmodmars,rqMod,tauchoice){
     tm_shape(rqmodmars %>% 
                filter(Period %in% .x)) +
       tm_fill(col = sprintf("t%.3f",tauchoice), 
-              title=.x,
+              title=.x, 
               style="cont", palette = "-Spectral", alpha = 0.7) +
     tm_shape(tm_areas) +  
-      tm_borders(alpha = 0.3, lwd = 2) +
+      tm_borders(alpha = 0.3, lwd = 1) +
     tm_layout(
               main.title=sprintf("%s (%s) t%.3f - %s", 
                               rqMod$meta$typetxt, 
@@ -1149,6 +1212,19 @@ walk(pl_rq_sel_map,
      ~iwalk(., ~tmap_save(.x$all, dpi=400, height=2, asp=0, #width=20,
                           filename=sprintf("%s/%s/%s_%s_map.tiff",
                               graph_path, substr(.y,1,6), espece, .y) ) ) )
+
+# Change the span of color scale to compare sdm between them
+max_map<-map(rq_Mod_mars_sel, ~{ # nlrqdata$
+  map_dbl(.x, ~max(
+    replace_outliers(.x[[sprintf("t%.3f",tauchoice)]]),na.rm=TRUE) ) %>% 
+  max(., na.rm=TRUE) %>% round(.,-1) } )
+
+pl_rq_sel_map<-map2(pl_rq_sel_map,max_map, \(x,y) # nlrqdata$
+      map(x,
+        ~modify_at(.x, "all",
+          ~modify_at(.x, "tm_fill",
+            ~modify_at(.x, "breaks", ~seq(0,y, length.out=5) ) #by=ifelse(y<1000,50,500)
+            ) ) ) )
 
 tm_mars_rq_gb <- map(pl_rq_sel_map,
   ~{ map(., ~ .x$all) %>%
@@ -1213,7 +1289,8 @@ Rdata are saved in `rdataout`. An excel file collects data in `r binderout` , wi
 
 ```{r}
 #| label: finalsave_r
-#| 
+
+# rm(list=ls()[grep("_qq_", ls())])
 
 save(list=(ls()[grep("rq_", ls())]),
      file = paste0(rdataout,".RData"))

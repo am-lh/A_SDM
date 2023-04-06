@@ -1,8 +1,8 @@
 ---
-title: "MELTING POTES PROJECT : SDM-NEO MODELS Linear Quantile Regression"
+title: "MELTING POTES PROJECT : SDM-NEO MODELS non Linear Quantile Regression"
 author: "Amélie Lehuen"
 description: "ANALYSIS WITH KOENKER'S QUANTREG PACKAGE"
-date: "`r format(Sys.time(), '%d %B %Y')`"
+date: "`r format(Sys.time(), '%B %Y')`"
 editor: source
 execute:
   eval: true
@@ -15,11 +15,11 @@ editor_options:
   chunk_output_type: console
 ---
 
-# LINEAR QUANTILE REGRESSION ANALYSIS WITH KOENKER'S QUANTREG PACKAGE
+# NON LINEAR QUANTILE REGRESSION ANALYSIS WITH KOENKER'S QUANTREG PACKAGE
 
 ## Introduction
 
-Linear quantile regression analysis with Koenker's `quantreg` package
+Non linear quantile regression analysis with Koenker's `quantreg` package
 
 <!-- ## Script preparation -->
 
@@ -70,7 +70,7 @@ wdres <- "Results/"
 pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
 
-flag_calc<-FALSE # to calculate RQ models and mars results
+flag_calc<-FALSE # to calculate RQ models and mars results and more time-consuming mars summary by period
 flag_calc_mars<-FALSE # to calculate time-consuming mars summary by period
 
 ```
@@ -105,8 +105,13 @@ Scale_map<- function() {scale_fill_distiller(palette = "Spectral")}
 ```{r}
 #| label: functmade
 
-AICc<-function(modelq){ 
-    df<-dim(modelq$coefficients)[1]-1 
+gaussf <- function(x,A,mu,sigma) {
+  A*exp(-((x-mu)^2/(2*sigma^2))/(sigma*sqrt(2*pi)))}
+gauss2d <- function(x1,x2,A,mu1,sigma1,mu2,sigma2) {
+  A*exp(-(((x1-mu1)^2/(2*sigma1^2))+((x2-mu2)^2/(2*sigma2^2))))}
+
+AICc<-function(modelq,smrq){ 
+    df<-dim(smrq$coefficients)[1]-1
     aicc<-AIC(modelq)+2*df*(df+1)/(length(modelq$y)-df-1) 
     return(aicc) 
 } 
@@ -135,7 +140,7 @@ load(sprintf("SIG/OSM_extraction.RData"))
 #| label: outfiles
 
 binderout <- sprintf("%sCSLN_BDD.xlsx",wdres)
-rdataout  <- sprintf("%sCSLN_Mars_RQ_BDD",wdmat)
+rdataout  <- sprintf("%sCSLN_Mars_RQnli_BDD",wdmat)
 # if exists
 # load(paste0(rdataout,".RData"))
 ```
@@ -147,13 +152,16 @@ rdataout  <- sprintf("%sCSLN_Mars_RQ_BDD",wdmat)
 
 etude <- "CSLN_Mars"
 espece <- "CERED"
-analysis <- "RQ Linear"
+analysis <- "RQ Nonlinear"
 sp <- which(speciesMP$SPCourt == espece)
 sai <- which(saison$M_Def == "Year") #Year Winter Summer
 
-type<-list(add= c("+","add"),int=c("*","int"))
-# tauchoice<-0.95
+type<-list(nli= c("*","nli"))
+tauchoice<-0.95
 graphfine<-50 # graph resolution for 2D and 3D graphs surfaces
+
+# Gaussian equation with Initial conditions (CI) vector, quantile choice of reponse (heigth of curve)
+FactA_CI <- 0.99
 
 df <- CSLN_Mars[which(CSLN_Mars$SPCourt == espece),]
 
@@ -171,14 +179,15 @@ titleG <- sprintf("%s %s in %s",
 ```{r}
 #| label: rq_Mod_calc
 if(flag_calc){ # flag_calc=1
-  rq_Lin <- function(df,biolo,sdmod,taus,typ) {
-      # biolo=reponse_l[[1]]; typ=type[[2]]
-      # sdmod=pred_red_comb$x1[[1]]
+  rq_nLin <- function(sdmod,df,biolo,typ,taus) {
+      # biolo=reponse_l[[1]]; typ=type[[1]]
+      # sdmod=pred_red_comb[[1]][[1]]
     typetxt<-paste0("RQ",length(sdmod$id),typ[2])
     sdmname<-sprintf("%s_%g%g%g%s%s",typetxt,sp,sai,
                      biolo$repi,
                      paste0(sdmod$id,collapse = ""),
                      ifelse(length(sdmod$id)==1,"0","") )
+    
     yt<- biolo$rvar
     yl<- biolo$compl
     xt<-paste(sdmod$Var, collapse=typ[1])
@@ -191,8 +200,15 @@ if(flag_calc){ # flag_calc=1
     dftmp<-df %>% 
       drop_na(all_of(c(yt,sdmod$Var))) %>%
       select(all_of(c("Zone","Tidal_level","Period","Season","Annee","Mois","NINJ")))
-    formumod<-as.formula(paste("y",paste0("x",1:length(sdmod$Var),collapse=typ[1]),sep=" ~ "))
-  
+    formumod<-as.formula(ifelse(length(sdmod$id)==1,"y~gaussf(x1,A,mu,sigma)",
+                                                    "y~gauss2d(x1,x2,A,mu1,sigma1,mu2,sigma2)"))
+    
+    lci <- if(length(sdmod$id)==1){
+                  list(A=quantile(dfrq$y,FactA_CI), mu=median(dfrq$x1), sigma=sd(dfrq$x1))
+              } else {
+                  list(A=quantile(dfrq$y,FactA_CI), mu1=median(dfrq$x1), sigma1=sd(dfrq$x1),
+                                                    mu2=median(dfrq$x2), sigma2=sd(dfrq$x2))}
+
     # Model grid definition
     xmod<-map( #x1x2mod
               map(as.list(names(dfrq %>% select(-y))),
@@ -210,119 +226,120 @@ if(flag_calc){ # flag_calc=1
       gridxmat <- mesh(xmod$x1,xmod$x2)
       } else{ gridxmat<-NULL }
     mod_grid<-list(xmod=xmod,gridx=gridx,gridxmat=gridxmat)
-    mod_t<-NULL
-    
-    tryCatch({
-      modelq0<-rq(y ~ 1, data=dfrq, tau=taus)
-      
-      # --- BOOTSTRAP OF RQ MODEL TO GET GOOD LCI THAT WILL GO INTO THE VALIDATED MODEL ---- 
-      calc_rq<-function(data,indices, formumod, taut){
-        d <- data[indices,] # d=dfrq
-        tryCatch({
-          fit<-rq(formumod, data=d, tau=taut)
-          return(coef(fit)) },
-        error = function(e) NULL) }
-      boot_res <- boot(dfrq, calc_rq, R = 1000, 
-                       formumod=formumod, taut=taus)
-      lci <- boot_res$t %>%
-        as.data.frame() %>% 
-        setNames(expand.grid(rownames(boot_res[["t0"]]), taus) %>% 
-                    unite(Var, Var1, Var2) %>% pull) %>% 
-        summarise(across(.cols=everything(),
-                         list(mean = ~mean(.,na.rm=TRUE), sd = ~sd(.,na.rm=TRUE)))) %>% 
-        pivot_longer(everything()) %>% 
-        separate(name,c("Var","tau","stat"), sep="_") %>% 
-        mutate(tau=sprintf("tau= %.3f",as.numeric(tau))) %>% 
-        pivot_wider(names_from = tau, values_from = value) %>% 
-        filter(stat=="mean") %>% select(-stat) %>% 
-        column_to_rownames(., var = "Var") %>% 
-        as.matrix
-      
-      modelq<-rq(formumod, data=dfrq, tau=taus) # , coef=lci # ca marche pas
-      modelq$coefficients<-lci #what about the fitted values?
-      # --- END OF BOOTSTRAP ---- 
-      
-      # modelq<-rq(formumod, data=dfrq, tau=taus) # should be commented if bootstrap
-      smrq <- summary(modelq, se="boot") %>% 
-        setNames(sprintf("%.3f",taus))
-      meta <- list(type=typ[1],typetxt=typetxt,
-                   Sp=espece,Season=saison[sai,2],
-                   reponse=yt,reponset=yl,
-                   unit=biolo$runit,
-                   predict=xt,predictt=xl,
-                   predictl=sdmod$whole,
-                   predfile=paste(sdmod$Var, collapse="_"))
-      valid <- map(as.list(seq(length(smrq))),
-                  ~list(AICc=round(AICc(modelq)[.x],1),
-                       Rone=round((1 - modelq$rho[.x]/modelq0$rho[.x]),5)) ) %>% 
-        setNames(sprintf("%.3f",taus))    
-      
-      smrq_t <- map2(smrq, taus_l,
-                ~{as.data.frame(.x$coefficients) %>%
-                  mutate(Var=rownames(.)) %>%
-                  relocate(Var) %>%
-                  remove_rownames(.) %>%
-                  mutate(tau=.y, taust=sprintf("tau= %s",.y),
-                         sdmname=sdmname,
-                         formula=format(modelq$formula),
-                         type=typ[1],typetxt=typetxt,
-                         Sp=espece, Season=saison[sai,2],
-                         reponse=yt, reponset=yl, unit=biolo$runit,
-                         # Predictor1=pred_red[k,1], Predictor2=pred_red[k2,1],
-                         predict=xt, predictt=xl,
-                         predfile=paste(sdmod$Var, collapse="_")) } )
-      smrq_t<-smrq_t %>% map2(valid,., append)
-  
-      # Out of limits points calculation
-      rqlim_t <- modelq %>% 
-        predict %>% 
-        as.data.frame %>%
-        rename_all(~sprintf("%.3f",taus)) %>% 
-        mutate(across(everything(), function(x){replace(x, which(x<0), NA)})) %>% 
-        bind_cols(tibble(dfrq)) %>% 
-        bind_cols(tibble(dftmp)) %>% 
-       melt(id.vars=c(names(dfrq),names(dftmp)),
-                      variable.name = "tau",value.name = "RqLim") %>% 
-        mutate(sdmname=sdmname,
-               taust=sprintf("tau= %s",tau),
-               tau=as.numeric(as.character(tau))) %>% 
-        mutate(status=case_when(y>RqLim ~"over",y<=RqLim ~"under" ))
-  
-      # Surface model calculation
-      mod_pred_t <- as.data.frame(predict(modelq,newdata=gridx)) %>%
-        rename_all(~sprintf("%.3f",taus)) %>% 
-        mutate(across(everything(), 
-                      function(x){replace(x, which(x<0), NA)})) %>% 
-        bind_cols(gridx) 
-      mod_pred_t <- melt(mod_pred_t,id.vars=names(dfrq %>% select(-y)),
-                      variable.name = "tau",value.name = "RqMod") %>% 
-        mutate(sdmname=sdmname,
-               taust=sprintf("tau= %s",tau),
-               tau=as.numeric(as.character(tau)))
 
-    mod_t<-list(sdmname=sdmname, meta=meta,
-                modelq=modelq, smrq=smrq, smrq_t=smrq_t,
-                rqlim_t=rqlim_t, mod_grid=mod_grid, mod_pred_t=mod_pred_t)
-    },error = function(e) {print(e)})#,finally = {}) # end try catch
-    return(mod_t)
+    modt<-map(as.list(taus), \(taut) { # taut=taus[[4]]
+      tryCatch({
+        # nlRQ PARAMETER CONTROL TO AVOID R ABORT WHEN SUMMARY(MODEL) : InitialStepSize=0 (ex=1)
+        cc<-nlrq.control(maxiter=100, k=2, 
+                         InitialStepSize = 0, 
+                         big=1e+20, eps=1e-06, beta=0.97)
+        modelq0<-rq(y ~ 1, data=dfrq, tau=taut)
+        
+        # --- BOOTSTRAP OF RQ MODEL TO GET GOOD LCI THAT WILL GO INTO THE VALIDATED MODEL ---- 
+        calc_rq<-function(data,indices, formumod, lci, taut, cc){
+          # d=dfrq
+          d <- data[indices,]
+          tryCatch({
+            fit<-nlrq(formumod, data=d, 
+                       start = lci, tau=taut,
+                       control=cc, method="L-BFGS-B")
+            return(coef(fit)) },
+          error = function(e) NA )
+        }
+        boot_res <- boot(dfrq, calc_rq, R = 3, 
+                         formumod=formumod, lci=lci, taut=taut, cc=cc)
+        lci <- boot_res$t %>%
+          as.data.frame() %>% 
+          setNames(names(lci)) %>% 
+          summarise(across(.cols=everything(),list(mean = ~mean(.,na.rm=TRUE), sd = ~sd(.,na.rm=TRUE)))) %>% 
+          rename_with(.,~gsub("_mean","",.x)) %>% 
+          select(names(lci)) %>% 
+          as.list
+        # --- END OF BOOTSTRAP ---- 
+        
+        modelq<-nlrq(formumod, data=dfrq, 
+                     start = lci, tau=taut,
+                     control=cc, method="L-BFGS-B")
+
+        smrq <- summary(modelq)  #, se="boot"
+        meta <- list(type=typ[1],typetxt=typetxt,
+               Sp=espece,Season=saison[sai,2],
+               reponse=yt,reponset=yl,
+               unit=biolo$runit,
+               predict=xt,predictt=xl,
+               predictl=sdmod$whole,
+               predfile=paste(sdmod$Var, collapse="_"),
+               lci=lci)
+        valid <- list(AICc=round(AICc(modelq,smrq),1),
+                      Rone=round((1 - modelq$m$rho/modelq0$rho),5))    
+        smrq_t <- smrq$coefficients %>% 
+                  as.data.frame %>%
+                    mutate(Var=rownames(.)) %>%
+                    relocate(Var) %>%
+                    remove_rownames(.) %>%
+                    mutate(tau=taut, taust=sprintf("tau= %s",tau),
+                           sdmname=sdmname,
+                           formula=paste0(format(formumod),collapse=""), #format(modelq$formula),
+                           type=typ[1],typetxt=typetxt,
+                           Sp=espece, Season=saison[sai,2],
+                           reponse=yt, reponset=yl, unit=biolo$runit,
+                           # Predictor1=pred_red[k,1], Predictor2=pred_red[k2,1],
+                           predict=xt, predictt=xl,
+                           predfile=paste(sdmod$Var, collapse="_"))
+        smrq_t<-smrq_t %>% append(valid)
+        # Out of limits points calculation
+        rqlim_t <- modelq %>% 
+          predict %>% 
+          as.data.frame %>%
+          rename_all(~sprintf("%s",taut)) %>% 
+          mutate(across(everything(), function(x){replace(x, which(x<0), NA)})) %>% 
+          bind_cols(tibble(dfrq)) %>% 
+          bind_cols(tibble(dftmp)) %>% 
+         melt(id.vars=c(names(dfrq),names(dftmp)),
+                        variable.name = "tau",value.name = "RqLim") %>% 
+          mutate(sdmname=sdmname,
+                 taust=sprintf("tau= %s",tau),
+                 tau=as.numeric(as.character(tau))) %>% 
+          mutate(status=case_when(y>RqLim ~"over",y<=RqLim ~"under" ))
+        # Surface model calculation
+        mod_pred_t <- as.data.frame(predict(modelq,newdata=gridx)) %>%
+          rename_all(~sprintf("%s",taut)) %>% 
+          mutate(across(everything(), 
+                        function(x){replace(x, which(x<0), NA)})) %>% 
+          bind_cols(gridx) 
+        mod_pred_t <- mod_pred_t %>% 
+          rename_all(~c("RqMod",names(dfrq %>% select(-y))) ) %>% 
+          mutate(sdmname=sdmname,
+                 tau=taut,
+                 taust=sprintf("tau= %s",tau))
+        
+      modl<-list(sdmname=sdmname, meta=meta,
+                  modelq=modelq, smrq=smrq, smrq_t=smrq_t,
+                  rqlim_t=rqlim_t, mod_grid=mod_grid, mod_pred_t=mod_pred_t)
+      },error = function(e) {print(e)})#,finally = {}) # end try catch
+    } ) # end map taus
+    
+    modt <- modt %>%
+      setNames(sprintf("%.3f",taus)) %>% 
+      transpose %>% 
+      modify_at(.,c("sdmname","meta","mod_grid"),~.x[[1]]) %>% 
+      modify_at(.,c("smrq_t","rqlim_t","mod_pred_t"),~.x %>% bind_rows())
+    return(modt)
   } # end func
   
   rq_Mod_all <-
-    map( reponse_l, \(biolo)
+    map(reponse_l, \(biolo)
       {map( type, \(typ)
-        {map_depth( pred_red_comb[1:2],2, # CHOSEN TO GO LIGHT ON CALCULATION
-              ~rq_Lin(df,biolo,.x,taus,typ)) } ) } ) %>%
-    map_depth(.,3, ~setNames(.x,map(.x,~.$sdmname)) ) %>%
-    map_depth(.,2,~list_flatten(.x,name_spec= "{inner}")) %>%
-    map(.,~list_flatten(.x,name_spec= "{inner}")) %>% 
-    map(.,compact) %>%  # suppress trycatch errors
-    map(.,~discard_at(.,~grepl("^RQ1int",.x)) ) # Suppress RQ1int redundant with add, because not found how to avoid its calculation, okay?
+        {map_depth( pred_red_comb,2,
+              ~rq_nLin(.x,df,biolo,typ,taus)) } ) } ) %>%
+    map_depth(.,3, ~setNames(.x,map(.x,~.$sdmname)) ) %>% # SDM names to list of results
+    map_depth(.,2,~list_flatten(.x,name_spec= "{inner}")) %>% # remove x1/x2 level
+    map(.,~list_flatten(.x,name_spec= "{inner}")) %>%  # remove typ level
+    map_depth(.,3,compact) # suppress trycatch errors
   
   rq_Mod_sel<-map(rq_Mod_all,
-        ~keep_at(.,~ grepl(paste0(names(pred_red_comb_sel),"$",collapse="|"),.x)) )
-  rq_Mod_sel<-map(rq_Mod_sel,
-        ~discard_at(.,~ grepl("add",.x) ) ) # to remove addition that are not usefull and taking too long to calculate
-        
+        ~keep_at(.,~ grepl(paste0(names(pred_red_comb_sel),"$",collapse="|"),
+                           .x)) ) # collect all mod in selection
 } # end if flag_calc
 ```
 
@@ -331,24 +348,25 @@ if(flag_calc){ # flag_calc=1
 #| label: rq_Mod_mars
 if(flag_calc){
   rq_Mod_mars <- function(rqMod,MarsSDM,taus) {
-      # biolo=reponse_l[[1]]; MarsSDM=Mars_SDM_per
-      # rqMod=rq_Mod_sel[[biolo$rdescr]][[1]]
+      # biolo=reponse_l[[1]]; MarsSDM=Mars_SDM
+      # rqMod=rq_Mod_sel[[biolo$rdescr]][[2]]
     typetxt<-rqMod$meta$typetxt
     vars<-unlist(strsplit(rqMod$meta$predict,rqMod$meta$type,fixed = TRUE))
-    # sdmname<-rqMod$sdmname
-  
+    taurel<-names(rqMod$modelq)
     xmars <- MarsSDM %>% 
       st_drop_geometry() %>% # as.data.frame() %>% 
       ungroup %>% 
       select(all_of(vars)) %>% 
-      rename_all(~paste0("x",1:length(vars)) )
+      rename_all(~paste0("x",1:length(vars)))
   
     MarsSDM<-MarsSDM %>% 
       select(all_of(c("NINJ","Lon","Lat","Zone","Tidal_level","Period","Annee",vars))) #%>% 
-    RqModMars <- as.data.frame(predict(rqMod$modelq,newdata=xmars)) %>%
-      rename_all(~sprintf("t%.3f",taus)) %>% 
-      # rename_all(~sprintf("%s_t%.3f",sdmname,taus)) %>% 
+  
+    RqModMars <- as.data.frame(map(rqMod$modelq,
+      ~predict(.x,,newdata=xmars) )) %>%
+      rename_all(~sprintf("t%s",taurel)) %>% 
       mutate(across(everything(), function(x){replace(x, which(x<0), NA)}))
+  
     MarsSDM<-MarsSDM %>% cbind(RqModMars)
     return(MarsSDM)
   }
@@ -369,7 +387,6 @@ if(flag_calc){
     map_depth(rq_Mod_sel,2,
               ~rq_Mod_mars(.x,Mars_SDM_per,taus))
 } # end if flag_calc
-
 ```
 
 Summary of values by period for mapping (!! can be very long)
@@ -384,41 +401,32 @@ if(flag_calc_mars){
               ~{ .x %>% 
                  group_by(NINJ,Period) %>% 
                  summarise(across(where(is.numeric),~mean(.x,na.rm=TRUE))) } )
+  
   save(list=(ls()[grep("rq_", ls())]),
        file = paste0(rdataout,".RData")) # save once it's done!
 } # end if flag_calc
-
 ```
 
-# Model graphs
 
+# Model graphs
 ## Summaries graphs
 ```{r}
 #| label: rq_Mod_plot_sum
 
 pl_rq_Mod_sum<-function(rqMod,titleG){
-    # biolo=reponse_l[[1]]
-    # rqMod=rq_Mod_sel[[biolo$rdescr]][[1]]
-  typetxt<-substr(rqMod$sdmname, 1, 6) 
-  png(file=sprintf("%s/%s/%s_%s_sm.tiff",
-                   graph_path, typetxt, espece, rqMod$sdmname),
-      width=3600, height=3600, res=400)
-  plot(rqMod$smrq, main=c("Beta 0",rqMod$meta$predictt),cex=.7,pch=19,lcol=colSum[1],col=colSum[2:3])
-  title(sub = titleG)
-  dev.off()
-  
-  # rqMod$smrq_t$lowerbd<- rqMod$smrq_t$Value-rqMod$smrq_t$`Std. Error`
-  # rqMod$smrq_t$upperbd<- rqMod$smrq_t$Value+rqMod$smrq_t$`Std. Error`
-  # ggplot(rqMod$smrq_t,aes(x=tau,y=Value, group = 1)) +
-  #   geom_ribbon(aes(ymin=lowerbd, ymax=upperbd), 
-  #               fill=colSum[3], alpha=0.8) +
-  #   geom_point(col=colSum[2],size=1) +
-  #   geom_line(col=colSum[2],linewidth=.5, alpha=0.8) +
-  #   facet_wrap(~Var,scales="free",labeller = label_wrap_gen(width = 30)) +
-  #   labs(title = titleG) +
-  #   theme(text=element_text(size=8),
-  #         strip.text = element_text(size=6),
-          # strip.background = element_blank())
+    # rqMod=rq_Mod_sel[[1]][[1]]
+  rqMod$smrq_t$lowerbd<- rqMod$smrq_t$Value-rqMod$smrq_t$`Std. Error`
+  rqMod$smrq_t$upperbd<- rqMod$smrq_t$Value+rqMod$smrq_t$`Std. Error`
+  ggplot(rqMod$smrq_t,aes(x=tau,y=Value, group = 1)) +
+    geom_ribbon(aes(ymin=lowerbd, ymax=upperbd), 
+                fill=colSum[3], alpha=0.8) +
+    geom_point(col=colSum[2],size=1) +
+    geom_line(col=colSum[2],linewidth=.5, alpha=0.8) +
+    facet_wrap(~Var,scales="free",labeller = label_wrap_gen(width = 30)) +
+    labs(title = titleG) +
+    theme(text=element_text(size=8),
+          strip.text = element_text(size=6),
+          strip.background = element_blank())
  }
 
 # pl_rq_all_sum<-
@@ -429,11 +437,11 @@ pl_rq_sel_sum<-
   map_depth(rq_Mod_sel,2,
             ~pl_rq_Mod_sum(.x,titleG))
 
-# walk(pl_rq_sel_sum,
-#   ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_sm.tiff",
-#                     graph_path, substr(.y,1,6), espece, .y),
-#                     plot = .x,
-#                     width = 10, height = 7, dpi=400) ) } )
+walk(pl_rq_sel_sum,
+  ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_sm.tiff",
+                    graph_path, substr(.y,1,6), espece, .y),
+                    plot = .x,
+                    width = 10, height = 7, dpi=400) ) } )
 ```
 
 ## AIC plot
@@ -506,12 +514,11 @@ ggsave(sprintf("%s%s_RQ_AIC_scores.tiff",
 
 ```
 
-
 ## Validation pred/obs plot
 ```{r}
-#| label: prefig-poplot_boot
+#| label: prefig-poplot
 
-rq_po_plot <- function(rqMod) { # without bootstrap
+rq_po_plot <- function(rqMod) {
     # rqMod=rq_Mod_sel[[1]][[1]]
   
    rqMod$rqlim_t %>% 
@@ -535,8 +542,6 @@ rq_po_plot <- function(rqMod) { # without bootstrap
                label.x.npc = "left", label.y.npc = "top", #label.x.npc = .6,label.y.npc=.3,
                show.legend = FALSE) +
       # stat_regline_equation(label.x.npc = .7,label.y.npc=.4,show.legend = FALSE) +
-      xlim(c(0, max(max(data$Observed,na.rm=TRUE),max(data$Predicted,na.rm=TRUE)) )) +
-      ylim(c(0, max(max(data$Observed,na.rm=TRUE),max(data$Predicted,na.rm=TRUE)) )) +
       labs(title=sprintf("%s (%s)\n%s", 
                             rqMod$meta$typetxt, 
                             rqMod$meta$unit,
@@ -547,12 +552,53 @@ rq_po_plot <- function(rqMod) { # without bootstrap
             plot.title=element_text(size=10)) +
       Scale_brew()
 }
+
 # pl_rq_po_sel<-map_depth(rq_Mod_sel,2,
 #     ~ {.x %>% rq_po_plot} )
+# 
+# walk(pl_rq_po_sel,
+#   ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_po.tiff",
+#                     graph_path, substr(.y,1,6), espece, .y),
+#                     plot = .x,
+#                     width = 5, height = 8, dpi=400) ) } )
+```
 
-rq_po_plot <- function(data, metas) { # for the bootstrap
+```{r}
+#| label: prefig-poplot_boot
+
+
+my_func <- function(data, indices, taut) {
+  d <- data[indices,]
+  Observed <- quantile(d$y, taut, na.rm=TRUE) 
+  Predicted <- mean(d$RqLim, na.rm=TRUE)
+  return(c(Observed, Predicted))
+}
+
+# create a function to perform the bootstrap and return a table of results
+bootstrap_table <- function(data, taut, bin, n_bootstraps) {
+    # data=rq_mod_tmp; taut=0.95; bin=9; n_bootstraps=10
+  subset_data <- data[data$tau == taut & 
+                      data$points_bin == bin,]
+
+  bootstrap_results <- boot(subset_data, my_func, R = n_bootstraps, taut=taut)
+  Observed <- bootstrap_results$t[,1]
+  Predicted <- bootstrap_results$t[,2]
+  Observed_ci <- boot.ci(bootstrap_results, type = "basic")$basic[2:3]
+  Predicted_ci <- boot.ci(bootstrap_results, type = "basic")$basic[4:5]
+  
+  results_table <- data.frame(
+    Observed = mean(Observed), Observed_se = sd(Observed), Observed_ci,
+    Predicted = mean(Predicted), Predicted_se = sd(Predicted), Predicted_ci,
+    tau=taut, points_bin=bin)
+
+  return(results_table)
+}
+
+rq_po_plot <- function(data, metas) {
     # data=rq_mod_boot_tmp
     # metas= rq_Mod_sel[[1]][[1]]$meta
+  
+  
    data %>% 
     ggplot(aes(x=Observed, y=Predicted, col=tau, fill=tau, shape=tau)) +
       # geom_pointrange(data=data,aes(#xmin=Observed-Observed_se,
@@ -580,38 +626,11 @@ rq_po_plot <- function(data, metas) { # for the bootstrap
       Scale_brew()
 }
 
-calc_boot <- function(data, indices, taut) {
-  d <- data[indices,]
-  Observed <- quantile(d$y, taut, na.rm=TRUE) 
-  Predicted <- mean(d$RqLim, na.rm=TRUE)
-  return(c(Observed, Predicted))
-}
-
-bootstrap_table <- function(data, taut, bin, n_bootstraps) {
-    # data=rq_mod_tmp; taut=0.95; bin=9; n_bootstraps=10
-  subset_data <- data[data$tau == taut & 
-                      data$points_bin == bin,]
-
-  bootstrap_results <- boot(subset_data, calc_boot, R = n_bootstraps, taut=taut)
-  Observed <- bootstrap_results$t[,1]
-  Predicted <- bootstrap_results$t[,2]
-  Observed_ci <- boot.ci(bootstrap_results, type = "basic")$basic[2:3]
-  Predicted_ci <- boot.ci(bootstrap_results, type = "basic")$basic[4:5]
-  
-  results_table <- data.frame(
-    Observed = mean(Observed), Observed_se = sd(Observed), Observed_ci,
-    Predicted = mean(Predicted), Predicted_se = sd(Predicted), Predicted_ci,
-    tau=taut, points_bin=bin)
-
-  return(results_table)
-}
-
 rq_po_plot_boot<- function(rqMod) {
      # rqMod=rq_Mod_sel[[1]][[1]]
   # create adequate data table for bootstrap
   rq_mod_tmp <- rqMod$rqlim_t %>%
     mutate(taustx=as.character(tau)) %>%
-    drop_na(RqLim) %>% 
     nest(data=-taustx) %>%
     mutate(data=map(data, ~{.x %>%
                     arrange(.,RqLim) %>%
@@ -648,10 +667,13 @@ walk(pl_rq_po_sel,
 #| label: rq_Mod_plot_res
 
 pl_rq_Mod_res<-function(rqMod,titleG){
-    # biolo=reponse_l[[1]]
-    # rqMod=rq_Mod_sel[[biolo$rdescr]][[1]]
-  rqResid <- melt(residuals(rqMod$modelq)) %>% 
-    rename(tau=Var2, residuals=value) 
+    # rqMod=rq_Mod_sel[[1]][[1]]
+
+  rqResid <- imap(rqMod$modelq,
+      ~{ melt(residuals(.x)) %>% 
+          mutate(tau=.y) } ) %>% 
+    bind_rows %>% 
+    rename(residuals=value)
   subtitleG <- sprintf("%s vs %s",rqMod$meta$reponset,rqMod$meta$predictt)
   ggplot(rqResid, aes(sample=residuals, color=tau)) + 
     stat_qq() + stat_po_line() + 
@@ -721,8 +743,8 @@ pl_rq_all_1d$all <- map(pl_rq_all_1d,
           plot_annotation(title=titleG) } )
 
 walk(pl_rq_all_1d["all"],
-  ~{iwalk(., ~ggsave(sprintf("%s/RQ1add/%s_%s_1d.tiff",
-                    graph_path, espece, .y),
+  ~{iwalk(., ~ggsave(sprintf("%s/RQ1nli/%s_%s_1d.tiff",
+              graph_path, espece, .y),
                     plot = .x,
                     width = 10, height = 7, dpi=400) ) } )
 
@@ -731,8 +753,6 @@ walk(pl_rq_all_1d["all"],
 ## Raster 2D sdm plots
 ```{r}
 #| label: rq_Mod_plot_2d
-
-# that could be nice to have the density plots in margin to see the max etc
 
 pl_rq_Mod_2d<-function(rqMod,titleG){
     # biolo=reponse_l[[1]]
@@ -846,7 +866,7 @@ pl_rq_Mod_3d<-function(rqMod,taus_l,titleG){
           add_surface(x = gridxmat$x, y = gridxmat$y, z = RqMod_mat,
                       opacity = 0.8, colorscale = list(c(0,1),c(blank,colRQ[t])))
   } # taus
-  unname(taus_l)
+  
   # Define surfaces for each tau
   pl_3d$one<-map2(taus_l,seq(1:length(taus_l)), ~{ #.x=taus_l[[1]]
     gridxmat<-rqMod$mod_grid$gridxmat
@@ -858,7 +878,7 @@ pl_rq_Mod_3d<-function(rqMod,taus_l,titleG){
     rqsup<-rqlim %>% filter(status=="over")
     rqinf<-rqlim %>% filter(status=="under")
       
-    plot_ly(showlegend=F) %>% #, scene=paste("scene",.y,sep="")
+    plot_ly(showlegend=F) %>%  #, scene=paste0("scene",.y)
       add_surface(x = gridxmat$x, 
                   y = gridxmat$y, 
                   z = RqMod_mat,
@@ -1008,9 +1028,9 @@ st_rq_Mod_map<-function(rqmodmars,rqMod,tauchoice){
     rqmodmars %>% 
     ggplot() + 
     geom_density_ridges(aes(y = Period , fill=Period,
-                            height = after_stat(count), # to have a comparative height between periods
+                            # height = after_stat(count), # to have a comparative height between periods
                             x=.data[[.x]]), 
-                        stat="density", alpha=0.3, size = .2) +
+                        alpha=0.3, size = .2) + #stat="density",
     facet_grid(. ~ Zone, 
                # scales = "free_y",
                labeller = label_wrap_gen(width = 20)) + 
@@ -1029,9 +1049,9 @@ st_rq_Mod_map<-function(rqmodmars,rqMod,tauchoice){
   descr$mod <-rqmodmars %>% 
     ggplot() + 
     geom_density_ridges(aes(y = Period , fill=Period, 
-                            height = after_stat(count), # to have a comparative height between periods
+                            # height = after_stat(count), # to have a comparative height between periods
                             x=.data[[sprintf("t%.3f",tauchoice)]]), 
-                        stat="density", alpha=0.25, size = .2) +
+                        alpha=0.25, size = .2) + #stat="density", 
     geom_point(data=tmp,aes(y=Period,x=Observed, fill=Period, size=n),
                shape=21, alpha=0.7) +
     xlim(c(0,biorange)) +
@@ -1088,14 +1108,14 @@ walk(pl_rq_mars_sel_st,
                     plot = .x$all,
                     width = 15, height = 10, dpi=400) ) } )
 
-pl_rq_mars_sel_st_board<-
-  map_depth(pl_rq_mars_sel_st, 2, ~.x$mod) %>% 
+pl_rq_mars_sel_st_board<-map_depth(pl_rq_mars_sel_st, 2,
+            ~.x$mod) %>% 
   map(., ~wrap_plots(.x) &
     plot_layout(ncol=1) &
-    theme(legend.position="none",
-        strip.background = element_blank(),
-        text=element_text(size=12)) &
-    plot_annotation(tag_levels = c('A')) )
+        theme(legend.position="none",
+          strip.background = element_blank(),
+          text=element_text(size=12)) &
+    plot_annotation(tag_levels = c('A')))
 
 iwalk(pl_rq_mars_sel_st_board,
       ~ggsave(sprintf("%s/%s_mars_st_board_%s.tiff",
@@ -1284,8 +1304,8 @@ Rdata are saved in `rdataout`. An excel file collects data in `r binderout` , wi
 ```{r}
 #| label: finalsave_r
 
-# save(list=( ls()[!grepl("rq_", ls()) ] ),
-#      file = paste0(wdmat,"CSLN_Mars_RQ.RData"))
+# rm(list=ls()[grep("_qq_", ls())])
+
 save(list=(ls()[grep("rq_", ls())]),
      file = paste0(rdataout,".RData"))
 beepr::beep(2)

@@ -183,9 +183,9 @@ predictMNT <- data.frame(
   punit=c("µm","µm","µm","%","%","%","%","%"))
 
 tidelevels<-data.frame(
-  level=c("upper intertidal", "medium intertidal", "lower intertidal", "subtidal"),
+  label=c("upper intertidal", "medium intertidal", "lower intertidal", "subtidal"),
   descr=c("[0-25%[ immersion time","[25-75%[ immersion time","[75-100%[ immersion time","100% immersion time")) %>% 
-  mutate(level=ordered(level,c("upper intertidal", "medium intertidal", "lower intertidal", "subtidal")))
+  mutate(level=factor(label,levels=label, ordered=TRUE))
 
 anMars <- unique(Mars_csv$Annee) # used for RQ scripts
 
@@ -237,11 +237,11 @@ Mars_dat_sf$Period[Mars_dat_sf$Annee %in% 2016:2019] <- "2015-2019"
 Mars_dat_sf$Period <- as.factor(Mars_dat_sf$Period)
 # TIDAL_LEVEL CALCULATION : should be in mars matlab script ? ----
 Mars_csv$Tidal_level <- NA
-Mars_csv$Tidal_level[Mars_csv$inunt>=0 & Mars_csv$inunt<0.25] <- tidelevels$level[1]
-Mars_csv$Tidal_level[Mars_csv$inunt>=0.25 & Mars_csv$inunt<0.75] <- tidelevels$level[2]
-Mars_csv$Tidal_level[Mars_csv$inunt>=0.75 & Mars_csv$inunt<1] <- tidelevels$level[3]
-Mars_csv$Tidal_level[Mars_csv$inunt==1] <- tidelevels$level[4]
-Mars_csv$Tidal_level <- as.factor(Mars_csv$Tidal_level)
+Mars_csv$Tidal_level[Mars_csv$inunt>=0 & Mars_csv$inunt<0.25] <- tidelevels$label[1]
+Mars_csv$Tidal_level[Mars_csv$inunt>=0.25 & Mars_csv$inunt<0.75] <- tidelevels$label[2]
+Mars_csv$Tidal_level[Mars_csv$inunt>=0.75 & Mars_csv$inunt<1] <- tidelevels$label[3]
+Mars_csv$Tidal_level[Mars_csv$inunt==1] <- tidelevels$label[4]
+Mars_csv$Tidal_level <- factor(Mars_csv$Tidal_level, levels=tidelevels$level, ordered=TRUE)
 
 Mars_csv_sf <- st_as_sf(Mars_csv, coords=c("Lon","Lat"),
                         crs=4326,na.fail=FALSE,remove = FALSE) %>%
@@ -249,11 +249,11 @@ Mars_csv_sf <- st_as_sf(Mars_csv, coords=c("Lon","Lat"),
 
 # TIDAL_LEVEL CALCULATION : should be in mars matlab script ? ----
 Mars_dat_sf$Tidal_level <- NA
-Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0 & Mars_dat_sf$inunt<0.25] <- tidelevels$level[1]
-Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0.25 & Mars_dat_sf$inunt<0.75] <- tidelevels$level[2]
-Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0.75 & Mars_dat_sf$inunt<1] <- tidelevels$level[3]
-Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt==1] <- tidelevels$level[4]
-Mars_dat_sf$Tidal_level <- as.factor(Mars_dat_sf$Tidal_level)
+Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0 & Mars_dat_sf$inunt<0.25] <- tidelevels$label[1]
+Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0.25 & Mars_dat_sf$inunt<0.75] <- tidelevels$label[2]
+Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt>=0.75 & Mars_dat_sf$inunt<1] <- tidelevels$label[3]
+Mars_dat_sf$Tidal_level[Mars_dat_sf$inunt==1] <- tidelevels$label[4]
+Mars_dat_sf$Tidal_level <- factor(Mars_dat_sf$Tidal_level, levels=tidelevels$level, ordered=TRUE)
 ```
 
 #### Bioturbation potential
@@ -342,14 +342,14 @@ CSLN_Mars <- sf_to_df(CSLN_sf,fill=TRUE)
 CSLN_Mars <- CSLN_Mars %>% left_join(Mars_csv,by=c("NINJ"="NINJ","Annee"="Annee","Period"))
 
 # # Add missing tidal levels on other years : TO BE DELETED WHEN ALL RUN ON MARS ?
-# CSLN_Mars[CSLN_Mars$NINJ %in% CSLN_Mars$NINJ[which(CSLN_Mars$Tidal_level=="Intertidal")],
-#           "Tidal_level"] <- "Intertidal"
-# CSLN_Mars[CSLN_Mars$NINJ %in% CSLN_Mars$NINJ[which(CSLN_Mars$Tidal_level=="Infratidal")],
-#           "Tidal_level"] <- "Infratidal"
-# CSLN_Mars[CSLN_Mars$NINJ %in% CSLN_Mars$NINJ[which(CSLN_Mars$Tidal_level=="Supratidal")],
-#           "Tidal_level"] <- "Supratidal"
-# CSLN_Mars[CSLN_Mars$NINJ %in% CSLN_Mars$NINJ[which(CSLN_Mars$Tidal_level=="Subtidal")],
-#           "Tidal_level"] <- "Subtidal"
+# CSLN_Mars[CSLN_Mars$NINJ %in% CSLN_Mars$NINJ[which(CSLN_Mars$Tidal_level==tidelevels$label[1])],
+#           "Tidal_level"] <- tidelevels$label[1]
+# CSLN_Mars[CSLN_Mars$NINJ %in% CSLN_Mars$NINJ[which(CSLN_Mars$Tidal_level==tidelevels$label[2])],
+#           "Tidal_level"] <- tidelevels$label[2]
+# CSLN_Mars[CSLN_Mars$NINJ %in% CSLN_Mars$NINJ[which(CSLN_Mars$Tidal_level==tidelevels$label[3])],
+#           "Tidal_level"] <- tidelevels$label[3]
+# CSLN_Mars[CSLN_Mars$NINJ %in% CSLN_Mars$NINJ[which(CSLN_Mars$Tidal_level==tidelevels$label[4])],
+#           "Tidal_level"] <- tidelevels$label[4]
 
 # Suppression of missing information for levels
 CSLN_Mars <- CSLN_Mars %>% filter(!is.na(Zone)) #!is.na(Tidal_level)
@@ -386,7 +386,7 @@ CSLN_Mars$MSRtot <- CSLN_Mars$MSR_mW*CSLN_Mars$Density_indm2
 CSLN_Mars <- CSLN_Mars %>% 
   select(-all_of(c("AphiaID_accepted","sfg_id","point_id",
                    "Lon","Lat","x","y","intersection")))
-facto_col <- c("Filtre","Zone","Type","Tidal_level",
+facto_col <- c("Filtre","Zone","Type", #"Tidal_level",
               "Period","Season","Annee","Mois",
               "idStationUnique","Station_originelle","NINJ",
               "SP","Taxon_SNa","SPCourt") #
