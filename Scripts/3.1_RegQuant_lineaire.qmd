@@ -70,7 +70,7 @@ wdres <- "Results/"
 pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
 
-flag_calc<-FALSE # to calculate RQ models and mars results
+flag_calc<-TRUE # to calculate RQ models and mars results
 flag_calc_mars<-FALSE # to calculate time-consuming mars summary by period
 
 ```
@@ -215,34 +215,34 @@ if(flag_calc){ # flag_calc=1
     tryCatch({
       modelq0<-rq(y ~ 1, data=dfrq, tau=taus)
       
-      # --- BOOTSTRAP OF RQ MODEL TO GET GOOD LCI THAT WILL GO INTO THE VALIDATED MODEL ---- 
-      calc_rq<-function(data,indices, formumod, taut){
-        d <- data[indices,] # d=dfrq
-        tryCatch({
-          fit<-rq(formumod, data=d, tau=taut)
-          return(coef(fit)) },
-        error = function(e) NULL) }
-      boot_res <- boot(dfrq, calc_rq, R = 1000, 
-                       formumod=formumod, taut=taus)
-      lci <- boot_res$t %>%
-        as.data.frame() %>% 
-        setNames(expand.grid(rownames(boot_res[["t0"]]), taus) %>% 
-                    unite(Var, Var1, Var2) %>% pull) %>% 
-        summarise(across(.cols=everything(),
-                         list(mean = ~mean(.,na.rm=TRUE), sd = ~sd(.,na.rm=TRUE)))) %>% 
-        pivot_longer(everything()) %>% 
-        separate(name,c("Var","tau","stat"), sep="_") %>% 
-        mutate(tau=sprintf("tau= %.3f",as.numeric(tau))) %>% 
-        pivot_wider(names_from = tau, values_from = value) %>% 
-        filter(stat=="mean") %>% select(-stat) %>% 
-        column_to_rownames(., var = "Var") %>% 
-        as.matrix
+      # # --- BOOTSTRAP OF RQ MODEL TO GET GOOD LCI THAT WILL GO INTO THE VALIDATED MODEL ---- 
+      # calc_rq<-function(data,indices, formumod, taut){
+      #   d <- data[indices,] # d=dfrq
+      #   tryCatch({
+      #     fit<-rq(formumod, data=d, tau=taut)
+      #     return(coef(fit)) },
+      #   error = function(e) NULL) }
+      # boot_res <- boot(dfrq, calc_rq, R = 1000, 
+      #                  formumod=formumod, taut=taus)
+      # lci <- boot_res$t %>%
+      #   as.data.frame() %>% 
+      #   setNames(expand.grid(rownames(boot_res[["t0"]]), taus) %>% 
+      #               unite(Var, Var1, Var2) %>% pull) %>% 
+      #   summarise(across(.cols=everything(),
+      #                    list(mean = ~mean(.,na.rm=TRUE), sd = ~sd(.,na.rm=TRUE)))) %>% 
+      #   pivot_longer(everything()) %>% 
+      #   separate(name,c("Var","tau","stat"), sep="_") %>% 
+      #   mutate(tau=sprintf("tau= %.3f",as.numeric(tau))) %>% 
+      #   pivot_wider(names_from = tau, values_from = value) %>% 
+      #   filter(stat=="mean") %>% select(-stat) %>% 
+      #   column_to_rownames(., var = "Var") %>% 
+      #   as.matrix
+      # 
+      # modelq<-rq(formumod, data=dfrq, tau=taus) # , coef=lci # ca marche pas
+      # modelq$coefficients<-lci #what about the fitted values?
+      # # --- END OF BOOTSTRAP ---- 
       
-      modelq<-rq(formumod, data=dfrq, tau=taus) # , coef=lci # ca marche pas
-      modelq$coefficients<-lci #what about the fitted values?
-      # --- END OF BOOTSTRAP ---- 
-      
-      # modelq<-rq(formumod, data=dfrq, tau=taus) # should be commented if bootstrap
+      modelq<-rq(formumod, data=dfrq, tau=taus) # should be commented if bootstrap
       smrq <- summary(modelq, se="boot") %>% 
         setNames(sprintf("%.3f",taus))
       meta <- list(type=typ[1],typetxt=typetxt,

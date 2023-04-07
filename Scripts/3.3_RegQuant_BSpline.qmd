@@ -221,31 +221,31 @@ if(flag_calc){
     tryCatch({
       modelq0<-rq(y ~ 1, data=dfrq, tau=taus)
       
-      # --- BOOTSTRAP OF RQ MODEL TO GET GOOD LCI THAT WILL GO INTO THE VALIDATED MODEL ---- 
-      calc_rq<-function(data,indices, formumod, taut){
-        d <- data[indices,] # d=dfrq
-        tryCatch({
-          fit<-rq(formumod, data=d, tau=taut)
-          return(coef(fit)) },
-        error = function(e) NULL) }
-      boot_res <- boot(dfrq, calc_rq, R = 1000, 
-                       formumod=formumod, taut=taus)
-      lci <- boot_res$t %>%
-        as.data.frame() %>% 
-        setNames(expand.grid(rownames(boot_res[["t0"]]), taus) %>% 
-                    unite(Var, Var1, Var2) %>% pull) %>% 
-        summarise(across(.cols=everything(),list(mean = ~mean(.,na.rm=TRUE), sd = ~sd(.,na.rm=TRUE)))) %>% 
-        pivot_longer(everything()) %>% 
-        separate(name,c("Var","tau","stat"), sep="_") %>% 
-        mutate(tau=sprintf("tau= %.3f",as.numeric(tau))) %>% 
-        pivot_wider(names_from = tau, values_from = value) %>% 
-        filter(stat=="mean") %>% select(-stat) %>% 
-        column_to_rownames(., var = "Var") %>% 
-        as.matrix
-      
-      modelq<-rq(formumod, data=dfrq, tau=taus) # , coef=lci # ca marche pas
-      modelq$coefficients<-lci #what about the fitted values?
-      # --- END OF BOOTSTRAP ---- 
+      # # --- BOOTSTRAP OF RQ MODEL TO GET GOOD LCI THAT WILL GO INTO THE VALIDATED MODEL ---- 
+      # calc_rq<-function(data,indices, formumod, taut){
+      #   d <- data[indices,] # d=dfrq
+      #   tryCatch({
+      #     fit<-rq(formumod, data=d, tau=taut)
+      #     return(coef(fit)) },
+      #   error = function(e) NULL) }
+      # boot_res <- boot(dfrq, calc_rq, R = 1000, 
+      #                  formumod=formumod, taut=taus)
+      # lci <- boot_res$t %>%
+      #   as.data.frame() %>% 
+      #   setNames(expand.grid(rownames(boot_res[["t0"]]), taus) %>% 
+      #               unite(Var, Var1, Var2) %>% pull) %>% 
+      #   summarise(across(.cols=everything(),list(mean = ~mean(.,na.rm=TRUE), sd = ~sd(.,na.rm=TRUE)))) %>% 
+      #   pivot_longer(everything()) %>% 
+      #   separate(name,c("Var","tau","stat"), sep="_") %>% 
+      #   mutate(tau=sprintf("tau= %.3f",as.numeric(tau))) %>% 
+      #   pivot_wider(names_from = tau, values_from = value) %>% 
+      #   filter(stat=="mean") %>% select(-stat) %>% 
+      #   column_to_rownames(., var = "Var") %>% 
+      #   as.matrix
+      # 
+      # modelq<-rq(formumod, data=dfrq, tau=taus) # , coef=lci # ca marche pas
+      # modelq$coefficients<-lci #what about the fitted values?
+      # # --- END OF BOOTSTRAP ---- 
       
       modelq<-rq(formumod, data=dfrq, tau=taus) # should be commented if bootstrap
       smrq <- summary(modelq, se="boot") %>% 

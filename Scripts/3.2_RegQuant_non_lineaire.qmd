@@ -70,8 +70,8 @@ wdres <- "Results/"
 pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
 
-flag_calc<-TRUE # to calculate RQ models and mars results and more time-consuming mars summary by period
-flag_calc_mars<-TRUE # to calculate time-consuming mars summary by period
+flag_calc<-FALSE # to calculate RQ models and mars results and more time-consuming mars summary by period
+flag_calc_mars<-FALSE # to calculate time-consuming mars summary by period
 
 ```
 
@@ -235,25 +235,25 @@ if(flag_calc){
                          big=1e+20, eps=1e-06, beta=0.97)
         modelq0<-rq(y ~ 1, data=dfrq, tau=taut)
         
-        # --- BOOTSTRAP OF RQ MODEL TO GET GOOD LCI THAT WILL GO INTO THE VALIDATED MODEL ---- 
-        calc_rq<-function(data,indices, formumod, lci, taut, cc){
-          d <- data[indices,] # d=dfrq
-          tryCatch({
-            fit<-nlrq(formumod, data=d, 
-                       start = lci, tau=taut,
-                       control=cc, method="L-BFGS-B")
-            return(coef(fit)) },
-          error = function(e) NA ) }
-        boot_res <- boot(dfrq, calc_rq, R = 1000, 
-                         formumod=formumod, lci=lci, taut=taut, cc=cc)
-        lci <- boot_res$t %>%
-          as.data.frame() %>% 
-          setNames(names(lci)) %>% 
-          summarise(across(.cols=everything(),list(mean = ~mean(.,na.rm=TRUE), sd = ~sd(.,na.rm=TRUE)))) %>% 
-          rename_with(.,~gsub("_mean","",.x)) %>% 
-          select(names(lci)) %>% 
-          as.list
-        # --- END OF BOOTSTRAP ---- 
+        # # --- BOOTSTRAP OF RQ MODEL TO GET GOOD LCI THAT WILL GO INTO THE VALIDATED MODEL ---- 
+        # calc_rq<-function(data,indices, formumod, lci, taut, cc){
+        #   d <- data[indices,] # d=dfrq
+        #   tryCatch({
+        #     fit<-nlrq(formumod, data=d, 
+        #                start = lci, tau=taut,
+        #                control=cc, method="L-BFGS-B")
+        #     return(coef(fit)) },
+        #   error = function(e) NA ) }
+        # boot_res <- boot(dfrq, calc_rq, R = 1000, 
+        #                  formumod=formumod, lci=lci, taut=taut, cc=cc)
+        # lci <- boot_res$t %>%
+        #   as.data.frame() %>% 
+        #   setNames(names(lci)) %>% 
+        #   summarise(across(.cols=everything(),list(mean = ~mean(.,na.rm=TRUE), sd = ~sd(.,na.rm=TRUE)))) %>% 
+        #   rename_with(.,~gsub("_mean","",.x)) %>% 
+        #   select(names(lci)) %>% 
+        #   as.list
+        # # --- END OF BOOTSTRAP ---- 
         
         modelq<-nlrq(formumod, data=dfrq, 
                      start = lci, tau=taut,

@@ -1,7 +1,6 @@
 ---
-title: "MELTING POTES"
-author: "Amélie Lehuen"
-description: "Task A : SDM-NEO Data analysis"
+title: "A modelling approach for predicting species distribution as function of physical drivers in Seine estuary by applying an Optimal Ecological Niche model : application to Cerastoderma edule population"
+author: "Lehuen Amélie*, Grasso Florent, Dancie Chloé, Orvain Francis"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 editor: source
 execute:

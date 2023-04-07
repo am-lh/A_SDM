@@ -401,12 +401,12 @@ iwalk(pl_des_gt,
 :::
 
 ## HMS data set description
-
 ```{r}
 #| label: hms_distr
 
 Mars_tmp<-Mars_SDM %>%
            st_drop_geometry %>%
+           group_by(Zone) %>% 
            # mutate(across(where(is.numeric), ~replace_outliers(.,2))) %>% 
            mutate(across(all_of(c("bathy","tenfon_mxd","temp_m")), ~replace_outliers(.,1.5))) %>%
            filter(!Zone %in% c("Bay","Octeville","Ilot Oiseaux","Cote Fleurie")) %>%
@@ -439,7 +439,6 @@ pl_mars_gt<-pl_mars_gt %>%
 
 ```
 
-
 ```{r}
 #| label: hms_stat
 
@@ -470,7 +469,9 @@ pl_var_st_board<-function(data,vars){
 }
 
 Mars_tmp<-Mars_SDM_per %>%
-           mutate(across(all_of(c("bathy","tenfon_mxd","temp_m")), ~replace_outliers(.,1.5))) %>%
+           st_drop_geometry() %>%
+           group_by(Zone) %>% 
+           mutate(across(any_of(c("bathy","tenfon_mxd","temp_m")), ~replace_outliers(.x,1.5))) %>%
            filter(!Zone %in% c("Bay","Octeville","Ilot Oiseaux","Cote Fleurie")) %>%
            mutate(across(where(is.factor), fct_drop))
 
@@ -560,10 +561,11 @@ pl_var_map<-function(data, vars){
  }
 
 Mars_tmp<-Mars_SDM_per %>%
-           # mutate(across(where(is.numeric), ~replace_outliers(.,2))) %>% 
-           mutate(across(all_of(c("bathy","tenfon_mxd","temp_m")), ~replace_outliers(.,1.5))) %>%
+           # st_drop_geometry() %>%
+           group_by(Zone) %>% 
+           mutate(across(all_of(c("bathy","tenfon_mxd","temp_m")), ~replace_outliers(.,1.5))) #%>%
            # filter(!Zone %in% c("Bay","Octeville","Ilot Oiseaux","Cote Fleurie")) %>%
-           mutate(across(where(is.factor), fct_drop))
+           # mutate(across(where(is.factor), fct_drop))
 
 pl_mars_map <-
     map(pred_red %>% transpose %>% 

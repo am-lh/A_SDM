@@ -2,6 +2,7 @@ project:
   title: "A_SDM_NEO"
   execute-dir: project
   output-dir: docs
+date: "`r format(Sys.time(), '%d %B %Y')`"
 execute:
   freeze: auto  # re-render only when source changes
   
