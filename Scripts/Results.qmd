@@ -77,92 +77,14 @@ wdmsr <- (paste(wdscript,"MSR/MSR.R",sep=""))
 ```
 
 ```{r}
-#| label: graphchart
+#| label: func
 
-theme_set(theme_bw(base_size = 14))
-colDarj <- function(x) {wes_palette("Darjeeling2",x, type = "continuous")}
-colZiss <- function(x) {wes_palette("Zissou1",x, type = "continuous")}
-colSpec <- colorRampPalette(brewer.pal(8, "Spectral")); # show_col(colSpec(2))
-colDark <- colorRampPalette(brewer.pal(8, "Dark2"));
-Scale_col <- function(x) {scale_colour_manual(values=colDarj(x))}
-Scale_fill <- function(x) {scale_fill_manual(values=colDarj(x))}
-Scale_brew <- function() {scale_colour_brewer(palette="Spectral",aesthetics=c("colour","fill"))}
-Scale_co <- function() 
-  {scale_colour_manual(palette=colorRampPalette(brewer.pal(11, "Spectral")))}
-Scale_fi <- function() 
-  {scale_fill_manual(palette=colorRampPalette(brewer.pal(11, "Spectral")))}
-
-
-pal_cspx <- function(x) {divergingx_hcl(x,palette = "Zissou 1")};
-colBin<-c(pal_cspx(6)[3],pal_cspx(6)[5]); 
-colRQ<-pal_cspx(4); blank<-alpha("#dae8ed",0.1); # show_col(colBin)
-Scalc_rq<- function() {scale_colour_manual(values=colRQ)}
-Scalf_rq2d <- function() {scale_fill_gradientn(colours=colRQ)} 
+source("Scripts/0.0_SDM_NEO_functions.R")
 
 ```
 
 ```{r}
-#| label: func
-
-loadRData <- function(fileName){
-#loads an RData file, and returns it
-    load(here::here(fileName))
-    mget(ls()[ls() != "fileName"])
-}
-
-# Function for corr ad pvalue table x was a matrix containing the data
-# method : correlation method. "pearson"" or "spearman"" was supported
-# removeTriangle : remove upper or lower triangle
-# results :  if "html" or "latex"
-# the results will be displayed in html or latex format
-corstars <-function(x, method=c("pearson", "spearman"), 
-                    removeTriangle=c("upper", "lower"),
-                     result=c("none", "html", "latex")){
-    #Compute correlation matrix
-    require(Hmisc)
-    x <- as.matrix(x)
-    correlation_matrix<-rcorr(x, type=method[1])
-    R <- correlation_matrix$r # Matrix of correlation coeficients
-    p <- correlation_matrix$P # Matrix of p-value 
-    
-    ## Define notions for significance levels; spacing was important.
-    mystars <- ifelse(p < .0001, "****", 
-                      ifelse(p < .001, "***", 
-                             ifelse(p < .01, "**", 
-                                    ifelse(p < .05, "*", " "))))
-    
-    ## trunctuate the correlation matrix to two decimal
-    R <- format(round(cbind(rep(-1.11, ncol(x)), R), 2))[,-1]
-    
-    ## build a new matrix that includes the correlations with their apropriate stars
-    Rnew <- matrix(paste(R, mystars, sep=""), ncol=ncol(x))
-    diag(Rnew) <- paste(diag(R), " ", sep="")
-    rownames(Rnew) <- colnames(x)
-    colnames(Rnew) <- paste(colnames(x), "", sep="")
-    
-    ## remove upper/lower triangle of correlation matrix
-    if(removeTriangle[1]=="upper"){
-      Rnew <- as.matrix(Rnew)
-      Rnew[upper.tri(Rnew, diag = TRUE)] <- ""
-    }
-    else if(removeTriangle[1]=="lower"){
-      Rnew <- as.matrix(Rnew)
-      Rnew[lower.tri(Rnew, diag = TRUE)] <- ""
-    }
-    
-    ## remove last column and return the correlation matrix
-    Rnew <- as.data.frame(Rnew)
-    Rnew <- cbind(Rnew[1:length(Rnew)-1])
-    if (result[1]=="none") return(Rnew)
-    else{
-      if(result[1]=="html") print(xtable(Rnew), type="html")
-      else print(xtable(Rnew), type="latex") 
-    }
-} 
-
-replace_outliers <- function(x, coefv=1.5) {
-  replace(x, x %in% boxplot.stats(x, coef = coefv)$out, NA) #mean(x)
-}
+#| label: graphchart
 
 ```
 
@@ -170,11 +92,11 @@ replace_outliers <- function(x, coefv=1.5) {
 #| label: externdata
 
 rdatain  <- sprintf("%sCSLN_Mars_RQ_BDD.RData",wdmat)
-rqdata<-loadRData(rdatain)
+rqdata<-f.loadRData(rdatain)
 rdatain  <- sprintf("%sCSLN_Mars_RQnli_BDD.RData",wdmat)
-nlrqdata<-loadRData(rdatain)
+nlrqdata<-f.loadRData(rdatain)
 rdatain  <- sprintf("%sCSLN_Mars_RQbsp_BDD.RData",wdmat)
-rqbsdata<-loadRData(rdatain)
+rqbsdata<-f.loadRData(rdatain)
 rdatain  <- sprintf("%sCSLN_Mars_BDD.RData",wdmat)
 load(rdatain) #load(here::here(rdatain))
 rdatain  <- sprintf("%sCSLN_Mars_plot.RData",wdmat)
@@ -200,8 +122,6 @@ espece <- "CERED"
 sp <- which(speciesMP$SPCourt == espece)
 sai <- which(saison$M_Def == "Year")
 taut <- which(taus %in% c(tauchoice))
-
-# rqname<- matrix(paste0(model_types$code[1],"_",sdm_comb_sel$type),nrow=4,ncol=2)
 
 factors<-predict # %>% filter(Var %in% Var_choosen)
 ```
@@ -431,7 +351,7 @@ D.  Mud content \[`r factors[14,3]`\] and bed shear stress \[`r factors[11,3]`\]
 
 # Results
 
-## Description of biological data set
+## Biological data set description
 
 ::: column-page-right
 ```{r}
@@ -500,7 +420,7 @@ df<- Mars_SDM_per %>%
 
 ```
 
-The selected predictors were observed with the same period and areas factors than the biological data (@sec-hms_struc, the map of their value was represented in the estuary @fig-mars_map). On a global point of view, all factors show significant differences between areas and periods:
+The selected predictors were observed with the same period and areas factors than the biological data (the map of their value was represented in the estuary @fig-mars_map). On a global point of view, all factors show significant differences between areas and periods:
 
 -   Current speed daily max \[m.s-1\]: the most dynamic area was the channel, at a mean of `r df$flow_mxd.m[which(df$Zone=="Channel")]` +/- `r df$flow_mxd.sd[which(df$Zone=="Channel")]`. North upstream and median mudflats were subject to an evolution in time in the current distribution, which had an impact on their global mean (upstream `r df$flow_mxd.m[which(df$Zone=="North Upstream Mudflat")]` +/- `r df$flow_mxd.sd[which(df$Zone=="North Upstream Mudflat")]`; median `r df$flow_mxd.m[which(df$Zone=="North Median Mudflat")]` +/- `r df$flow_mxd.sd[which(df$Zone=="North Median Mudflat")]`). The north median mudflat significantly changed in its distribution, bimodal at the first periods, that became unimodal at the end. Spatially, the closer the estuary mouth, the higher the mean current speed.
 
@@ -561,7 +481,7 @@ ggsave(sprintf("%s/mars_st_board.tiff", wdgraph),
 
 iwalk(pl_mars_gt, 
       ~ {
-        cat('#### ', .y, ' {#sec-hms_struc}\n\n')
+        cat('#### ', .y, '\n\n')
         print(.x)
         cat('\n\n')
         })
@@ -576,7 +496,7 @@ iwalk(pl_mars_gt,
 
 :::
 
-## Pre-evaluation of methods
+## Methodology assessment
 
 ::: column-page-right
 ```{r}
@@ -596,7 +516,7 @@ tmpaic <- bind_rows(
             sd=round(sd(Delta_AICc),0)) %>%
   arrange(m) %>% 
   unite(msd,m,sd,sep=" +/- ") %>% 
-  unite(tmsd,typetxt,msd,sep=" Delta AICc = ") %>% 
+  unite(tmsd,typetxt,msd,sep=" = ") %>% 
   pull() %>% 
   paste(collapse = ", ")
 
@@ -612,7 +532,7 @@ tmpaic2<- bind_rows(
   arrange(m) %>% 
   select(-tau) %>% 
   unite(msd,m,sd,sep=" +/- ") %>% 
-  unite(tmsd,typetxt,msd,sep=" Delta AICc = ") %>% 
+  unite(tmsd,typetxt,msd,sep=" = ") %>% 
   pull() %>% 
   paste(collapse = ", ")
 
@@ -625,7 +545,7 @@ tmprone <- bind_rows(
             sd=round(sd(Rone),3)) %>%
   arrange(desc(m)) %>% 
   unite(msd,m,sd,sep=" +/- ") %>% 
-  unite(tmsd,typetxt,msd,sep=" R1 = ") %>% 
+  unite(tmsd,typetxt,msd,sep=" = ") %>% 
   pull() %>% 
   paste(collapse = ", ")
 
@@ -641,7 +561,7 @@ tmprone2<- bind_rows(
   arrange(desc(m)) %>% 
   select(-tau) %>% 
   unite(msd,m,sd,sep=" +/- ") %>% 
-  unite(tmsd,typetxt,msd,sep=" R1 = ") %>% 
+  unite(tmsd,typetxt,msd,sep=" = ") %>% 
   pull() %>% 
   paste(collapse = ", ")
   
@@ -658,13 +578,14 @@ On the range of both predictors for each scenario, the quantile responses of SDM
 #| include: true
 #| column: page-right
 #| fig-cap: "Indicators comparison for all SDM-NEOs computed, by quantile and type of model and response."
-#| fig-height: 3
+#| fig-height: 4
 
 AIC_plot<-bind_rows(
             rqdata$rq_Mod_sel_sm,
             nlrqdata$rq_Mod_sel_sm,
             rqbsdata$rq_Mod_sel_sm) %>% 
-  select(all_of(c("Delta_AICc","Rone","reponse","typetxt","tau"))) %>% 
+  # select(all_of(c("Delta_AICc","Rone","reponse","typetxt","tau"))) %>% 
+  select(all_of(c("Delta_AICc","reponse","typetxt","tau"))) %>% 
   distinct %>% 
   pivot_longer(cols=-c("reponse","typetxt","tau"), 
                names_to = "Indicator", values_to = "value") %>% 
@@ -677,18 +598,18 @@ AIC_plot<-bind_rows(
   geom_jitter(size= 4,width=.3, height=0 ) +
   scale_shape_manual(values=c(1, 8, 23)) +
   scale_color_manual(values=colRQ) +
-  facet_grid(.~Indicator, scales="free") +
+  # facet_grid(.~Indicator, scales="free") +
   labs(#title=titleG, 
        # x="biological",y="Indicator",
        color="Quantile",shape="Model") +
-  theme(axis.text = element_text(size=10,face="bold"),
-        strip.background = element_blank(),
+  theme(aspect.ratio=1,
+        axis.text = element_text(size=10,face="bold"),
         axis.title = element_blank()) +
   coord_flip(); AIC_plot
   
 ggsave(sprintf("%sfig-aic_3mod.tiff",wdgraph),
        plot = AIC_plot,
-       width = 8, height = 4, dpi=600)
+       width = 6, height = 4, dpi=600)
 
 ```
 
@@ -787,7 +708,7 @@ ggsave(sprintf("%sfig-3mod3d.tiff",wdgraph),
 #| label: fig-3mod
 #| include: true
 #| column: page-right
-#| fig-cap: "SDM-NEO surfaces example with scenario A: linear with interaction (A), Gaussian non-linear (B) and Cubic B-Splines linear (C). On the top the surfaces side by side, on the second line 3D plots, all processed quantiles superposed. All negative results of model were NA (in grey). The observed biological data under the model were represented by an isometric curve, over by red stars."
+#| fig-cap: "SDM-NEO surfaces example with scenario A: linear with interaction (A), Gaussian non-linear (B) and Cubic B-Splines linear (C). On the top the surfaces side by side, on the second line 3D plots, all processed quantiles superposed. All negative results of model were NA (in grey). The observed biological data under the model were represented by a contour plot, over by red stars."
 #| fig-width: 16
 #| fig-height: 10
 
@@ -845,7 +766,7 @@ nlrq_opti<-map_depth(nlrqdata$rq_Mod_sel,2,
 
 ```
 
-The four scenarios were treated with the two selected model types: either linear with interaction, or non-linear with bifactorial gaussian equation with the biomass as biological response (@sec-sdm_board, predict/observed plot in  @sec-qq_sdm, SDM-NEOs with the distribution of HMS data in @sec-sdm_real, RQ2nli SDM-NEOs were represented in 3D graph in @sec-sdm_3d).
+The four scenarios were treated with the two selected model types: either linear with interaction, or non-linear with bifactorial gaussian equation with the biomass as biological response (with predict/observed plot, SDM-NEOs with the distribution of HMS data, RQ2nli SDM-NEOs were represented in 3D graph in @sec-sdm_3d).
 
 A.  Current speed daily max \[`r factors[2,3]`\] and inundation time \[`r factors[3,3]`\]:
     1.  RQ2int optimum was of `r rq_opti$Biomass$maxsdm[1]`gAFDW/m², at `r rq_opti$Biomass$optx1[1]``r  factors[2,3]` and `r rq_opti$Biomass$optx2[1]``r factors[3,3]`; RQ2nli optimum was of `r nlrq_opti$Biomass$maxsdm[1]`gAFDW/m², at `r nlrq_opti$Biomass$optx1[1]``r factors[2,3]` and `r nlrq_opti$Biomass$optx2[1]``r factors[3,3]`.
@@ -921,8 +842,8 @@ pl_board_rq_nlrq <-
       wrap_plots(nrow=1,ncol=4,tag_level="new") + #plot_layout(widths = c(.1,50,.1,50)) +
       plot_annotation(title = sprintf("SDM-NEO (tau=%g)",taus[taut]),
                       tag_levels = c('A', '1')) & 
-      theme(plot.title = element_text(hjust = 0.5),
-            plot.tag = element_text(size = 11,face = "bold")) )
+      theme()
+    )
 
 iwalk(pl_board_rq_nlrq,
   ~ggsave(sprintf("%sfig-graphboard_2d_%s.tiff",wdgraph,.y),
@@ -944,8 +865,8 @@ pl_po_sdm<-
            } ) %>% 
   wrap_plots(nrow=1,ncol=4,tag_level="new") + 
   plot_annotation(tag_levels = c('A', '1')) & 
-  theme(plot.title = element_text(hjust = 0.5),
-        plot.tag = element_text(size = 11,face = "bold")) } )
+  theme()
+        } )
 
 iwalk(pl_po_sdm, ~ggsave(sprintf("%sfig-rq_po_sdm_%s.tiff",
                     wdgraph, .y),
@@ -1000,9 +921,8 @@ pl_board_rq_nlrq_real <- map2(plot_rq_real,plot_nlrq_real,
   wrap_plots(nrow=1,ncol=4,tag_level="new") + #plot_layout(widths = c(.1,50,.1,50)) +
   plot_annotation(title = sprintf("SDM-NEO (tau=%g)",taus[taut]),
                   tag_levels = c('A', '1')) & 
-  theme(plot.title = element_text(hjust = 0.5),
-        plot.tag = element_text(size = 11,face = "bold")),
-        plot.tag.position = "top")
+  theme()
+  )
 
 iwalk(pl_board_rq_nlrq_real,
   ~ggsave(sprintf("%sfig-graphboard_2d_real_%s.tiff",wdgraph,.y),
@@ -1014,13 +934,13 @@ iwalk(pl_board_rq_nlrq_real,
 ```{r}
 #| include: true
 #| results: asis
-#| fig-cap: "Scenarios computed with linear model (top, numbered 1) and nonlinear with gaussian equation (bottom numbered 2), the observed biological data under the model were represented by an isometric curve, over by red stars. Each couple had its own scale to ensure visibility."
+#| fig-cap: "Scenarios computed with linear model (top, numbered 1) and nonlinear with gaussian equation (bottom numbered 2), the observed biological data under the model were represented by a contour plot, over by red stars. Each couple had its own scale to ensure visibility."
 #| fig-width: 16
 #| fig-height: 8
 
 iwalk(pl_board_rq_nlrq, 
       ~ {
-        cat('#### ', .y, ' {#sec-sdm_board}\n\n')
+        cat('#### ', .y, '\n\n')
         print(.x)
         cat('\n\n')
         })
@@ -1037,7 +957,7 @@ iwalk(pl_board_rq_nlrq,
 
 iwalk(pl_po_sdm, 
       ~ {
-        cat('#### ', .y, ' {#sec-qq_sdm}\n\n')
+        cat('#### ', .y, '\n\n')
         print(.x)
         cat('\n\n')
         })
@@ -1048,13 +968,13 @@ iwalk(pl_po_sdm,
 ```{r}
 #| include: true
 #| results: asis
-#| fig-cap: "Scenarios computed with linear with interaction (top, numbered 1) and nonlinear with gaussian equation (bottom numbered 2), the isometric curve represents the observed HMS data"
+#| fig-cap: "Scenarios computed with linear with interaction (top, numbered 1) and nonlinear with gaussian equation (bottom numbered 2), the contour plot represents the observed HMS data"
 #| fig-width: 16
 #| fig-height: 8
 
 iwalk(pl_board_rq_nlrq_real, 
       ~ {
-        cat('#### ', .y, ' {#sec-sdm_real}\n\n')
+        cat('#### ', .y, '\n\n')
         print(.x)
         cat('\n\n')
         })
@@ -1076,26 +996,6 @@ nlrqdata$pl_rq_sel_3d$Biomass$RQ2nli_11134$all
 nlrqdata$pl_rq_sel_3d$Biomass$RQ2nli_11137$all
 nlrqdata$pl_rq_sel_3d$Biomass$RQ2nli_11156$all
 
-# iwalk(nlrqdata$pl_rq_sel_3d,
-#       ~ {
-#         cat('#### ', .y, '\n\n')
-#         map(.x, ~print(.x$all))
-#         cat('\n\n')
-#         })
-
-# imap(nlrqdata$pl_rq_sel_3d,
-#       ~ {
-#         knitr::knit_child(text = c(
-#               "#### ", .y, "\n\n",
-#               "```{r}", "\n\n",
-#               "#| layout-ncol: 2",
-#               "#| label: fig-stat descr ", .y, "\n\n",
-#               "#| fig-cap: try about this ", .y, "\n\n",
-#               "map(.x, ~print(.x$all))",
-#               "\n\n", "```", "\n\n"
-#             ), envir = globalenv(), quiet = TRUE)
-#         })
-
 ```
 
 Only the chosen quantile :
@@ -1116,7 +1016,7 @@ nlrqdata$pl_rq_sel_3d$Biomass$RQ2nli_11156$one[[sprintf("%0.3f",tauchoice)]]
 
 ::: column-page-right
 
-The non-linear model was globally more performant than the linear, it was the only one geographically analysed. Each SDM-NEO for RQ2nli model was applied on the HMS model web over the estuary, for each period (@sec-sdm_map). Density plots were made for each SDM-NEO, focusing on mudflats to ease the comparisons (@sec-sdm_dens).
+The non-linear model was globally more performant than the linear, it was the only one geographically analysed. Each SDM-NEO for RQ2nli model was applied on the HMS model web over the estuary, for each period (@sec-map), the mean of the suitability index was calculated by areas and periods (@sec-suitability). Density plots were made for each SDM-NEO, focusing on mudflats to ease the comparisons (@sec-densplot).
 
 ```{r}
 #| label: prefig-graphboard_map
@@ -1131,11 +1031,11 @@ tmap_mode("plot") # "plot" "view"
 
 ```
 
-#### Application maps
+#### Application maps {#sec-map}
 
 ::: panel-tabset
 
-##### Biomass {#sec-sdm_map}
+##### Biomass
 
 ```{r}
 #| include: true
@@ -1162,11 +1062,62 @@ print(nlrqdata$tm_mars_rq_gb$Density)
 ```
 :::
 
-#### Application density plots
+#### Suitability index {#sec-suitability}
+
+```{r}
+#| label : prefig-suit_idx
+
+pl_rq_suit_idx_nlrq_brd <- map(nlrqdata$pl_rq_suit_idx,
+  ~{wrap_plots(.x, nrow=1,guides = 'collect') &
+    ylim(0,1) &
+    plot_annotation(title = sprintf("SDM-NEO %s (tau=%g)",
+                                    model_types$code[3],tauchoice),
+                    tag_levels = c('A')) & 
+    guides(colour = guide_legend(nrow = 1)) &
+    labs(color="Areas", fill="Areas") &
+    theme(aspect.ratio=1,
+          plot.title = element_text(size=10),
+          legend.position = "bottom",
+          legend.title = element_text(size=10),
+          legend.text = element_text(size=10)
+          )
+  } )
+
+# pl_rq_suit_idx_nlrq_brd$Biomass
+
+iwalk(pl_rq_suit_idx_nlrq_brd,
+  ~ggsave(.x, 
+         width = 18, height = 6, dpi=600, 
+         filename = sprintf("%sfig-suit_idx_nlrq_brd_%s.tiff",wdgraph,.y) ) )
+
+```
+
+::: column-page-right
+
+::: panel-tabset
+```{r}
+#| include: true
+#| results: asis
+#| fig-cap: "Suitability index per period and areas for all SDM models with 95% confidence interval on means"
+#| fig-width: 16
+#| fig-height: 5
+
+iwalk(pl_rq_suit_idx_nlrq_brd, 
+      ~ {
+        cat('##### ', .y, '\n\n')
+        print(.x)
+        cat('\n\n')
+        })
+
+```
+:::
+:::
+
+#### Application density plots {#sec-densplot}
 
 ::: panel-tabset
 
-##### Biomass {#sec-sdm_dens}
+##### Biomass
 
 ```{r}
 #| include: true
@@ -1199,6 +1150,7 @@ pl_tmp
 
 ggsave(pl_tmp, width = 12, height = 12, dpi=600, filename= 
          sprintf("%sfig-mars_st_board_Density.tiff",wdgraph) )
+
 ```
 :::
 
@@ -1208,7 +1160,7 @@ ggsave(pl_tmp, width = 12, height = 12, dpi=600, filename=
 
 
 ::: column-page-right
-The four models result on the estuary regarding Areas and Periods, with the two calculation modes, for both response (biomass: @sec-sdm_st_det_b, density: @sec-sdm_st_det_d)
+The four models result on the estuary regarding Areas and Periods, with the two calculation modes, for both responses.
 
 ##### Biomass
 ::: panel-tabset
@@ -1222,7 +1174,7 @@ The four models result on the estuary regarding Areas and Periods, with the two 
 
 iwalk(nlrqdata$pl_rq_mars_sel_st$Biomass, 
       ~ {
-        cat('###### ', .y, ' {#sec-sdm_st_det_b}\n\n')
+        cat('###### ', .y, '\n\n')
         print(.x$all)
         cat('\n\n')
         })
@@ -1244,7 +1196,7 @@ iwalk(nlrqdata$pl_rq_mars_sel_st$Biomass,
 
 iwalk(nlrqdata$pl_rq_mars_sel_st$Density, 
       ~ {
-        cat('###### ', .y, ' {#sec-sdm_st_det_d}\n\n')
+        cat('###### ', .y, '\n\n')
         print(.x$all)
         cat('\n\n')
         })
@@ -1259,9 +1211,12 @@ iwalk(nlrqdata$pl_rq_mars_sel_st$Density,
 ```{r}
 #| label: finalsave_rdata
 
+rm(list=(ls()[grepl("tmp", ls())] ))
+# rm(list=lsf.str()) # remove all functions
 # rm("rqdata","nlrqdata","rqbsdata")
-# save(list=(ls()[!grepl("rq_", ls())]),
-# file = paste0(rdataout,".RData"))
+# save(list=(setdiff(ls()[!grepl("rq_", ls())], lsf.str())),
+#      file = paste0(rdataout))
+
 beepr::beep(2)
 
 ```

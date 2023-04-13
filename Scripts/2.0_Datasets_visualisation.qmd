@@ -68,48 +68,24 @@ wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
 
 ```
 
-### Definition of the graphic charter
-
-```{r}
-#| label: graphchart
-theme_set(theme_bw(base_size = 14)) # theme_gray() theme_bw() theme_light()
-colDarj <- function(x) {wes_palette("Darjeeling2",x, type = "continuous")}
-colZiss <- function(x) {wes_palette("Zissou1",x, type = "continuous")}
-colSpec <- colorRampPalette(brewer.pal(8, "Spectral")); # show_col(colSpec(2))
-colDark <- colorRampPalette(brewer.pal(8, "Dark2"));
-# Scale_col <- function(x) {scale_colour_manual(values=colDarj(x))}
-# Scale_fill <- function(x) {scale_fill_manual(values=colDarj(x))}
-
-pal_cspx <- function(x) {divergingx_hcl(x,palette = "Zissou 1")};
-colBin<-c(pal_cspx(6)[3],pal_cspx(6)[5]); 
-colRQ<-pal_cspx(4); blank<-alpha("#dae8ed",0.1); # show_col(colBin)
-Scalc_rq<- function() {scale_colour_manual(values=colRQ)}
-Scalf_rq2d <- function() {scale_fill_gradientn(colours=colRQ)} 
-pal_cspx <- function(x) {divergingx_hcl(x,palette = "Zissou 1")}; # show_col(pal_cspx(6)) # colorspace
-Scale_brew <- function()
-  {scale_colour_brewer(palette="Spectral",aesthetics=c("colour","fill"))}
-Scale_co <- function() 
-  {scale_colour_manual(palette=colorRampPalette(brewer.pal(11, "Spectral")))}
-Scale_fi <- function() 
-  {scale_fill_manual(palette=colorRampPalette(brewer.pal(11, "Spectral")))}
-
-pal_ggscc <- pal_material("teal"); # show_col(pal_ggscc(9)) # ggsci
-colSum <- c(pal_ggscc(9)[3],pal_ggscc(9)[7],pal_ggscc(9)[1]) # show_col(colSum)
-colInliers<-pal_material("teal")(10)[5] ; colOutliers = pal_material("deep-orange")(10)[5] # show_col(colOutliers)
-Scalc_misc <- function() {scale_color_discrete_diverging(palette = "Blue-Red 3")}
-Scale_map<- function() {scale_fill_distiller(palette = "Spectral")}
-```
-
 ### Home made functions
 
 ```{r}
 #| label: functmade
-replace_outliers <- function(x, coefv=1.5) {
-  replace(x, x %in% boxplot.stats(x, coef = coefv)$out, NA) #mean(x)
-}
+
+source("Scripts/0.0_SDM_NEO_functions.R")
 
 ```
+
+### Graphic charter
+
+```{r}
+#| label: graphchart
+
+```
+
 ## Load of External data and Basic Variables
+
 ### External data
 
 ```{r}
@@ -155,7 +131,6 @@ The Seine estuary has been studied regarding several historically known areas th
 tmap_mode("plot") # "plot" "view"
 # Extract data of interest
 tm_areas <- ES_Areas %>% 
-  dplyr::filter(!Zone  %in% c("Bay", "Ilot Oiseaux")) %>%
   st_transform(4326)
 
 # Zoom tm_boxes
@@ -185,7 +160,7 @@ tm_bay<-
 tm_estu<-tm_shape(osm_df_wat_estu) +  
     tm_rgb(saturation = .6, alpha= 0.8) +
   tm_shape(tm_areas) +  
-    tm_fill(col = "Zone", title="Areas", palette = "Set2", alpha = 0.7) +
+    tm_fill(col = "Zone", title="Areas", palette = areas_pal, alpha = 0.5) +
   tm_shape(st_as_sfc(tm_box_mud)) + 
     tm_borders("red", lwd = 2) +
   tm_layout(legend.show= FALSE)
@@ -195,11 +170,11 @@ tm_Bio<-
   tm_shape(osm_df_mud) +  
     tm_rgb(saturation = .6, alpha= 0.8) +
   tm_shape(tm_areas) +  
-    tm_fill(col = "Zone", title="Areas", palette = "Set2", alpha = 0.6) +
+    tm_fill(col = "Zone", title="Areas", palette = areas_pal, alpha = 0.5) +
     # tm_text("Zone", size = .8, col= "black") +
-    tm_borders("grey", lwd = 1.5) +
+    tm_borders("grey", lwd = 1.5) +±
   tm_shape(CSLN_sf) +
-    tm_dots(col="grey30", size=0.1, alpha = 0.5) +
+    tm_dots(col="grey30", size=0.1, alpha = 0.3) +
   tm_scale_bar(position = c("LEFT", "BOTTOM"), width = 0.15) + #SCALE
   tm_compass(type = "8star",position = c("LEFT", "TOP"), size = 2) +  #NORTH COMPASS
   tm_layout(#legend.outside = TRUE,
@@ -229,11 +204,11 @@ tmap_mode("view") # "plot" "view"
 tm_study_map_html<-
   tm_basemap(leaflet::providers$OpenStreetMap.HOT) +
   tm_shape(tm_areas) +  
-    tm_fill(col = "Zone", palette = "Set2", alpha = 0.6, legend.show = FALSE) +
+    tm_fill(col = "Zone", palette = areas_pal, alpha = 0.5, legend.show = FALSE) +
     # tm_text("Zone", size = .8, col= "black") +
     tm_borders("grey", lwd = 1.5) +
   tm_shape(CSLN_sf) +
-    tm_dots(col="Zone", title="Areas", palette = "Set2", size=0.05, alpha = 0.9) +
+    tm_dots(col="Zone", title="Areas", palette = areas_pal, size=0.05, alpha = 0.7) +
   tm_layout(legend.show=FALSE)
 tm_study_map_html
 tmap_save(tm_study_map_html, filename = "SIG/Estuary_map.html")
@@ -246,27 +221,6 @@ tmap_save(tm_study_map_html, filename = "SIG/Estuary_map.html")
 #| label: pl_mars_corr
 #| include: true
 
-# ggpairs custom colors on corr
-corr_col <- function(data, mapping, method="p", use="pairwise", ...){
-  # grab data
-  x <- eval_data_col(data, mapping$x)
-  y <- eval_data_col(data, mapping$y)
-  # calculate correlation
-  corr <- cor(x, y, method=method, use=use)
-  # calculate colour based on correlation value
-  colFn <- colorRampPalette(c(colSpec(2)[1], "white", colSpec(2)[2]), interpolate ='spline')
-  fill <- colFn(100)[findInterval(corr, seq(-1, 1, length=100))]
-  ggally_text(
-    label = as.character(round(corr, 2)),
-    mapping = aes(),
-    xP = 0.5, yP = 0.5,
-    ...) + #  ggally_cor(data = data, mapping = mapping, ...) + 
-    theme_void() +
-    theme(panel.background = element_rect(fill=fill))
-
-} #wrap(cor_func,method = 'spearman', symbol = "Corr:\n")
-
-
 df <- CSLN_mud %>%
   filter(SPCourt == espece) %>% 
   select(paste(predict[,1],saison[sai,1],sep=""),
@@ -275,7 +229,7 @@ df <- CSLN_mud %>%
 
 pl_mars_corr <- ggpairs(df, 
                         labeller=label_wrap_gen(width = 10,multi_line = TRUE),
-                        upper = list(continuous = corr_col),
+                        upper = list(continuous = f.corr_col),
                         lower = list(continuous=
                                        wrap("smooth", size = .3,
                                             alpha = 0.4, color = "aquamarine4")),
@@ -291,84 +245,6 @@ ggsave(sprintf("%sfig-mars_corr.tiff",wdgraph),
 
 # Results
 
-```{r}
-#| label: data_set_description
-
-data_descr <- function (dataset,vars) {
-    # dataset=Mars_SDM %>% st_drop_geometry %>% filter(!Zone %in% c("Bay","Octeville"))
-      # vars ="inunt"
-  # dataset= CSLN_df  ; vars ="Biomass_gAFDWm2"
-  
-  descr<-list(geog=list(stat.test=NULL,plot=NULL),
-              time=list(stat.test=NULL,plot=NULL))
-
-  # dataset %>% 
-  #   levene_test(formula(paste0(vars," ~ Period")))
-  
-  descr$geog$stat.test <- dataset %>% 
-    # group_by(Zone) %>% 
-    wilcox_test(formula(paste0(vars," ~ Period"))) %>%
-    # levene_test(formula(paste0(vars," ~ Period"))) %>% 
-    add_xy_position(x = "Period",group = "Zone",
-                    dodge = 0,step.increase = 0.05) %>%
-    filter(p.adj.signif!="ns")
-  descr$geog$plot <- ggplot(dataset) + 
-    # geom_boxplot(aes(x=Period, y = .data[[vars]], fill = Period)) +
-    # geom_density_ridges(aes(y = Period , fill=Period,
-    #                       x=.data[[vars]]), alpha=0.3) +
-    geom_flat_violin(aes(x=Period, fill = Period,
-                     y = .data[[vars]] ),
-                     alpha = 0.5,size = .1,show.legend = FALSE) +
-    stat_summary(aes(x=Period, fill = Period,
-                     y = .data[[vars]]),  
-                 size=.4, fun.data = mean_cl_boot, 
-                 shape=21, stroke =.5, linewidth = .5,
-                 inherit.aes = FALSE, show.legend = FALSE) +
-    # stat_pvalue_manual(descr$geog$stat.test,label = "p.adj.signif",
-    #                    size = 3,tip.length = 0, coord.flip = TRUE) +
-    coord_flip() +
-    facet_wrap( ~ Zone, 
-               nrow = 1, #scales = "free_y", 
-               labeller = label_wrap_gen(width = 20)) + 
-    labs(y = vars, x="") +
-    Scale_brew() +
-    theme(legend.position="none",
-          strip.background = element_blank())
-
-  descr$time$stat.test <- dataset %>% 
-    group_by(Period) %>%
-    wilcox_test(formula(paste0(vars," ~ Zone"))) %>% 
-    add_xy_position(x = "Zone",group = "Period",
-                    dodge = 0,step.increase = 0.05) %>%
-    filter(p.adj.signif!="ns")
-
-  descr$time$plot <- ggplot(dataset) + 
-    # geom_boxplot(aes(x=Zone, y = .data[[vars]], fill = Zone)) +
-    geom_flat_violin(aes(x=Zone, fill = Zone,
-                     y = .data[[vars]] ),
-                     alpha = 0.5,size = .1,show.legend = FALSE) +
-    stat_summary(aes(x=Zone, fill = Zone,
-                     y = .data[[vars]]),  
-                 size=.4, fun.data = mean_cl_boot, 
-                 shape=21, stroke = .5, linewidth = .5,
-                 inherit.aes = FALSE, show.legend = FALSE) +
-    # stat_pvalue_manual(descr$time$stat.test,label = "p.adj.signif", 
-    #                    size = 3,tip.length = 0, coord.flip = TRUE) +
-    coord_flip() +
-    facet_wrap( ~ Period, 
-               nrow = 1, #scales = "free_y", 
-               labeller = label_wrap_gen(width = 20)) + 
-    labs(y = vars, x="") +
-    Scale_brew() +
-    guides(fill=guide_legend(nrow=2,byrow=TRUE)) +
-    theme(legend.position="none",
-          strip.background = element_blank())
-  
-  return(descr)
-}
-
-```
-
 ## Biological data set description
 
 ::: column-screen-inset-right
@@ -380,13 +256,13 @@ CSLN_df <- CSLN %>%
   filter(SPCourt %in% c(espece)) %>%
   drop_na(Biomass_gAFDWm2) %>%
   drop_na(Density_indm2) %>% 
-  mutate(across(where(is.numeric), ~replace_outliers(.,3))) %>%
+  mutate(across(where(is.numeric), ~f.replace_outliers(.,3))) %>%
   mutate(across(where(is.factor), fct_drop)) %>% # recode predict when filter has remove levels
   mutate(Period=factor(Period, 
                       labels = str_replace_all(unique(Period),"-"," - ")))
 
 pl_des <- map(reponse_l,
-              ~data_descr(CSLN_df,.x$rvar))
+              ~f.data_descr(CSLN_df,.x$rvar))
 pl_des_gt <- map(pl_des, ~{
                   .x$geog$plot / .x$time$plot & 
                     theme(text=element_text(size=12)) &
@@ -407,14 +283,14 @@ iwalk(pl_des_gt,
 Mars_tmp<-Mars_SDM %>%
            st_drop_geometry %>%
            group_by(Zone) %>% 
-           # mutate(across(where(is.numeric), ~replace_outliers(.,2))) %>% 
-           mutate(across(all_of(c("bathy","tenfon_mxd","temp_m")), ~replace_outliers(.,1.5))) %>%
-           filter(!Zone %in% c("Bay","Octeville","Ilot Oiseaux","Cote Fleurie")) %>%
+           # mutate(across(where(is.numeric), ~f.replace_outliers(.,2))) %>% 
+           mutate(across(all_of(c("bathy","tenfon_mxd","temp_m")), ~f.replace_outliers(.,1.5))) %>%
+           filter(!Zone %in% c("Octeville","Cote Fleurie")) %>%
            mutate(across(where(is.factor), fct_drop))
 
 pl_mars <- 
   map(setNames(as.list(Var_choosen),Var_choosen), \(vars)
-          data_descr(Mars_tmp,
+          f.data_descr(Mars_tmp,
                      vars) )
 
 pl_mars<- map(setNames(as.list(Var_choosen),Var_choosen),  \(vars)
@@ -442,37 +318,11 @@ pl_mars_gt<-pl_mars_gt %>%
 ```{r}
 #| label: hms_stat
 
-pl_var_st_board<-function(data,vars){
-  data=Mars_tmp
-  vars=pred_red
-
-  descr<-list(pred=NULL, all=NULL)
-  descr$pred <-imap(setNames(as.list(vars$Var),vars$whole), ~{
-    data %>% 
-    ggplot() + 
-    geom_density_ridges(aes(y = Period , fill=Period,
-                            height = after_stat(count), # to have a comparative height between periods
-                            x=.data[[.x]]), 
-                        stat="density", alpha=0.3, size = .2) +
-    facet_grid(. ~ Zone, 
-               # scales = "free_y",
-               labeller = label_wrap_gen(width = 20)) + 
-    labs(x=.y, y="") +
-    Scale_brew() } )
-
-  descr$all<-wrap_plots(descr$pred, ncol=1) & 
-    theme(legend.position="none",
-          strip.background = element_blank(),
-          text=element_text(size=10)) &
-    plot_annotation(tag_levels = c('A')) 
-  return(descr)
-}
-
-Mars_tmp<-Mars_SDM_per %>%
+Mars_tmp<- Mars_SDM_per %>%
            st_drop_geometry() %>%
            group_by(Zone) %>% 
-           mutate(across(any_of(c("bathy","tenfon_mxd","temp_m")), ~replace_outliers(.x,1.5))) %>%
-           filter(!Zone %in% c("Bay","Octeville","Ilot Oiseaux","Cote Fleurie")) %>%
+           mutate(across(any_of(c("bathy","tenfon_mxd","temp_m")), ~f.replace_outliers(.x,1.5))) %>%
+           filter(!Zone %in% c("Octeville","Cote Fleurie")) %>%
            mutate(across(where(is.factor), fct_drop))
 
 # pl_mars_st_board <- Mars_tmp %>% 
@@ -506,71 +356,18 @@ ggsave(sprintf("%s/mars_st_board.tiff", wdgraph),
 #| label: hms_map
 
 tmap_mode("plot") # "plot" "view"
-pl_var_map<-function(data, vars){
-  # data=Mars_tmp
-  # vars=pred_red %>% transpose %>% setNames(.,pred_red$Var); vars=vars[[1]]
-
-  pl_map<-list(all=NULL, one=NULL)
-
-  pl_map$all <- tm_shape(osm_df) +  
-    tm_rgb(saturation = .6, alpha= 0.8) +
-  # tm_scale_bar(position = c("left", "bottom"), width = 0.15) + #SCALE
-  # tm_compass(position = c("left", "top"), size = 2) +          #NORTH COMPASS
-    tm_shape(data) +
-      tm_fill(col = vars$Var, midpoint = NA,
-              style="cont", palette = "-Spectral", alpha = 0.6) +
-    tm_facets(by="Period", nrow = 1) +
-    tm_shape(tm_areas) +  
-      tm_borders(alpha = 0.3, lwd = 1) +
-    tm_layout(
-      main.title=vars$whole,
-      main.title.size= .8,
-      panel.label.bg.color = 'white',
-      panel.label.size=.8,
-      legend.outside = TRUE, 
-      legend.outside.size = .08,
-      legend.title.size= .8,
-      legend.text.size= .6,
-      legend.format=list(text.separator="-"),
-      outer.margins=c(0,0,0,0), inner.margins=c(0,0,0,0))
-  
-  peri<-setNames(as.list(levels(data$Period)), levels(data$Period))
-  # Define map for each Period
-  pl_map$one <- map(peri, ~{
-    tm_shape(osm_df) +  
-      tm_rgb(saturation = .6, alpha= 0.8) +
-    tm_shape(data %>% 
-               filter(Period %in% .x)) +
-      tm_fill(col = vars$Var, 
-              title=.x, midpoint = NA,
-              style="cont", palette = "-Spectral", alpha = 0.6) +
-    tm_shape(tm_areas) +  
-      tm_borders(alpha = 0.3, lwd = 1) +
-    tm_layout(
-              main.title=vars$whole,
-              main.title.size= .8,
-              panel.label.size=.8,
-              legend.outside = TRUE,
-              legend.outside.size = .08,
-              legend.title.size= .8,
-              legend.text.size= .6,
-              legend.format=list(text.separator="-"),
-              outer.margins=c(0,0,0,0), inner.margins=c(0,0,0,0))
-  } ) # map peri
-  return(pl_map)
- }
 
 Mars_tmp<-Mars_SDM_per %>%
            # st_drop_geometry() %>%
            group_by(Zone) %>% 
-           mutate(across(all_of(c("bathy","tenfon_mxd","temp_m")), ~replace_outliers(.,1.5))) #%>%
-           # filter(!Zone %in% c("Bay","Octeville","Ilot Oiseaux","Cote Fleurie")) %>%
+           mutate(across(all_of(c("bathy","tenfon_mxd","temp_m")), ~f.replace_outliers(.,1.5))) #%>%
+           # filter(!Zone %in% c("Octeville","Cote Fleurie")) %>%
            # mutate(across(where(is.factor), fct_drop))
 
 pl_mars_map <-
     map(pred_red %>% transpose %>% 
            setNames(.,pred_red$Var),
-        ~pl_var_map(Mars_tmp,.x))
+        ~f.pl_var_map(Mars_tmp,.x))
 
 
 iwalk(pl_mars_map, ~tmap_save(.x$all, dpi=400, height=2, asp=0, #width=20,
@@ -594,40 +391,16 @@ tmap_save(tm_mars_gb, dpi=600,
 ```{r}
 #| label: hms_map_gif
 
-pl_mars_map_gif<-function(data, vars){
-  # data=Mars_tmp
-  # vars=pred_red %>% transpose %>% setNames(.,pred_red$Var); vars=vars[[1]]
-  
-  tmap_mode("view") # "plot" "view"
-  tmp_sf <-
-  tm_basemap(leaflet::providers$OpenStreetMap.HOT) +
-  tm_shape(data) +
-    tm_fill(col =  vars$Var,
-            palette = "-Spectral", alpha = 0.6) +
-    # tm_borders("white", lwd = 0) +
-    tm_facets(along = "Annee") +
-  tm_shape(tm_areas) +  
-    tm_borders(alpha = 0.3, lwd = 2) +
-  tm_layout(legend.outside = TRUE,
-              title.size=10)
-
-  tmap_animation(
-    tmp_sf, filename = sprintf("%s/%s_map.gif",
-                    wdgraph, vars$Var),
-    fps = 1, width = 2000, height = 2000, dpi=600 )
-
-}
-
 # Mars_tmp<-Mars_SDM %>%
-#            # mutate(across(where(is.numeric), ~replace_outliers(.,2))) %>% 
-#            # mutate(across(all_of(c("bathy","tenfon_mxd")), ~replace_outliers(.,1.5))) %>%
-#            # filter(!Zone %in% c("Bay","Octeville","Ilot Oiseaux","Cote Fleurie")) %>%
+#            # mutate(across(where(is.numeric), ~f.replace_outliers(.,2))) %>% 
+#            # mutate(across(all_of(c("bathy","tenfon_mxd")), ~f.replace_outliers(.,1.5))) %>%
+#            # filter(!Zone %in% c("Octeville","Cote Fleurie")) %>%
 #            mutate(across(where(is.factor), fct_drop))
 
 # pl_mars_map_gif <-
 #     map(pred_red %>% transpose %>% 
 #            setNames(.,pred_red$Var),
-#         ~pl_var_map_gif(Mars_tmp,.x))
+#         ~f.pl_var_map_gif(Mars_tmp,.x))
 
 ```
 
@@ -640,7 +413,9 @@ Rdata are saved in `rdataout`. An excel file collects data in `r binderout` , wi
 ```{r}
 #| label: finalsave_r
 
-save(list=(ls()[grep("^tm_|^pl_", ls())]),
+# rm(list=lsf.str()) # remove all functions
+rm(list=(ls()[grepl("tmp", ls())] ))
+save(list=(setdiff(ls()[grep("^tm_|^pl_", ls())], lsf.str())), # select only variables that respect pattern, remove functions
      file = paste0(rdataout,".RData"))
 beepr::beep(2)
 ```

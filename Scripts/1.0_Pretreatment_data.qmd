@@ -63,7 +63,16 @@ flag_calc_mars<-FALSE # to calculate time-consuming mars summary by period
 
 ```
 
-### Definition of the graphic charter
+### Home made functions
+
+```{r}
+#| label: functmade
+
+source("Scripts/0.0_SDM_NEO_functions.R")
+
+```
+
+### Graphic charter
 
 ```{r}
 #| label: graphchart
@@ -131,6 +140,17 @@ ES_Areas <- sprintf("%sLayers made/ES_Areas_WGS.shp",wdGIS)
 ES_Areas <- st_read(ES_Areas,quiet=TRUE,crs=4326) %>%
   st_transform(2154) %>%
   filter(Zone!="NA")
+name_areas <- c(
+  "North Upstream Mudflat", 
+  "North Median Mudflat", 
+  "North Downstream Mudflat", 
+  "South Mudflat", 
+  "Ilot Oiseaux",
+  "Channel", 
+  "Cote Fleurie", 
+  "OffShore", 
+  "Octeville",
+  "Bay" )
 
 Mars_csv <- sprintf("%sES_Mars_Maps_sh.csv",wdres)
 Mars_csv <- read.csv(Mars_csv)
@@ -319,9 +339,9 @@ CSLN_sf <- st_as_sf(CSLN, coords=c("longitude","latitude"),
 
 # ASSIGNMENT OF AREAS TO MARS3D
 Mars_csv_sf <- st_intersection(Mars_csv_sf,ES_Areas)
-Mars_csv_sf$Zone <- as.factor(Mars_csv_sf$Zone)
+Mars_csv_sf$Zone <- factor(Mars_csv_sf$Zone,levels=name_areas)
 Mars_dat_sf <- st_intersection(Mars_dat_sf,ES_Areas)
-Mars_dat_sf$Zone <- as.factor(Mars_dat_sf$Zone)
+Mars_dat_sf$Zone <- factor(Mars_dat_sf$Zone,levels=name_areas)
 
 # ADD NINJ OF MARS_CSV FOR EACH SAMPLING POINT IN FAUNA
 CSLN_sf$NINJ <- Mars_csv_sf$NINJ[st_nearest_feature(CSLN_sf,Mars_csv_sf)]
@@ -386,7 +406,7 @@ CSLN_Mars$MSRtot <- CSLN_Mars$MSR_mW*CSLN_Mars$Density_indm2
 CSLN_Mars <- CSLN_Mars %>% 
   select(-all_of(c("AphiaID_accepted","sfg_id","point_id",
                    "Lon","Lat","x","y","intersection")))
-facto_col <- c("Filtre","Zone","Type", #"Tidal_level",
+facto_col <- c("Filtre","Type", #,"Zone","Tidal_level",
               "Period","Season","Annee","Mois",
               "idStationUnique","Station_originelle","NINJ",
               "SP","Taxon_SNa","SPCourt") #
@@ -427,7 +447,7 @@ CSLN_pur <- CSLN_Mars # CSLN_Mars <- CSLN_pur #summary(CSLN_pur) # Save before m
 
 ```
 
-#### Discard data not relevant for study
+#### Discard data not relevant for GIPSA
 
 ```{r}
 #| label: calculation_7
@@ -441,13 +461,6 @@ CSLN <- CSLN_Mars %>%
 CSLN_mud <- CSLN %>%
   filter(grepl("Mudflat", Zone)) # focus on mudflat only
 
-
-```
-
-```{r}
-#_BREAK_SAVE_________________________________________________----
-# save.image(file = paste0(wdmat,"CSLN_Mars_BDD.RData"))
-# load(file = "/Matrices/CSLN_Mars_BDD.RData")
 
 ```
 
@@ -642,13 +655,18 @@ sdm_comb<- tidyr::expand_grid(model_types %>% rowid_to_column("type"),
 sdm_comb_sel<-sdm_comb %>% 
   filter(sp==1 & sai==1 & id %in% names(pred_red_comb_sel) )
 
-# sdmname_l<- map(seq(length(reponse)),
-#                     ~sprintf("%g%g%g%s",sp,sai,.x,names(pred_red_comb_sel)) ) %>% 
-#   bind_cols() %>% 
-#   as.matrix
-
 Mars_SDM<-Mars_dat_sf %>% 
-  select(c(NINJ,Lon,Lat,Zone,Tidal_level,Period,Annee,pred_red$Var))
+  select(c(NINJ,Lon,Lat,Zone,Tidal_level,Period,Annee,pred_red$Var)) %>%
+  filter(!Zone %in% c("Bay", "Ilot Oiseaux")) %>%
+  mutate(across(where(is.factor), fct_drop))
+ES_Areas <- ES_Areas %>% 
+  filter(!Zone %in% c("Bay", "Ilot Oiseaux")) %>%
+  mutate(across(where(is.factor), fct_drop))
+CSLN_Mars <- CSLN_Mars %>%
+  filter(!Zone %in% c("Bay", "Ilot Oiseaux")) %>%
+  mutate(across(where(is.factor), fct_drop))
+
+areas_pal<-pal_csps(10); names(areas_pal)<-name_areas
 
 ```
 
@@ -668,6 +686,11 @@ if(flag_calc_mars){
 #                                 "Subtidal" ~"subtidal",
 #                                 .default = Tidal_level) ) %>% 
 #   mutate(Tidal_level=ordered(Tidal_level,tidelevels$level))
+# Mars_SDM_per<-Mars_SDM_per %>% 
+#     filter(!Zone %in% c("Bay", "Ilot Oiseaux")) %>%
+#   mutate(Zone=factor(as.character(Zone),levels=name_areas, ordered=TRUE)) %>% 
+#   mutate(across(where(is.factor), fct_drop))
+
 
 ```
 
@@ -715,7 +738,9 @@ write.csv(CSLN_Stations,file=paste(wdres,"CSLN_Stations", ".csv",sep=""), na = "
 #| eval: false
 
 rm(flag_calc_mars)
-save(list=(ls()),
+# rm(list=lsf.str()) # remove all functions
+rm(list=(ls()[grepl("tmp", ls())] ))
+save(list=(setdiff(ls(), lsf.str())),
      file = paste0(rdataout))
 beepr::beep(2)
 
