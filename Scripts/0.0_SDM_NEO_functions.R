@@ -26,6 +26,7 @@ conflict_prefer("summarise", "dplyr")
 conflict_prefer("melt", "reshape2")
 conflict_prefer("layout", "plotly")
 
+options(scipen=999) # Prevents scientific display of numbers
 set.seed(123)
 
 # GENERAL FUNCTIONS ----
@@ -902,7 +903,7 @@ f.rq_po_plot <- function(rqMod) { # without bootstrap
       geom_point(size=2) +
       geom_abline(slope=1,intercept=0) +
       geom_smooth(method = "lm", formula= y~x, aes(fill = tau), alpha=0.05) +
-      stat_cor(aes(label=after_stat(r.label)), 
+      stat_cor(aes(label=after_stat(rr.label)), 
                label.x.npc = "left", label.y.npc = "top", #label.x.npc = .6,label.y.npc=.3,
                show.legend = FALSE) +
       # stat_regline_equation(label.x.npc = .7,label.y.npc=.4,show.legend = FALSE) +
@@ -932,7 +933,7 @@ f.rq_po_plot <- function(data, metas) { # for the bootstrap
       geom_point(size=2) +
       geom_abline(slope=1,intercept=0) +
       geom_smooth(method = "lm", formula= y~x, aes(fill = tau), alpha=0.05) +
-      stat_cor(aes(label=after_stat(r.label)), 
+      stat_cor(aes(label=after_stat(rr.label)), 
                label.x.npc = "left", label.y.npc = "top",
                show.legend = FALSE) +
       # stat_regline_equation(label.x.npc = .7,label.y.npc=.4,show.legend = FALSE) +
@@ -1357,7 +1358,7 @@ f.pl_suit_idx<-function(rqmodmars,rqMod){
                  names_to = "tau",
                  names_prefix = "si_",
                  values_to = "suit_index") %>% 
-    filter(!Zone %in% c("Bay","Ilot Oiseaux")) %>% #,"Cote Fleurie","Octeville"
+    filter(!Zone %in% c("Ilot Oiseaux")) %>% #,"Cote Fleurie","Octeville"
     filter(tau==sprintf("t%.3f",tauchoice)) %>% 
     ggplot() +
     # stat_summary(aes(x=Period, group= Zone, fill=Zone,

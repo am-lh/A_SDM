@@ -1,31 +1,3 @@
----
-title: "MELTING POTES PROJECT : SDM-NEO MODELS non Linear Quantile Regression"
-author: "Amélie Lehuen"
-description: "ANALYSIS WITH KOENKER'S QUANTREG PACKAGE"
-date: "`r format(Sys.time(), '%B %Y')`"
-editor: source
-execute:
-  eval: true
-  echo: false
-  message: false
-  warning: false
-  output: true
-  include: false
-editor_options: 
-  chunk_output_type: console
----
-
-# NON LINEAR QUANTILE REGRESSION ANALYSIS WITH KOENKER'S QUANTREG PACKAGE
-
-## Introduction
-
-Non linear quantile regression analysis with Koenker's `quantreg` package
-
-<!-- ## Script preparation -->
-
-### Packages
-
-```{r}
 #| label: load-packages
 #| code-summary: "Packages"
 library(conflicted)
@@ -56,11 +28,8 @@ conflict_prefer("layout", "plotly")
 
 set.seed(123)
 
-```
 
-### Working Environment
 
-```{r}
 #| label: workenvir
 
 rm(list=ls())
@@ -70,68 +39,48 @@ wdres <- "Results/"
 pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
 
-flag_calc<-FALSE # to calculate RQ models and mars results and more time-consuming mars summary by period
+flag_calc<-FALSE # to calculate RQ models and mars results
 flag_calc_mars<-FALSE # to calculate time-consuming mars summary by period
 
-```
 
-### Home made functions
 
-```{r}
 #| label: functmade
 
 source("Scripts/0.0_SDM_NEO_functions.R")
 
-```
 
-### Graphic charter
 
-```{r}
 #| label: graphchart
 
-```
 
-## Load of External data and Basic Variables
 
-### External data
-
-```{r}
 #| label: externdata
 
 rdatain <- sprintf("%sCSLN_Mars_BDD.RData",wdmat)
 load(rdatain)
 load(sprintf("SIG/OSM_extraction.RData"))
 
-```
 
-### Output save binder and Rdata
 
-```{r}
 #| label: outfiles
 
 binderout <- sprintf("%sCSLN_BDD.xlsx",wdres)
-rdataout  <- sprintf("%sCSLN_Mars_RQnli_BDD",wdmat)
+rdataout  <- sprintf("%sCSLN_Mars_RQ_BDD",wdmat)
 # if exists
 load(paste0(rdataout,".RData"))
-```
 
-### Basic variables
 
-```{r}
 #| label: basicvar
 
 etude <- "CSLN_Mars"
 espece <- "CERED"
-analysis <- "RQ Nonlinear"
+analysis <- "RQ Linear"
 sp <- which(speciesMP$SPCourt == espece)
 sai <- which(saison$M_Def == "Year") #Year Winter Summer
 
-type<-list(nli= c("*","nli"))
-tauchoice<-0.95
+type<-list(add= c("+","add"),int=c("*","int"))
+# tauchoice<-0.95
 graphfine<-50 # graph resolution for 2D and 3D graphs surfaces
-
-# Gaussian equation with Initial conditions (CI) vector, quantile choice of reponse (heigth of curve)
-FactA_CI <- 0.99
 
 CSLN_Mars_spe <- CSLN_Mars %>%
   filter(SPCourt==espece)
@@ -140,50 +89,48 @@ wdgraph <- "C:/Users/lehuen201/Back Up AMLH/Melting Potes/BDD/A_SDM_NEO/Plots/" 
 graph_path <- sprintf("%s%s/%s/",wdgraph,espece,analysis)
 titleG <- sprintf("%s %s in %s",
                   analysis,speciesMP$Taxon_SNa[sp],saison[sai,2])
-```
 
-# SDM Model calculation
-## RQ calculation
-```{r}
+
 #| label: rq_Mod_calc
 if(flag_calc){ # flag_calc=1
 
   rq_Mod_all <-
-    map(reponse_l, \(biolo)
+    map( reponse_l, \(biolo)
       {map( type, \(typ)
-        {map_depth( pred_red_comb,2,
-              ~f.rq_nLin(CSLN_Mars_spe,biolo,.x,typ,taus)) } ) } ) %>%
-    map_depth(.,3, ~setNames(.x,map(.x,~.$sdmname)) ) %>% # SDM names to list of results
-    map_depth(.,2,~list_flatten(.x,name_spec= "{inner}")) %>% # remove x1/x2 level
-    map(.,~list_flatten(.x,name_spec= "{inner}")) %>%  # remove typ level
-    map_depth(.,3,compact) # suppress trycatch errors
+        {map_depth( pred_red_comb[1:2],2, # CHOSEN TO GO LIGHT ON CALCULATION
+              ~f.rq_Lin(CSLN_Mars_spe,biolo,.x,taus,typ)) } ) } ) %>%
+    map_depth(.,3, ~setNames(.x,map(.x,~.$sdmname)) ) %>%
+    map_depth(.,2,~list_flatten(.x,name_spec= "{inner}")) %>%
+    map(.,~list_flatten(.x,name_spec= "{inner}")) %>% 
+    map(.,compact) %>%  # suppress trycatch errors
+    map(.,~discard_at(.,~grepl("^RQ1int",.x)) ) # Suppress RQ1int redundant with add, because not found how to avoid its calculation, okay?
   
   rq_Mod_sel<-map(rq_Mod_all,
-        ~keep_at(.,~ grepl(paste0(names(pred_red_comb_sel),"$",collapse="|"),
-                           .x)) ) # collect all mod in selection
+        ~keep_at(.,~ grepl(paste0(names(pred_red_comb_sel),"$",collapse="|"),.x)) )
+  rq_Mod_sel<-map(rq_Mod_sel,
+        ~discard_at(.,~ grepl("add",.x) ) ) # to remove addition that are not usefull and taking too long to calculate
+        
 } # end if flag_calc
-```
 
-## Mars calculation of models
-```{r}
+
 #| label: rq_Mod_mars
 if(flag_calc){ # flag_calc=1
 
   rq_Mod_mars_all<-
     map_depth(rq_Mod_all,2,
-              ~f.rq_Mod_mars_nl(.x,Mars_SDM,taus))
+              ~f.rq_Mod_mars(.x,Mars_SDM,taus))
   
   rq_Mod_mars_sel<-
     map_depth(rq_Mod_sel,2,
-              ~f.rq_Mod_mars_nl(.x,Mars_SDM,taus))
+              ~f.rq_Mod_mars(.x,Mars_SDM,taus))
   
   rq_Mod_mars_all_per<-
     map_depth(rq_Mod_all,2,
-              ~f.rq_Mod_mars_nl(.x,Mars_SDM_per,taus))
+              ~f.rq_Mod_mars(.x,Mars_SDM_per,taus))
   
   rq_Mod_mars_sel_per<-
     map_depth(rq_Mod_sel,2,
-              ~f.rq_Mod_mars_nl(.x,Mars_SDM_per,taus))
+              ~f.rq_Mod_mars(.x,Mars_SDM_per,taus))
   
   # Suitability index calculation
   # rq_Mod_mars_all <- map2(rq_Mod_mars_all, rq_Mod_all,
@@ -196,10 +143,9 @@ if(flag_calc){ # flag_calc=1
   rq_Mod_mars_sel_per <- map2(rq_Mod_mars_sel_per, rq_Mod_sel,
                           ~map2(.x,.y, ~f.suit_index(.x,.y,taus)) )
 } # end if flag_calc
-```
 
-Summary of values by period for mapping (!! can be very long)
-```{r}
+
+
 if(flag_calc){
   save(list=(setdiff(ls()[grep("rq_", ls())], lsf.str())),
        file = paste0(rdataout,".RData")) # save before going heavy
@@ -210,35 +156,29 @@ if(flag_calc_mars){
               ~{ .x %>% 
                  group_by(NINJ,Period) %>% 
                  summarise(across(where(is.numeric),~mean(.x,na.rm=TRUE))) } )
-  
-  save(list=(setdiff(ls()[grep("rq_", ls())], lsf.str())), 
+  save(list=(setdiff(ls()[grep("rq_", ls())], lsf.str())),
        file = paste0(rdataout,".RData")) # save once it's done!
 } # end if flag_calc
-```
 
 
-# Model graphs
-## Summaries graphs
-```{r}
+
 #| label: rq_Mod_plot_sum
 
 # pl_rq_all_sum<-
 #   map_depth(rq_Mod_all,2,
-#             ~pl_rq_Mod_sum(.x,titleG))
+#             ~pl_rq_Mod_sum_rq(.x,titleG))
 
 pl_rq_sel_sum<-
   map_depth(rq_Mod_sel,2,
-            ~f.pl_rq_Mod_sum(.x,titleG))
+            ~f.pl_rq_Mod_sum_rq(.x,titleG))
 
-walk(pl_rq_sel_sum,
-  ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_sm.tiff",
-                    graph_path, substr(.y,1,6), espece, .y),
-                    plot = .x,
-                    width = 10, height = 7, dpi=400) ) } )
-```
+# walk(pl_rq_sel_sum,
+#   ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_sm.tiff",
+#                     graph_path, substr(.y,1,6), espece, .y),
+#                     plot = .x,
+#                     width = 10, height = 7, dpi=400) ) } )
 
-## AIC plot
-```{r}
+
 #| label: rq_Mod_plot_aic
 
 rq_Mod_all_sm<-
@@ -286,15 +226,12 @@ ggsave(sprintf("%s%s_RQ_AIC_scores.tiff",
          plot = pl_rq_aic,
          width = 16, height = 8, dpi=400)
 
-```
 
 
-## Validation pred/obs plot
-```{r}
 #| label: prefig-poplot_boot
 
 # pl_rq_po_sel<-map_depth(rq_Mod_sel,2,
-#     ~ {.x %>% rq_po_plot} )
+#     ~ {.x %>% f.rq_po_plot} )
 
 pl_rq_po_sel<-map_depth(rq_Mod_sel,2,
     ~ {.x %>% f.rq_po_plot_boot} )
@@ -305,10 +242,8 @@ walk(pl_rq_po_sel,
                     plot = .x,
                     width = 5, height = 8, dpi=400) ) } )
 
-```
 
-## Qqplots Residuals graphs
-```{r}
+
 #| label: rq_Mod_plot_res
 
 pl_rq_sel_res<-
@@ -326,10 +261,8 @@ iwalk(pl_rq_sel_resb,
                    graph_path,.y),
      plot = .x, width = 18, height = 12, dpi=400) } )
 
-```
 
-## Curves 1D sdm plots
-```{r}
+
 #| label: rq_Mod_plot_1d
 
 pl_rq_all_1d <- rq_Mod_all %>% 
@@ -345,15 +278,13 @@ pl_rq_all_1d$all <- map(pl_rq_all_1d,
           plot_annotation(title=titleG) } )
 
 walk(pl_rq_all_1d["all"],
-  ~{iwalk(., ~ggsave(sprintf("%s/RQ1nli/%s_%s_1d.tiff",
+  ~{iwalk(., ~ggsave(sprintf("%s/RQ1add/%s_%s_1d.tiff",
                     graph_path, espece, .y),
                     plot = .x,
                     width = 10, height = 7, dpi=400) ) } )
 
-```
 
-## Raster 2D sdm plots
-```{r}
+
 #| label: rq_Mod_plot_2d
 
 pl_rq_all_2d<- rq_Mod_all %>%
@@ -370,10 +301,8 @@ walk(pl_rq_sel_2d,
               plot = .x$all,
               width = 10, height = 7, dpi=400) ) } )
 
-```
 
-## Surfaces 3D sdm plots
-```{r}
+
 #| label: rq_Mod_plot_3d
 
 # pl_rq_all_3d<- rq_Mod_sel %>% 
@@ -389,13 +318,8 @@ walk(pl_rq_sel_3d,
                           sprintf("%s/%s/%s_%s_3d.html",
                     graph_path, substr(.y,1,6), espece, .y), 
                     selfcontained = F, libdir = "lib") ) } )
-```
 
-# GIS results
 
-## Mars SDM stats
-
-```{r}
 #| label: rq_Mod_mars_stat
 
 # pl_rq_mars_all_st<-
@@ -431,15 +355,12 @@ iwalk(pl_rq_mars_sel_st_board,
                   plot = .x,
                   width = 12, height = 12, dpi=400) )
 
-```
 
-## Shapefile save
-```{r}
+
+
 # st_write(rq_Mod_mars_sel_per, sprintf("%sLayers made/SDM_NEO_RQ_%s.shp",wdGIS,espece),append=FALSE)
-```
 
-## Maps plots
-```{r}
+
 #| label: rq_Mod_plot_map
 
 # option tmap version facet
@@ -479,19 +400,15 @@ tm_mars_rq_gb <- map(pl_rq_sel_map,
     tmap_arrange(., asp=NA, ncol=1,
                  sync = TRUE, outer.margins=0) } )
 
-```
 
-## Suitability index plots
 
-```{r}
+
 
 pl_rq_suit_idx <- map2(rq_Mod_mars_sel,
                     rq_Mod_sel,
                   ~map2(.x,.y, f.pl_suit_idx )  )
-```
 
-## Animated GIF Maps plots
-```{r}
+
 #| label: rq_Mod_plot_map_gif
 
 # pl_rq_all_map<-
@@ -504,41 +421,25 @@ pl_rq_suit_idx <- map2(rq_Mod_mars_sel,
 #     {imap(rq_Mod_mars_sel_per[[biolo$rdescr]],
 #          ~f.pl_rq_Mod_map_gif(.x,.y,tauchoice)) } )
 
-```
 
-# Final actions and save
 
-Rdata are saved in `rdataout`. An excel file collects data in `r binderout` , with sheets for :
-
--   data : contains whatever
-
-```{r}
 #| label: finalsave_xls
 # wb <- loadWorkbook(binderout) # addWorksheet(wb, sheetName = "rql")
 # writeData(wb, sheet = "Rq_coeff", x = smrq_l, 
 #           startCol = 1, startRow = 1,withFilter = FALSE)
 # saveWorkbook(wb,file=binderout, overwrite = TRUE)
 
-```
 
-```{r}
+
 #| label: finalsave_r
 
 # rm(list=lsf.str()) # remove all functions
 rm(list=(ls()[grepl("tmp", ls())] ))
-save(list=(setdiff(ls()[grep("rq_", ls())], lsf.str())), # select only variables that respect pattern, remove functions
+save(list=(setdiff(ls()[grep("rq_", ls())], lsf.str()) ), # select only variables that respect pattern, remove functions
      file = paste0(rdataout,".RData"))
 beepr::beep(2)
-```
 
-# Supplementary data
 
-## Session information
-
-::: {.callout-tip collapse="true"}
-## Expand for R Session Info
-
-```{r, echo = FALSE}
 #| include: true
 
 library(sessioninfo)
@@ -550,7 +451,4 @@ pkg_sesh$platform$quarto <- paste(
   quarto::quarto_path()
   )
 pkg_sesh
-```
-:::
 
-# References {.unnumbered}

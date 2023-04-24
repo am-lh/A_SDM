@@ -172,7 +172,7 @@ tm_Bio<-
   tm_shape(tm_areas) +  
     tm_fill(col = "Zone", title="Areas", palette = areas_pal, alpha = 0.5) +
     # tm_text("Zone", size = .8, col= "black") +
-    tm_borders("grey", lwd = 1.5) +±
+    tm_borders("grey", lwd = 1.5) +
   tm_shape(CSLN_sf) +
     tm_dots(col="grey30", size=0.1, alpha = 0.3) +
   tm_scale_bar(position = c("LEFT", "BOTTOM"), width = 0.15) + #SCALE
@@ -325,26 +325,8 @@ Mars_tmp<- Mars_SDM_per %>%
            filter(!Zone %in% c("Octeville","Cote Fleurie")) %>%
            mutate(across(where(is.factor), fct_drop))
 
-# pl_mars_st_board <- Mars_tmp %>% 
-#   st_drop_geometry() %>% 
-#   pivot_longer(cols = !NINJ:Annee) %>% 
-#   mutate(name=factor(name, levels = pred_red$Var, labels = pred_red$whole)) %>% 
-#   ggplot() + 
-#   geom_density_ridges(aes(y = Period , fill=Period,
-#                           height = after_stat(count), # to have a comparative height between periods
-#                           x=value), 
-#                       stat="density", alpha=0.3, size = .2) +
-#   facet_grid(name ~ Zone, 
-#              scales = "free",
-#              labeller = label_wrap_gen(width = 20) ) + 
-#   labs(x="", y="") +
-#   Scale_brew() + 
-#   theme(legend.position="none",
-#         strip.background = element_blank(),
-#         text=element_text(size=10))
-
 pl_mars_st_board <-
-  pl_var_st_board(Mars_tmp,pred_red)
+  f.pl_var_st_board(Mars_tmp,pred_red)
 
 ggsave(sprintf("%s/mars_st_board.tiff", wdgraph),
                   plot = pl_mars_st_board$all,
@@ -422,7 +404,7 @@ beepr::beep(2)
 
 # Supplementary data
 
-## Software details
+## Session information
 
 ::: {.callout-tip collapse="true"}
 ## Expand for R Session Info

@@ -548,7 +548,7 @@ beepr::beep(2)
 
 # Supplementary data
 
-## Software details
+## Session information
 
 ::: {.callout-tip collapse="true"}
 ## Expand for R Session Info

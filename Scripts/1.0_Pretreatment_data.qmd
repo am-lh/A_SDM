@@ -657,13 +657,13 @@ sdm_comb_sel<-sdm_comb %>%
 
 Mars_SDM<-Mars_dat_sf %>% 
   select(c(NINJ,Lon,Lat,Zone,Tidal_level,Period,Annee,pred_red$Var)) %>%
-  filter(!Zone %in% c("Bay", "Ilot Oiseaux")) %>%
+  filter(!Zone %in% c("Bay")) %>% #, "Ilot Oiseaux"
   mutate(across(where(is.factor), fct_drop))
 ES_Areas <- ES_Areas %>% 
-  filter(!Zone %in% c("Bay", "Ilot Oiseaux")) %>%
+  filter(!Zone %in% c("Bay")) %>% #, "Ilot Oiseaux"
   mutate(across(where(is.factor), fct_drop))
 CSLN_Mars <- CSLN_Mars %>%
-  filter(!Zone %in% c("Bay", "Ilot Oiseaux")) %>%
+  filter(!Zone %in% c("Bay")) %>% #, "Ilot Oiseaux"
   mutate(across(where(is.factor), fct_drop))
 
 areas_pal<-pal_csps(10); names(areas_pal)<-name_areas
@@ -710,7 +710,7 @@ Rdata are saved in `r rdataout`. An excel file collects data in `r binderout` , 
 ```{r}
 #| label: finalsave_xlsx
 #| eval: false
-wb <- loadWorkbook(paste(wdres,"CSLN_BDD",".xlsx", sep=""))
+wb <- loadWorkbook(paste(wdres,"CSLN_BDD.xlsx", sep=""))
 writeData(wb, sheet = "CSLN", x = CSLN, 
           startCol = 1, startRow = 1,withFilter = FALSE)
 writeData(wb, sheet = "CSLN_Mars", x = CSLN_Mars, 
@@ -760,7 +760,7 @@ beepr::beep(2)
 
 # Supplementary data
 
-## Software details
+## Session information
 
 ::: {.callout-tip collapse="true"}
 ## Expand for R Session Info
