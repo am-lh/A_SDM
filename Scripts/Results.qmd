@@ -14,49 +14,21 @@ editor_options:
 ---
 
 ```{r}
+rm(list=ls())
+```
+
+
+```{r}
 #| label: load-packages
 #| code-summary: "Packages"
 
-library(conflicted)
-library(knitr)
-library(readxl) ; library(openxlsx)
-library(beepr); library(clipr)
-library(tidyverse); library(data.table)
-library(broom); library(purrr) # tidy,glance,augment
-library(lubridate)
-library(rstatix); library(Hmisc)  # corr and pvalue calculation
+list_packages <-c("beepr", "knitr", "conflicted", 
+    # data tidy
+    "tidyverse", "data.table" #"broom"
+    )
+invisible(lapply(list_packages, library, character.only = TRUE))
 
-# SIG
-library(sf); library(sfheaders)
-library(rnaturalearth) # library(raster)
-library(tmap)
-library(tmaptools) # tmap_mode; for static and interactive maps
-library(ggspatial)
-
-# Graphics packages
-library(scales) ; library(grafify)
-library(RColorBrewer) ; library(wesanderson); library(colorspace)
-library(ggpubr);library(GGally); library(gginnards)
-library(patchwork); library(figpatch)
-library(metR)
-library(rayshader)
-library(introdataviz) # geom_split_violin # devtools::install_github("psyteachr/introdataviz")
-library(ggridges) # geom_density_ridges
-library(ggforce)
-library(plotly)
-
-conflict_prefer("transpose", "purrr")
-conflict_prefer("filter", "dplyr")
-conflict_prefer("select", "dplyr")
-conflict_prefer("summarise", "dplyr")
-conflict_prefer("melt", "reshape2")
-conflict_prefer("layout", "plotly")
-
-sf_use_s2(FALSE)
-tmap_mode("view") # "plot" "view"
-Sys.setlocale("LC_TIME", "English")
 ```
-
 
 Run the preparation and Seuilflux calculation for all Runs
 ```{r}
@@ -77,9 +49,9 @@ Run the preparation and Seuilflux calculation for all Runs
 ```{r}
 #| label: workenvir
 
-rm(list=ls())
+backup<-"C:/Users/lehuen201/Back Up AMLH/Melting Pot/BDD/A_SDM_NEO/"
 wdsource <- "Data/Faune/CSLN/"
-wdmat <-  "C:/Users/lehuen201/Back Up AMLH/Melting Potes/BDD/A_SDM_NEO/Matrices/" # "Matrices/"
+wdmat <-  sprintf("%s%s",backup,"Matrices/") # "Matrices/"
 wdgraph <- "Plots/"
 wdres <- "Results/"
 
@@ -109,12 +81,12 @@ rdatain  <- sprintf("%sCSLN_Mars_RQ_BDD.RData",wdmat)
 rqdata<-f.loadRData(rdatain)
 rdatain  <- sprintf("%sCSLN_Mars_RQnli_BDD.RData",wdmat)
 nlrqdata<-f.loadRData(rdatain)
-rdatain  <- sprintf("%sCSLN_Mars_RQbsp_BDD.RData",wdmat)
-rqbsdata<-f.loadRData(rdatain)
+# rdatain  <- sprintf("%sCSLN_Mars_RQbsp_BDD.RData",wdmat)
+# rqbsdata<-f.loadRData(rdatain)
 rdatain  <- sprintf("%sCSLN_Mars_BDD.RData",wdmat)
 load(rdatain) #load(here::here(rdatain))
-rdatain  <- sprintf("%sCSLN_Mars_plot.RData",wdmat)
-load(rdatain)
+# rdatain  <- sprintf("%sCSLN_Mars_plot.RData",wdmat)
+# load(rdatain)
 load(sprintf("SIG/OSM_extraction.RData"))
 
 ```
@@ -519,6 +491,16 @@ iwalk(pl_mars_gt,
 # ggsave(sprintf("%sRQ lin nli 1D compa example.tiff",wdgraph),
 #        plot = tmp_plot,
 #        width = 12, height = 6, dpi=600)
+
+# titleG <- sprintf("%s", analysis)
+# tmp_plot<-wrap_plots(rqdata$pl_rq_all_sum$Biomass$RQ1add_11110,
+#           nlrqdata$pl_rq_all_sum$Biomass$RQ1nli_11110) & 
+#   plot_layout(guides="collect", design = "AABBB") & 
+#   theme(legend.position = "bottom") & 
+#   plot_annotation(tag_levels = c("A"))
+# ggsave(sprintf("%sRQ lin nli 1D summry example.tiff",wdgraph),
+#        plot = tmp_plot,
+#        width = 15, height = 4, dpi=600)
 
 ```
 

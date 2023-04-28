@@ -415,7 +415,7 @@ f.rq_Lin <- function(df,biolo,sdmod,taus,typ) {
                        Rone=round((1 - modelq$rho[.x]/modelq0$rho[.x]),5)) ) %>% 
         setNames(sprintf("%.3f",taus))    
       
-      smrq_t <- map2(smrq, as.list(taus),
+      smrq_t <- map2(smrq, taus_l,
                 ~{as.data.frame(.x$coefficients) %>%
                   mutate(Var=rownames(.)) %>%
                   relocate(Var) %>%
@@ -429,9 +429,7 @@ f.rq_Lin <- function(df,biolo,sdmod,taus,typ) {
                          # Predictor1=pred_red[k,1], Predictor2=pred_red[k2,1],
                          predict=xt, predictt=xl,
                          predfile=paste(sdmod$Var, collapse="_")) } )
-      smrq_t<-smrq_t %>% 
-        map2(.,valid, append) %>% 
-        bind_rows()
+      smrq_t<-smrq_t %>% map2(valid,., append)
   
       # Out of limits points calculation
       rqlim_t <- modelq %>% 
@@ -467,7 +465,7 @@ f.rq_Lin <- function(df,biolo,sdmod,taus,typ) {
     return(mod_t)
   } # end func
 
-f.rq_nLin <- function(df,biolo,sdmod,taus,typ) {
+f.rq_nLin <- function(df,biolo,sdmod,typ,taus) {
   # biolo=reponse_l[[1]]; typ=type[[1]]
   # sdmod=pred_red_comb[[1]][[2]]
   typetxt<-paste0("RQ",length(sdmod$id),typ[2])
@@ -714,9 +712,7 @@ f.rq_Bsp <- function(df,biolo,sdmod,taus,typ) {
                               # Predictor1=pred_red[k,1], Predictor2=pred_red[k2,1],
                               predict=xt, predictt=xl,
                               predfile=paste(sdmod$Var, collapse="_")) } )
-    smrq_t<-smrq_t %>% 
-      map2(.,valid, append) %>% 
-      bind_rows()
+    smrq_t<-smrq_t %>% map2(valid,., append)
     
     # Out of limits points calculation
     rqlim_t <- modelq %>% 
@@ -823,30 +819,30 @@ f.suit_index<-function(rqmodmars,rqMod,taus){
 
 #| label: rq_Mod_plot_sum ----
 
-# f.pl_rq_Mod_sum_rq<-function(rqMod,titleG){
-#     # biolo=reponse_l[[1]]
-#     # rqMod=rq_Mod_sel[[biolo$rdescr]][[1]]
-#   typetxt<-substr(rqMod$sdmname, 1, 6) 
-#   png(file=sprintf("%s/%s/%s_%s_sm.tiff",
-#                    graph_path, typetxt, espece, rqMod$sdmname),
-#       width=3600, height=3600, res=400)
-#   plot(rqMod$smrq, main=c("Beta 0",rqMod$meta$predictt),cex=.7,pch=19,lcol=colSum[1],col=colSum[2:3])
-#   title(sub = titleG)
-#   dev.off()
-#   
-#   # rqMod$smrq_t$lowerbd<- rqMod$smrq_t$Value-rqMod$smrq_t$`Std. Error`
-#   # rqMod$smrq_t$upperbd<- rqMod$smrq_t$Value+rqMod$smrq_t$`Std. Error`
-#   # ggplot(rqMod$smrq_t,aes(x=tau,y=Value, group = 1)) +
-#   #   geom_ribbon(aes(ymin=lowerbd, ymax=upperbd), 
-#   #               fill=colSum[3], alpha=0.8) +
-#   #   geom_point(col=colSum[2],size=1) +
-#   #   geom_line(col=colSum[2],linewidth=.5, alpha=0.8) +
-#   #   facet_wrap(~Var,scales="free",labeller = label_wrap_gen(width = 30)) +
-#   #   labs(title = titleG) +
-#   #   theme(text=element_text(size=8),
-#   #         strip.text = element_text(size=6))
-# 
-# }
+f.pl_rq_Mod_sum_rq<-function(rqMod,titleG){
+    # biolo=reponse_l[[1]]
+    # rqMod=rq_Mod_sel[[biolo$rdescr]][[1]]
+  typetxt<-substr(rqMod$sdmname, 1, 6) 
+  png(file=sprintf("%s/%s/%s_%s_sm.tiff",
+                   graph_path, typetxt, espece, rqMod$sdmname),
+      width=3600, height=3600, res=400)
+  plot(rqMod$smrq, main=c("Beta 0",rqMod$meta$predictt),cex=.7,pch=19,lcol=colSum[1],col=colSum[2:3])
+  title(sub = titleG)
+  dev.off()
+  
+  # rqMod$smrq_t$lowerbd<- rqMod$smrq_t$Value-rqMod$smrq_t$`Std. Error`
+  # rqMod$smrq_t$upperbd<- rqMod$smrq_t$Value+rqMod$smrq_t$`Std. Error`
+  # ggplot(rqMod$smrq_t,aes(x=tau,y=Value, group = 1)) +
+  #   geom_ribbon(aes(ymin=lowerbd, ymax=upperbd), 
+  #               fill=colSum[3], alpha=0.8) +
+  #   geom_point(col=colSum[2],size=1) +
+  #   geom_line(col=colSum[2],linewidth=.5, alpha=0.8) +
+  #   facet_wrap(~Var,scales="free",labeller = label_wrap_gen(width = 30)) +
+  #   labs(title = titleG) +
+  #   theme(text=element_text(size=8),
+  #         strip.text = element_text(size=6))
+
+}
 
 f.pl_rq_Mod_sum<-function(rqMod,titleG){
   # rqMod=rq_Mod_sel[[1]][[1]]
@@ -1048,7 +1044,7 @@ f.pl_rq_Mod_1d<-function(rqMod,titleG){
 #| label: rq_Mod_plot_2d ----
 # that could be nice to have the density plots in margin to see the max etc ?
 
-f.pl_rq_Mod_2d<-function(rqMod,taus_l,titleG){
+f.pl_rq_Mod_2d<-function(rqMod,titleG){
     # biolo=reponse_l[[1]]
     # rqMod=rq_Mod_sel[[biolo$rdescr]][[1]]
   

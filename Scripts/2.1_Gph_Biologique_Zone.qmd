@@ -225,7 +225,7 @@ dev.off()
 
 ```
 
-#### GRAPHICS OF MSR AND BPC PER PERIOD FACET MUDFLATS with significance stars♦
+#### GRAPHICS OF MSR AND BPC PER PERIOD FACET MUDFLATS with significance stars
 
 ```{r}
 #| label: global_4

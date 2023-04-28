@@ -347,7 +347,8 @@ CSLN_sm$Groupe_Simprof <- as.factor(CSLN_sm$Groupe_Simprof)
 col_Period <- colZiss(CSLN_unique$Period)[factor(CSLN_simp_names$Period)]
 col_Zone <- colZiss(length(unique(CSLN_simp_names$Zone)))[factor(CSLN_simp_names$Zone)]
 ggd1 <- CSLN_simprof$hclust %>% as.dendrogram %>% ladderize
-ggd1 <- ggd1 %>% set("branches_k_color", k=CSLN_simprof$numgroups,value=colDarj(CSLN_simprof$numgroups)) %>% #
+ggd1 <- ggd1 %>% set("branches_k_color", k=CSLN_simprof$numgroups,
+                     value=colDarj(CSLN_simprof$numgroups)) %>% #
           set("branches_lwd", .8) %>%
           set("labels_col", col_Zone[order.dendrogram(ggd1)]) %>%
           set("labels_cex", .6) %>%
