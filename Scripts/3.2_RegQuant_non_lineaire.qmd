@@ -2,7 +2,7 @@
 title: "MELTING POTES PROJECT : SDM-NEO MODELS non Linear Quantile Regression"
 author: "Amélie Lehuen"
 description: "ANALYSIS WITH KOENKER'S QUANTREG PACKAGE"
-date: "`r format(Sys.time(), '%B %Y')`"
+date: last-modified
 editor: source
 execute:
   eval: true
@@ -50,8 +50,7 @@ backup<-"C:/Users/lehuen201/Back Up AMLH/Melting Pot/BDD/A_SDM_NEO/"
 wdmat <-paste0(backup,"Matrices/") #"Matrices/"
 wdgraph <- paste0(backup,"Plots/") #"Plots/"
 wdres <- "Results/"
-pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
-wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
+wdGIS <- "SIG/"
 
 flag_calc<-TRUE # to calculate RQ models and mars results and more time-consuming mars summary by period
 flag_calc_mars<-FALSE # to calculate VERY time-consuming mars summary by period
@@ -294,20 +293,20 @@ walk(pl_rq_po_sel,
 ```{r}
 #| label: rq_Mod_plot_res
 
-pl_rq_sel_res<-
-  map_depth(rq_Mod_sel,2,
-         ~f.pl_rq_Mod_res(.x,titleG)) 
-
-pl_rq_sel_resb<-map(pl_rq_sel_res,
-          ~{wrap_plots(., guides="collect") &
-              plot_annotation(title=titleG,tag_levels = c('A')) &
-              theme(plot.title = element_blank(),
-                    plot.subtitle = element_text(size=12))   } )
-
-iwalk(pl_rq_sel_resb,
-  ~{ggsave(sprintf("%s/%s_residuals.tiff",
-                   graph_path,.y),
-     plot = .x, width = 18, height = 12, dpi=400) } )
+# pl_rq_sel_res<-
+#   map_depth(rq_Mod_sel,2,
+#          ~f.pl_rq_Mod_res(.x,titleG)) 
+# 
+# pl_rq_sel_resb<-map(pl_rq_sel_res,
+#           ~{wrap_plots(., guides="collect") &
+#               plot_annotation(title=titleG,tag_levels = c('A')) &
+#               theme(plot.title = element_blank(),
+#                     plot.subtitle = element_text(size=12))   } )
+# 
+# iwalk(pl_rq_sel_resb,
+#   ~{ggsave(sprintf("%s/%s_residuals.tiff",
+#                    graph_path,.y),
+#      plot = .x, width = 18, height = 12, dpi=400) } )
 
 ```
 

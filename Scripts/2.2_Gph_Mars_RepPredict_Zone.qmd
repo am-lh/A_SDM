@@ -2,7 +2,7 @@
 title: "CREATION DE GRAPHIQUES DESCRIPTIFS DES DONNEES PROGRAMME REPONSES PREDICTEURS"
 author: "Amélie Lehuen"
 description: "add info on script"
-date: "`r format(Sys.time(), '%B %Y')`"
+date: last-modified
 editor: source
 execute:
   eval: true

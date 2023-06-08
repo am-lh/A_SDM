@@ -2,7 +2,7 @@
 title: "TREATMENT OF BIOLOGIC DATA FROM CSLN BEFORE SDM TREATMENT"
 author: "Amélie Lehuen"
 description: "add info on script"
-date: "`r format(Sys.time(), '%B %Y')`"
+date: last-modified
 editor: source
 execute:
   eval: true
@@ -16,6 +16,9 @@ editor_options:
 ---
 
 # TREATMENT OF BIOLOGIC DATA FROM CSLN BEFORE SDM TREATMENT
+```{r}
+rm(list=ls())
+```
 
 ## Script preparation
 
@@ -57,14 +60,13 @@ options(scipen=999) # Prevents scientific display of numbers
 ```{r}
 #| label: workenvir
 
-rm(list=ls())
-wdsource <- "Data/Faune/CSLN/"
-wdmat <- "Matrices/"
-wdgraph <- "C:/Users/lehuen201/Back Up AMLH/Melting Potes/BDD/A_SDM_NEO/Plots/" #"Plots/"
+backup<-"C:/Users/lehuen201/Back Up AMLH/Melting Pot/BDD/A_SDM_NEO/"
+wdmat <-paste0(backup,"Matrices/") #"Matrices/"
+wdgraph <- paste0(backup,"Plots/") #"Plots/"
 wdres <- "Results/"
+wdsource <- "Data/Faune/CSLN/"
 wdproj<-getwd()
-pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
-wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
+wdGIS <- "SIG/"
 
 ```
 
@@ -102,7 +104,7 @@ load(rdatain)
 
 rdataout <- sprintf("%sCSLN_Mars_plot",wdmat)
 # if exists
-load(paste0(rdataout,".RData"))
+# load(paste0(rdataout,".RData"))
 
 ```
 
@@ -224,7 +226,7 @@ tmap_save(tm_study_map_html, filename = "SIG/Estuary_map.html")
 df <- CSLN_mud %>%
   filter(SPCourt == espece) %>% 
   select(paste(predict[,1],saison[sai,1],sep=""),
-         map(reponse_l,~.x$rvar) %>% unlist(., use.names=FALSE)) %>%
+         map(reponse_l,~.x$Var) %>% unlist(., use.names=FALSE)) %>%
   select(-c("eptot_dt"))
 
 pl_mars_corr <- ggpairs(df, 
@@ -262,7 +264,7 @@ CSLN_df <- CSLN %>%
                       labels = str_replace_all(unique(Period),"-"," - ")))
 
 pl_des <- map(reponse_l,
-              ~f.data_descr(CSLN_df,.x$rvar))
+              ~f.data_descr(CSLN_df,.x))
 pl_des_gt <- map(pl_des, ~{
                   .x$geog$plot / .x$time$plot & 
                     theme(text=element_text(size=12)) &
@@ -283,19 +285,14 @@ iwalk(pl_des_gt,
 Mars_tmp<-Mars_SDM %>%
            st_drop_geometry %>%
            group_by(Zone) %>% 
-           # mutate(across(where(is.numeric), ~f.replace_outliers(.,2))) %>% 
            mutate(across(all_of(c("bathy","tenfon_mxd","temp_m")), ~f.replace_outliers(.,1.5))) %>%
            filter(!Zone %in% c("Octeville","Cote Fleurie")) %>%
            mutate(across(where(is.factor), fct_drop))
 
 pl_mars <- 
-  map(setNames(as.list(Var_choosen),Var_choosen), \(vars)
-          f.data_descr(Mars_tmp,
-                     vars) )
-
-pl_mars<- map(setNames(as.list(Var_choosen),Var_choosen),  \(vars)
-  map(pl_mars[[vars]], ~{modify_at(.x,"plot", 
-          ~{ .x + ylab(pred_red$whole[which(pred_red$Var == vars)])} )} ) ) 
+  map(transpose(pred_red) %>% 
+        setNames(pred_red$Var) , \(vars) #as.list(Var_choosen),Var_choosen), \(vars)
+          f.data_descr(Mars_tmp, vars) )
 
 pl_mars_gt <- map(pl_mars,
                   ~{.x$geog$plot / .x$time$plot  & 
@@ -396,9 +393,11 @@ Rdata are saved in `rdataout`. An excel file collects data in `r binderout` , wi
 #| label: finalsave_r
 
 # rm(list=lsf.str()) # remove all functions
-rm(list=(ls()[grepl("tmp", ls())] ))
-save(list=(setdiff(ls()[grep("^tm_|^pl_", ls())], lsf.str())), # select only variables that respect pattern, remove functions
+rm(list=(ls()[grepl("tmp|^wd", ls())] ))
+save(list=(setdiff(ls()[grep("^tm_|^pl_", ls())],
+                   lsf.str())), # select only variables that respect pattern, remove functions
      file = paste0(rdataout,".RData"))
+
 beepr::beep(2)
 ```
 

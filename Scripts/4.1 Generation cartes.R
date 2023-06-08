@@ -1,0 +1,322 @@
+# ____________________________________________________________________________________________________
+# CREATION DE CARTES DU LIEU D'ETUDE ET DES RESULTATS
+# ____________________________________________________________________________________________________
+
+rm(list=ls())
+#________________________________________________________________
+# PACKAGES USED ----
+library(tidyverse) ; library(RColorBrewer)
+library(sf) ; library(sfheaders); #library(raster)
+library(dplyr);library(ggpubr) ; library(grid) ; library(gridExtra)
+library(plotly); library(plot3D);  
+# library(leaflet) # for interactive maps
+library(tmap) # tmap_mode; for static and interactive maps
+library(htmlwidgets) # library(leaflet) # saveWidget ; for interactive maps
+library(rnaturalearth) # ne_states install_github("ropensci/rnaturalearthhires")
+# library(spData) ; library(spDataLarge) #remotes::install_github("Nowosad/spDataLarge")
+# library(raster) 
+
+options(scipen=999) # Empeche affichage scientifique des nombres
+
+#________________________________________________________________
+# DEFINITION OF THE GRAPHIC CHARTER ----
+theme_set(theme_bw()) # theme_gray theme_bw() theme_light()
+colorsS <- colorRampPalette(brewer.pal(8, "Spectral")); coldiscS <- function(x) {scale_colour_manual(values=colorsS(x))}
+colorsD <- colorRampPalette(brewer.pal(8, "Dark2")); coldiscD <- function(x) {scale_colour_manual(values=colorsD(x))}
+
+#________________________________________________________________
+# WORKING ENVIRONMENT AND LOADING OF BASIC DATA ----
+# tsk <- "A_SDM_NEO/"
+wdtask <- "./" #paste(pc,"Melting Pot/BDD/",tsk,sep="")
+wdwork <- paste(wdpath,"Matrices/",sep="")
+wdgraph <- paste(wdpath,"Graphiques/",sep="")
+wdres <- paste(wdpath,"Resultats/",sep="")
+setwd(wdpath)
+
+pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
+wdgraphEx<-wdgraph #paste(pc,"Copie-HD/Melting Potes/",tsk,"Graphiques/",sep="")
+wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
+
+#________________________________________________________________
+# DEFINITION OF BASIC VARIABLES ----
+prgm <- "CSLN" # 1:CSLN 2:Mabes 3:Geco 4:Beaug
+etude <- paste(prgm,"_Mars",sep="")
+
+#________________________________________________________________
+# SHP CREATION OF FAUNA & MARS DATA ----
+CSLN_sf <- st_as_sf(CSLN_pur,coords= c("longitude","latitude"),crs=4326,remove = FALSE) #c("x","y"),crs=2154,remove = FALSE) %>% st_transform(4326) #"Lon","Lat" in WGS=4326
+Sel_col<-c(facto_col,"Density_indm2","Biomass_gAFDWm2",
+           "IndBodySize_gAFDW","MSR_mW","MSRtot") #,"Itot"
+CSLN_sf <- CSLN_sf %>% select(all_of(Sel_col)) # lighten the data to help build the map
+# GIS HTML MAP CREATION ----
+# https://thinkr.fr/sil-te-plait-dessine-moi-carte-r/
+# https://thinkr.fr/cartographie-interactive-comment-visualiser-mes-donnees-spatiales-de-maniere-dynamique-avec-leaflet/
+# https://thinkr.fr/cartographie-interactive-avec-r-la-suite/
+# https://cran.r-project.org/web/packages/tmap/vignettes/tmap-getstarted.html
+# https://bookdown.org/nicohahn/making_maps_with_r5/docs/tmap.html
+#________________________________________________________________
+# boxbds=c(xmin=-0.1, ymin=49.3, xmax=0.45, ymax=49.7)
+# bds<-st_crop(ES_Areas,boxbds, crs = st_crs(4326)) %>% # decoupe zone interet
+#   st_transform(2154) # transform to planar as required by st_intersection()
+# bds_points <- cbind(bds, st_coordinates(st_centroid(bds$geometry))) # def centroides pour placer les noms
+# # pol1 = st_polygon(list(rbind(c(0,0),c(1,0),c(1,1),c(0,1),c(0,0))))
+
+tmap_mode("view") #tmap_mode("plot") # ttm() toggle #
+tm_Bio<-tm_basemap("OpenStreetMap.HOT") + # OpenStreetMap.HOT .Mapnik .France - Stamen.Watercolor #https://leaflet-extras.github.io/leaflet-providers/preview/
+  # tm_logo(paste(wdlogos,"logo-MIE.png",sep=""), height = 2) +
+  # tm_logo(c(paste(wdlogos,"logoMP.png",sep=""),
+  #           paste(wdlogos,"Logo Borea.png",sep="")), height = 2) +
+  tm_scale_bar(position = c("left", "bottom"), width = 0.15)+ #SCALE
+  tm_compass(position = c("left", "top"), size = 2)+          #NORTH COMPASS
+  tm_shape(ES_Areas) +
+  tm_fill(col = "Zone", palette = "Spectral", alpha = 0.6) +
+  tm_borders("white", lwd = 1) +
+  tm_shape(CSLN_sf) +
+  # tm_bubbles(size="Density_indm2") +
+  tm_dots(size=0.001) +
+  tm_layout(legend.outside = TRUE)
+# tm_Bio # WARNING THIS OPERATION CAN LAST LONG
+tmlf_Bio<-tmap_leaflet(tm_Bio) # conversion to leaflet object, quicker??
+# tmlf_Bio
+
+# # Simple and basic map of France
+# france <- ne_states(country = "France", returnclass = "sf") %>%
+#   filter(region %in% c("Haute-Normandie","Basse-Normandie"))
+# map_france<-tm_shape(france) + tm_polygons()#+
+# # tm_shape(mybb)+tm_borders("white", lwd = 1) # ajout du cadre rouge sur la zone interet
+# print(map_france, vp = grid::viewport(0.9, 0.7, width = 0.2, height = 0.2))
+# # map_france<-qtm("france") # creation tres rapide d'une carte
+
+# GIS SAVE
+write.csv(CSLN_Mars,file=paste(wdres,"CSLN_Mars", ".csv",sep=""), na = "",row.names = FALSE)
+write.csv(CSLN_pur,file=paste(wdres,"CSLN_data", ".csv",sep=""), na = "",row.names = FALSE)
+# WARNING FOLLOWING OPERATION CAN LAST LONG
+tmap_save(tm_Bio, filename = paste(wdres,'CSLN_Mars Map.html',sep=""))
+# saveWidget(tmlf_Bio, paste(wdres,'CSLN_Mars Map.html',sep=""), selfcontained = TRUE)
+
+# #________________________________________________________________
+# # # OPTION LEAFLET----
+# pal <- colorFactor(
+#   palette = "viridis",na.color = NA,
+#   levels = factor(bds$Type))
+# map_leaflet <- leaflet() %>%
+#   addProviderTiles("OpenStreetMap.HOT") %>% #addTiles()
+#   # setView(lng = 2.80, lat = 46.80, zoom = 5) %>%
+#   # addMarkers(data = CSLN_sf) %>%  # ATTENTION HYPER LONG !!!
+#   addPolygons(data = bds,
+#               label = ~Type, # En passant la souris
+#               popup = ~Zone, # En cliquant sur l'icone
+#               fill = TRUE,
+#               fillColor = ~pal(Type),
+#               fillOpacity = 0.8,
+#               highlightOptions = highlightOptions(color = "white", weight = 2)) %>%
+#    addRectangles(
+#     lng1 = boxbds[1], lat1 = boxbds[2],
+#     lng2 = boxbds[3], lat2 = boxbds[4],
+#     color = "green",
+#     fill = FALSE) %>%
+#   addLegend(
+#     title = "Zones",
+#     pal = pal, values = bds$Type)
+# map_leaflet
+# saveWidget(map_leaflet, 'test_leaflet.html', selfcontained = TRUE)
+
+
+#________________________________________________________________
+# MAPS BUILDING ----
+#________________________________________________________________
+# Linear Two factor Quantile Regression ----
+load(paste(wdwork,etude,"_RQ_BDD",".RData", sep=""))
+
+spe <- 1#:nrow(species) # 1:CERED 2:CORVO 3:HEDDI 4:LIMBA 5:PERUL 6:SCRPL
+# reponse<-reponse[1:3,] # 1:Biomass_gAFDWm2 2:Density_indm2 3:MSRtot 4:Itot  
+answ <- 1#:nrow(reponse)
+sai <- 1#:nrow(saison) # 1:Year 2:Winter 3:Summer
+sdm <-1:nrow(sdmlist)
+foldtxt<-"RQ Lineaire"; filtxt<-"Rq"
+# Mars_SDM<-Mars_SDM %>% filter(!is.na(Lat) & !is.na(Lon) & !is.na(flow_mxd))
+
+for (sp in spe) { # sp=1
+  mlist<-vector(mode = "list", length = length(sdm))
+  for (sdi in sdm) { # sdi=1
+    x1t<-sdmlist$x1t[sdi]; x2t<-sdmlist$x2t[sdi]; yt<-sdmlist$yt[sdi]
+    x1l<-pred_red$Desc[which(pred_red$Var==x1t)]; x2l<-pred_red$Desc[which(pred_red$Var==x2t)]
+    yl<-reponse$rdescr[which(reponse$rvar==yt)]; ylu<-reponse$runit[which(reponse$rvar==yt)]
+    zt<-paste(species[sp,1],sdi,saison[sa,1],sep="")
+    subtitre = sprintf("%s & %s", x1l,x2l)
+    capt = sprintf("%s Quantile regression", sdmlist$SDM_desc[sdi])
+    Mars_SDM_sf <- Mars_SDM %>% dplyr::select(c(Annee, !!zt)) # raster::select also exists!
+    anMars<-unique(Mars_SDM_sf$Annee)
+    for (ann in 1:length(anMars)) { # ann=1
+      for (sai in sai) { # sai=1
+        titreG = sprintf("SDM-NEO for %s in %s",species[sp,2],anMars[ann])
+        Mars_SDM_sfi<-Mars_SDM_sf %>% filter(Mars_SDM_sf$Annee==anMars[ann])
+        sfp<-ggplot(data = Mars_SDM_sfi) +
+          geom_sf(aes_string(fill = zt), color = NA) + #
+          labs(x="Latitude",y="Longitude",
+               fill = sprintf("SDM-NEO\n%s\n(%s)\nTau=%s",yl,ylu,sdmlist$SDM_tau[sdi])) +
+          theme(plot.margin = margin(0.05,0.05,0.05,0.05, "cm")) +
+          scale_fill_distiller(palette = "Spectral") # + coord_sf(xlim = c(-88, -78), ylim = c(24.5, 33), expand = FALSE)
+        assign(paste('sfp', ann, sep=''), 
+               sfp + theme(legend.position="none",
+                           axis.title.x=element_blank(), axis.text.x=element_blank(),axis.ticks.x=element_blank(),
+                           axis.title.y=element_blank(), axis.text.y=element_blank(),axis.ticks.y=element_blank()) + labs(title=anMars[ann]))
+
+        mlist[[ann]] <- eval(parse(text = paste('sfp', ann, sep='')))
+        
+        sfp <- sfp + labs(title=titreG, subtitle=subtitre, caption=capt)
+        ggsave(sprintf("%s%s/%s/Map Detail/%s_%s_%s_SDM%s_%s_%s_%s.png",
+                       wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,paste(x1t,x2t,sep="&"),anMars[ann]),
+                       plot = sfp, width = 10, height = 9)
+      } #sai sfp1
+    } #year
+    titreG = sprintf("SDM-NEO for %s in %s (%s)",species[sp,2],yl,ylu)
+    nncol = 5; nnrow=ceiling(length(anMars)/nncol)
+    sfp <- ggarrange(plotlist=mlist, ncol=nncol, nrow=nnrow, common.legend = TRUE, legend="bottom")+
+          theme(plot.margin = margin(0.05,0.05,0.05,0.05, "cm")) 
+    sfp <- annotate_figure(sfp, top = text_grob(titreG, face = "bold", size = 14))+
+          bgcolor("white"); #print(sfp)
+    ggsave(sprintf("%s%s/%s/%s_%s_%s_SDM%s_%s_%s.png",
+                   wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,paste(x1t,x2t,sep="&")), plot = sfp, width = 10, height = 9)
+  } # sdm
+} #spe
+
+#________________________________________________________________
+# Non-linear One factor Gaussian Quantile Regression ----
+load(paste(wdwork,etude,"_NLRQ_BDD",".RData", sep=""))
+
+spe <- 1#:nrow(species) # 1:CERED 2:CORVO 3:HEDDI 4:LIMBA 5:PERUL 6:SCRPL
+# reponse<-reponse[2:4,] # 1:Itot 2:MSRtot 3:Density_indm2 4:Biomass_gAFDWm2
+answ <- 4#1:nrow(reponse)
+sai <- 1#:nrow(saison) # 1:Year 2:Winter 3:Summer
+sdm<-1:nrow(sdmlist)
+foldtxt<-"RQ Nonlineaire"; filtxt<-"Nlrq"
+# Mars_SDM<-Mars_SDM %>% filter(!is.na(Lat) & !is.na(Lon) & !is.na(flow_mxd))
+
+for (sp in spe) { # sp=1
+  mlist<-vector(mode = "list", length = length(sdm))
+  for (sdi in sdm) { # sdi=1
+    x1t<-sdmlist$x1t[sdi]; yt<-sdmlist$yt[sdi]
+    x1l<-pred_red$Desc[which(pred_red$Var==x1t)];
+    yl<-reponse$rdescr[which(reponse$rvar==yt)]; ylu<-reponse$runit[which(reponse$rvar==yt)]
+    zt<-paste(species[sp,1],sdi,saison[sa,1],sep="")
+    subtitre = sprintf("%s", x1l)
+    capt = sprintf("%s Quantile regression", sdmlist$SDM_desc[sdi])
+    Mars_SDM_sf <- Mars_SDM %>% dplyr::select(c(Annee, !!zt))
+    anMars<-unique(Mars_SDM_sf$Annee)
+    for (ann in 1:length(anMars)) { # ann=1
+      for (sai in saison) { # sai=1
+        titreG = sprintf("SDM-NEO for %s in %s",species[sp,2],anMars[ann])
+        Mars_SDM_sfi<-Mars_SDM_sf %>% filter(Mars_SDM_sf$Annee==anMars[ann])
+        sfp<-ggplot(data = Mars_SDM_sfi) +
+          geom_sf(aes_string(fill = zt), color = NA) +
+          labs(x="Latitude",y="Longitude",
+               fill = sprintf("SDM-NEO\n%s\n(%s)\nTau=%s",yl,ylu,sdmlist$SDM_tau[sdi])) +
+          theme(plot.margin = margin(0.05,0.05,0.05,0.05, "cm")) +
+          scale_fill_distiller(palette = "Spectral") # + coord_sf(xlim = c(-88, -78), ylim = c(24.5, 33), expand = FALSE)
+        assign(paste('sfp', ann, sep=''), 
+               sfp + theme(legend.position="none",
+                           axis.title.x=element_blank(), axis.text.x=element_blank(),axis.ticks.x=element_blank(),
+                           axis.title.y=element_blank(), axis.text.y=element_blank(),axis.ticks.y=element_blank()) + labs(title=anMars[ann]))
+        
+        mlist[[ann]] <- eval(parse(text = paste('sfp', ann, sep='')))
+        
+        sfp <- sfp + labs(title=titreG, subtitle=subtitre, caption=capt)
+        ggsave(sprintf("%s%s/%s/Map Detail/%s_%s_%s_SDM%s_%s_%s_%s.png",
+                       wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,x1t,anMars[ann]),plot = sfp, width = 10, height = 9)
+      } #sai sfp1
+    } #year
+    titreG = sprintf("SDM-NEO for %s in %s (%s)\n%s",species[sp,2],yl,ylu,capt)
+    nncol = 5; nnrow=ceiling(length(anMars)/nncol)
+    sfp <- ggarrange(plotlist=mlist, ncol=nncol, nrow=nnrow, common.legend = TRUE, legend="bottom")+
+      theme(plot.margin = margin(0.05,0.05,0.05,0.05, "cm")) 
+    sfp <- annotate_figure(sfp, top = text_grob(titreG, face = "bold", size = 14))+
+      bgcolor("white"); #print(sfp)
+    ggsave(sprintf("%s%s/%s/%s_%s_%s_SDM%s_%s_%s.png",
+                   wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,x1t), plot = sfp, width = 10, height = 9)
+  } # sdm
+} #spe
+
+#________________________________________________________________
+# Non-linear Two factor Gaussian Quantile Regression ----
+load(paste(wdwork,etude,"_NLRQ2d_BDD",".RData", sep=""))
+
+spe <- 1#:nrow(species) # 1:CERED 2:CORVO 3:HEDDI 4:LIMBA 5:PERUL 6:SCRPL
+# reponse<-reponse[2:4,] # 1:Itot 2:MSRtot 3:Density_indm2 4:Biomass_gAFDWm2
+answ <- 4#1:nrow(reponse)
+sai <- 1#:nrow(saison) # 1:Year 2:Winter 3:Summer
+sdm<-1:nrow(sdmlist)
+foldtxt<-"RQ Nonlineaire"; filtxt<-"Nlrq2d"
+# Mars_SDM2d<-Mars_SDM2d %>% filter(!is.na(Lat) & !is.na(Lon) & !is.na(flow_mxd))
+
+for (sp in spe) { # sp=1
+  mlist<-vector(mode = "list", length = length(sdm))
+  for (sdi in sdm) { # sdi=1
+    x1t<-sdmlist$x1t[sdi]; x2t<-sdmlist$x2t[sdi]; yt<-sdmlist$yt[sdi]
+    x1l<-pred_red$Desc[which(pred_red$Var==x1t)]; x2l<-pred_red$Desc[which(pred_red$Var==x2t)]
+    yl<-reponse$rdescr[which(reponse$rvar==yt)]; ylu<-reponse$runit[which(reponse$rvar==yt)]
+    zt<-paste(species[sp,1],sdi,saison[sa,1],sep="")
+    subtitre = sprintf("%s & %s", x1l,x2l)
+    capt = sprintf("%s Quantile regression", sdmlist$SDM_desc[sdi])
+    Mars_SDM_sf <- Mars_SDM2d %>% dplyr::select(c(Annee, !!zt))
+    anMars<-unique(Mars_SDM_sf$Annee)
+    for (ann in 1:length(anMars)) { # ann=1
+      for (sai in saison) { # sai=1
+        titreG = sprintf("SDM-NEO for %s in %s",species[sp,2],anMars[ann])
+        Mars_SDM_sfi<-Mars_SDM_sf %>% filter(Mars_SDM_sf$Annee==anMars[ann])
+        sfp<-ggplot(data = Mars_SDM_sfi) +
+          geom_sf(aes_string(fill = zt), color = NA) +
+          labs(x="Latitude",y="Longitude",
+               fill = sprintf("SDM-NEO\n%s\n(%s)\nTau=%s",yl,ylu,sdmlist$SDM_tau[sdi])) +
+          theme(plot.margin = margin(0.05,0.05,0.05,0.05, "cm")) +
+          scale_fill_distiller(palette = "Spectral") # + coord_sf(xlim = c(-88, -78), ylim = c(24.5, 33), expand = FALSE)
+        assign(paste('sfp', ann, sep=''), 
+               sfp + theme(legend.position="none",
+                           axis.title.x=element_blank(), axis.text.x=element_blank(),axis.ticks.x=element_blank(),
+                           axis.title.y=element_blank(), axis.text.y=element_blank(),axis.ticks.y=element_blank()) + labs(title=anMars[ann]))
+        
+        mlist[[ann]] <- eval(parse(text = paste('sfp', ann, sep='')))
+        
+        sfp <- sfp + labs(title=titreG, subtitle=subtitre, caption=capt)
+        ggsave(sprintf("%s%s/%s/Map Detail/%s_%s_%s_SDM%s_%s_%s_%s.png",
+                       wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,paste(x1t,x2t,sep="&"),anMars[ann]),plot = sfp, width = 10, height = 9)
+      } #sai sfp1
+    } #year
+    titreG = sprintf("SDM-NEO for %s in %s (%s)\n%s",species[sp,2],yl,ylu,capt)
+    nncol = 5; nnrow=ceiling(length(anMars)/nncol)
+    sfp <- ggarrange(plotlist=mlist, ncol=nncol, nrow=nnrow, common.legend = TRUE, legend="bottom")+
+      theme(plot.margin = margin(0.05,0.05,0.05,0.05, "cm")) 
+    sfp <- annotate_figure(sfp, top = text_grob(titreG, face = "bold", size = 14))+
+      bgcolor("white"); #print(sfp)
+    ggsave(sprintf("%s%s/%s/%s_%s_%s_SDM%s_%s_%s.png",
+                   wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,paste(x1t,x2t,sep="&")), plot = sfp, width = 10, height = 9)
+  } # sdm
+} #spe
+
+
+
+
+# wdshp <- paste("D:/Melting Potes/SIG/SIG sources externes/Communes 2015 5m/");
+# fdc<-st_read(paste(wdshp,"communes-20150101-5m.shp",sep=""),quiet=TRUE) ; #str(cadre)
+# bds<-st_crop(fdc,boxbds, crs = st_crs(4326)) # decoupe zone interet
+# bds_points <- cbind(bds, st_coordinates(st_centroid(bds$geometry))) # def centroides pour placer les noms
+
+# #________________________________________________________________
+# # Ajout fond de carte des points de prelevement ----
+# tmap_mode("view") #tmap_mode("plot") # ttm() toggle #
+# tm_Bio<-tm_basemap("OpenStreetMap.HOT") + # OpenStreetMap.HOT .Mapnik .France - Stamen.Watercolor #https://leaflet-extras.github.io/leaflet-providers/preview/
+#   # tm_logo(paste(wdlogos,"logo-MIE.png",sep=""), height = 2) +
+#   # tm_logo(c(paste(wdlogos,"logoMP.png",sep=""),
+#             # paste(wdlogos,"Logo Borea.png",sep="")), height = 2) +
+#   tm_scale_bar(position = c("left", "bottom"), width = 0.15)+ #SCALE
+#   tm_compass(position = c("left", "top"), size = 2)+          #NORTH COMPASS
+#   # tm_shape(ES_Areas) +
+#   # annotation_map_tile() +
+#   tm_fill(col = "Zone", palette = "Spectral", alpha = 0.6) +
+#   tm_borders("white", lwd = 1) +
+#   tm_shape(Mars_SDM_sfi) +
+#   tm_dots(size=0.001) +
+#   tm_layout(legend.outside = TRUE)
+# # tm_Bio # WARNING THIS OPERATION CAN LAST LONG
+# tmlf_Bio<-tmap_leaflet(tm_Bio) # conversion to leaflet object, quicker??
+

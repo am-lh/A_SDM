@@ -2,7 +2,7 @@
 title: "TREATMENT OF BIOLOGIC DATA FROM CSLN BEFORE SDM TREATMENT"
 author: "Amélie Lehuen"
 description: "add info on script"
-date: "`r format(Sys.time(), '%B %Y')`"
+date: last-modified
 editor: source
 execute:
   eval: true
@@ -16,6 +16,9 @@ editor_options:
 ---
 
 # TREATMENT OF BIOLOGIC DATA FROM CSLN BEFORE SDM TREATMENT
+```{r}
+rm(list=ls())
+```
 
 ## Script preparation
 
@@ -47,11 +50,11 @@ options(scipen=999) # Prevents scientific display of numbers
 ```{r}
 #| label: workenvir
 
-rm(list=ls())
-wdsource <- "Data/Faune/CSLN/"
-wdmat <- "Matrices/"
-wdgraph <- "C:/Users/lehuen201/Back Up AMLH/Melting Potes/BDD/A_SDM_NEO/Plots/" #"Plots/"
+backup<-"C:/Users/lehuen201/Back Up AMLH/Melting Pot/BDD/A_SDM_NEO/"
+wdmat <-paste0(backup,"Matrices/") #"Matrices/"
+wdgraph <- paste0(backup,"Plots/") #"Plots/"
 wdres <- "Results/"
+wdsource <- "Data/Faune/CSLN/"
 wdproj<-getwd()
 
 pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
@@ -89,7 +92,7 @@ source("Scripts/0.0_SDM_NEO_functions.R")
 binderout <- sprintf("%sCSLN_BDD.xlsx", wdres)
 rdataout <- sprintf("%sCSLN_Mars_BDD.RData",wdmat)
 # if exists
-load(rdataout)
+# load(rdataout)
 
 ```
 
@@ -190,9 +193,9 @@ speciesBonus <- speciesList %>%
   bind_rows(speciesMP)
 
 reponse <- data.frame(
-  rvar=c("Biomass_gAFDWm2","Density_indm2","MSRtot"),
-  rdescr=c("Biomass","Density","Specific Respiration Rate"),
-  runit=c("gAFDW/m2","ind/m2","mW/m2"))
+  Var=c("Biomass_gAFDWm2","Density_indm2","MSRtot"),
+  Desc=c("Biomass","Density","Specific Respiration Rate"),
+  Unit=c("gAFDW/m2","ind/m2","mW/m2"))
 predictMNT <- data.frame(
   pvar=c("moyenneMu","modeMu","medianeMu",
          "siltsArgiles","sablesFins","sablesMoyens",
@@ -590,15 +593,15 @@ taus_l<-setNames(as.list(taus),sprintf("%0.3f",taus))
 tauchoice<-0.95
 
 model_types<- data.frame(rbind(
-  c(analysis="RQ Linear",code="RQ2add",bdd="rqdata"),
-  c(analysis="RQ Linear",code="RQ2int",bdd="rqdata"),
-  c(analysis="RQ Nonlinear",code="RQ2nli",bdd="nlrqdata"),
-  c(analysis="RQ BSpline",code="RQ2bsp",bdd="rqbsdata")))
+  c(analysis="RQ linear with addition",code="RQ2add",bdd="rqdata"),
+  c(analysis="RQ linear with interaction",code="RQ2int",bdd="rqdata"),
+  c(analysis="RQ bifactorial gaussian",code="RQ2nli",bdd="nlrqdata"),
+  c(analysis="RQ linear with bSpline",code="RQ2bsp",bdd="rqbsdata")))
 
 reponse<-reponse %>%
-  filter(rvar %in% c("Biomass_gAFDWm2","Density_indm2")) %>%
-  rowid_to_column("repi") %>% 
-  mutate(compl=sprintf("%s (%s)",rdescr,runit))
+  filter(Var %in% c("Biomass_gAFDWm2","Density_indm2")) %>%
+  rowid_to_column("id") %>% 
+  mutate(whole=sprintf("%s (%s)",Desc,Unit))
 
 reponse_l<-reponse %>%
   as.list %>% 
@@ -639,21 +642,26 @@ pred_red_comb_sel<-map(pred_red_comb,
 
 sdm_comb<- tidyr::expand_grid(model_types %>% rowid_to_column("type"),
                               speciesMP %>% rowid_to_column("sp"),
-                         reponse,
+                         setNames(reponse, nm=sprintf("%s_bio",names(reponse))),
                          saison %>% 
                            filter(M_Def %in% c("Year")) %>%
                            rowid_to_column("sai"),
-                         pred_red_comb_t) %>%
-  unite("type",c(sp,sai,repi,id),sep="", remove = FALSE) %>% 
+                         pred_red_comb_t,
+                         .name_repair = "universal") %>%
+  unite("type",c(sp,sai,id_bio,id),sep="", remove = FALSE) %>% 
   unite("sdmname",c(code,type),sep="_", remove = FALSE) %>% 
   relocate(sdmname) %>% 
   separate(Var,c("name_x1","name_x2"), sep="__",remove = FALSE) %>% 
   separate(Desc,c("Desc_x1","Desc_x2"), sep="__",remove = FALSE) %>% 
   separate(Unit,c("Unit_x1","Unit_x2"), sep="__",remove = FALSE) %>% 
-  separate(whole,c("whole_x1","whole_x2"), sep="__",remove = FALSE)
+  separate(whole,c("whole_x1","whole_x2"), sep="__",remove = FALSE) %>% 
+  mutate(titre=sprintf("%s based on %s\n%s * %s",analysis,whole_bio,whole_x1,whole_x2))
 
 sdm_comb_sel<-sdm_comb %>% 
   filter(sp==1 & sai==1 & id %in% names(pred_red_comb_sel) )
+sdm_comb_sel_l<-sdm_comb_sel %>% 
+  split(.,f=sdm_comb_sel$Desc) %>% 
+  map(., ~split(.x,f=.x$sdmname))
 
 Mars_SDM<-Mars_dat_sf %>% 
   select(c(NINJ,Lon,Lat,Zone,Tidal_level,Period,Annee,pred_red$Var)) %>%
@@ -740,23 +748,11 @@ write.csv(CSLN_Stations,file=paste(wdres,"CSLN_Stations", ".csv",sep=""), na = "
 rm(flag_calc_mars)
 # rm(list=lsf.str()) # remove all functions
 rm(list=(ls()[grepl("tmp", ls())] ))
-save(list=(setdiff(ls(), lsf.str())),
+save(list=(setdiff(ls()[!grepl("^wd", ls())], lsf.str())),
      file = paste0(rdataout))
 beepr::beep(2)
 
 ```
-
-# Run of all sequence after that (ca pas l'air demarcher comme ça avec les qmd...)
-```{r}
-
-# source("Scripts/2.0_Datasets_visualisation.qmd")
-# source("Scripts/3.1_RegQuant_lineaire.qmd")
-# source("Scripts/3.2_RegQuant_non_lineaire.qmd")
-# source("Scripts/3.3_RegQuant_BSpline.qmd")
-
-```
-
-
 
 # Supplementary data
 

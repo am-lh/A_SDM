@@ -2,7 +2,7 @@
 title: "CUBIC B-SPLINES QUANTILE REGRESSION ANALYSIS WITH KOENKER'S QUANTREG PACKAGE"
 author: "Amélie Lehuen"
 description: "ANALYSIS WITH KOENKER'S QUANTREG PACKAGE"
-date: "`r format(Sys.time(), '%B %Y')`"
+date: last-modified
 editor: source
 execute:
   eval: true

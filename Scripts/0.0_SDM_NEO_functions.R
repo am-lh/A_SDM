@@ -7,24 +7,24 @@ library(data.table)
 library(rstatix); library(Hmisc)  # corr and pvalue calculation
 library(boot); library(splines)
 
-library(ggpubr); #library(GGally); # stat_compare_means ;
+library(ggpubr); library(GGally); # stat_compare_means ;
 library(scales); library(RColorBrewer); library(wesanderson); library(grafify); library(colorspace); library(ggsci)# show_col and colors colors colors!
 library(quantreg);# library(visreg)
 library(plotly); library(plot3D);  # graphiques 3D plot 3D for mesh library(pracma)
-library(patchwork)
-library(ggridges)
+library(patchwork); library(figpatch)
+library(ggridges); library(gginnards)
 # GIS Packages
 library(sf); library(sfheaders); # st_as_sf ; sf_to_df
 library(tmap); library(tmaptools)
 library(htmlwidgets) # library(leaflet) # saveWidget ; for interactive maps
-library(introdataviz) # geom_split_violin # devtools::install_github("psyteachr/introdataviz")
+library(introdataviz) # geom_flat_violin # devtools::install_github("psyteachr/introdataviz",force = TRUE)
 
-conflict_prefer("transpose", "purrr")
-conflict_prefer("filter", "dplyr")
-conflict_prefer("select", "dplyr")
-conflict_prefer("summarise", "dplyr")
-conflict_prefer("melt", "reshape2")
-conflict_prefer("layout", "plotly")
+conflict_prefer_all("dplyr", quiet = TRUE)
+conflict_prefer_all("ggplot2", "ggtern", quiet = TRUE)
+conflict_prefer("transpose", "purrr", quiet = TRUE)
+conflict_prefer("melt", "reshape2", quiet = TRUE)
+conflict_prefer("layout", "plotly", quiet = TRUE)
+conflict_prefer("year", "lubridate", quiet = TRUE)
 
 options(scipen=999) # Prevents scientific display of numbers
 set.seed(123)
@@ -65,6 +65,16 @@ f.Scalf_csps <- function() {scale_fill_continuous_sequential(palette = "Batlow")
 
 
 #| label: functmade ----
+compare.scripts<-function(){
+  require(diffr)
+  files<-choose.files(default = "", caption = "Select 1 or 2 files",
+                      multi = TRUE,
+                      index = nrow(Filters))
+  if (length(files)==1)
+  {files[2]<-choose.files(default = "", caption = "Select the 2nd file",
+                          multi = TRUE,index = nrow(Filters))}
+  diffr(files[1], files[2])
+}
 
 f.loadRData <- function(fileName){
   #loads an RData file, and returns it
@@ -167,8 +177,8 @@ f.corr_col <- function(data, mapping, method="p", use="pairwise", ...){
 
 f.data_descr <- function (dataset,vars) {
   # dataset=Mars_SDM %>% st_drop_geometry %>% filter(!Zone %in% c("Octeville"))
-  # vars ="inunt"
-  # dataset= CSLN_df  ; vars ="Biomass_gAFDWm2"
+  # vars = transpose(pred_red) %>% setNames(pred_red$Var); vars=vars[[1]]
+  # dataset= CSLN_df  ; vars = reponse_l[[1]]
   
   descr<-list(geog=list(stat.test=NULL,plot=NULL),
               time=list(stat.test=NULL,plot=NULL))
@@ -178,58 +188,66 @@ f.data_descr <- function (dataset,vars) {
   
   descr$geog$stat.test <- dataset %>% 
     # group_by(Zone) %>% 
-    wilcox_test(formula(paste0(vars," ~ Period"))) %>%
-    # levene_test(formula(paste0(vars," ~ Period"))) %>% 
+    wilcox_test(formula(paste0(vars$Var," ~ Period"))) %>%
+    # levene_test(formula(paste0(vars$Var," ~ Period"))) %>% 
     add_xy_position(x = "Period",group = "Zone",
                     dodge = 0,step.increase = 0.05) %>%
     filter(p.adj.signif!="ns")
   descr$geog$plot <- ggplot(dataset) + 
-    # geom_boxplot(aes(x=Period, y = .data[[vars]], fill = Period)) +
+    # geom_boxplot(aes(x=Period, y = .data[[vars$Var]], fill = Period)) +
     # geom_density_ridges(aes(y = Period , fill=Period,
-    #                       x=.data[[vars]]), alpha=0.3) +
-    geom_flat_violin(aes(x=Period, fill = Period,
-                         y = .data[[vars]] ),
-                     alpha = 0.5,size = .1,show.legend = FALSE) +
+    #                       x=.data[[vars$Var]]), alpha=0.3) +
+    # geom_flat_violin(aes(x=Period, fill = Period,
+    #                      y = .data[[vars$Var]] ),
+    #                  alpha = 0.5,size = .1,show.legend = FALSE) +
+    ggdist::stat_halfeye(aes(x=Period, fill = Period,
+                             y = .data[[vars$Var]] ), 
+                         slab_colour="grey20",slab_linewidth=.5,
+                         .width = 0, point_colour = NA,
+                         alpha = 0.5,size = .1,show.legend = FALSE) +
     stat_summary(aes(x=Period, fill = Period,
-                     y = .data[[vars]]),  
+                     y = .data[[vars$Var]]),  
                  size=.4, fun.data = mean_cl_boot, 
                  shape=21, stroke =.5, linewidth = .5,
                  inherit.aes = FALSE, show.legend = FALSE) +
     # stat_pvalue_manual(descr$geog$stat.test,label = "p.adj.signif",
     #                    size = 3,tip.length = 0, coord.flip = TRUE) +
     coord_flip() +
-    facet_wrap( ~ Zone, 
-                nrow = 1, #scales = "free_y", 
+    facet_wrap( ~ Zone, nrow = 1, #scales = "free_y", 
                 labeller = label_wrap_gen(width = 20)) + 
-    labs(y = vars, x="") +
+    labs(y = vars$whole, x="") +
     f.Scale_brew() +
     theme(legend.position="none",
-          strip.background = element_blank())
+          strip.background = element_blank())  ; descr$geog$plot
   
   descr$time$stat.test <- dataset %>% 
     group_by(Period) %>%
-    wilcox_test(formula(paste0(vars," ~ Zone"))) %>% 
+    wilcox_test(formula(paste0(vars$Var," ~ Zone"))) %>% 
     add_xy_position(x = "Zone",group = "Period",
                     dodge = 0,step.increase = 0.05) %>%
     filter(p.adj.signif!="ns")
   
   descr$time$plot <- ggplot(dataset) + 
-    # geom_boxplot(aes(x=Zone, y = .data[[vars]], fill = Zone)) +
-    geom_flat_violin(aes(x=Zone, fill = Zone,
-                         y = .data[[vars]] ),
-                     alpha = 0.5,size = .1,show.legend = FALSE) +
+    # geom_boxplot(aes(x=Zone, y = .data[[vars$Var]], fill = Zone)) +
+    # geom_flat_violin(aes(x=Zone, fill = Zone,
+    #                      y = .data[[vars$Var]] ),
+    #                  alpha = 0.5,size = .1,show.legend = FALSE) +
+    ggdist::stat_halfeye(aes(x=Zone, fill = Zone,
+                             y = .data[[vars$Var]] ),
+                         slab_colour="grey20",slab_linewidth=.5,
+                         .width = 0, point_colour = NA,
+                         alpha = 0.5,size = .1,show.legend = FALSE) +
     stat_summary(aes(x=Zone, fill = Zone,
-                     y = .data[[vars]]),  
+                     y = .data[[vars$Var]]),  
                  size=.4, fun.data = mean_cl_boot, 
                  shape=21, stroke = .5, linewidth = .5,
                  inherit.aes = FALSE, show.legend = FALSE) +
     # stat_pvalue_manual(descr$time$stat.test,label = "p.adj.signif", 
     #                    size = 3,tip.length = 0, coord.flip = TRUE) +
     coord_flip() +
-    facet_wrap( ~ Period, 
-                nrow = 1, #scales = "free_y", 
+    facet_wrap( ~ Period, nrow = 1, #scales = "free_y", 
                 labeller = label_wrap_gen(width = 20)) + 
-    labs(y = vars, x="") +
+    labs(y = vars$whole, x="") +
     f.Scale_brew() +
     guides(fill=guide_legend(nrow=2,byrow=TRUE)) +
     theme(legend.position="none",
@@ -334,7 +352,7 @@ f.rq_Lin <- function(df,biolo,sdmod,taus,typ) {
       # sdmod=pred_red_comb$x1[[1]]
     typetxt<-paste0("RQ",length(sdmod$id),typ[2])
     sdmname<-sprintf("%s_%g%g%g%s%s",typetxt,sp,sai,
-                     biolo$repi,
+                     biolo$id,
                      paste0(sdmod$id,collapse = ""),
                      ifelse(length(sdmod$id)==1,"0","") )
     yt<- biolo$rvar
@@ -472,7 +490,7 @@ f.rq_nLin <- function(df,biolo,sdmod,taus,typ) {
   # sdmod=pred_red_comb[[1]][[2]]
   typetxt<-paste0("RQ",length(sdmod$id),typ[2])
   sdmname<-sprintf("%s_%g%g%g%s%s",typetxt,sp,sai,
-                   biolo$repi,
+                   biolo$id,
                    paste0(sdmod$id,collapse = ""),
                    ifelse(length(sdmod$id)==1,"0","") )
   
@@ -617,7 +635,7 @@ f.rq_Bsp <- function(df,biolo,sdmod,taus,typ) {
   # sdmod=pred_red_comb$x2[[1]]
   typetxt<-paste0("RQ",length(sdmod$id),typ[2])
   sdmname<-sprintf("%s_%g%g%g%s%s",typetxt,sp,sai,
-                   biolo$repi,
+                   biolo$id,
                    paste0(sdmod$id,collapse = ""),
                    ifelse(length(sdmod$id)==1,"0","") )
   

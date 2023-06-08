@@ -2,7 +2,7 @@
 title: "NEO Workshop"
 author: "Amélie Lehuen"
 description: "add info on script"
-date: "`r format(Sys.time(), '%d %B %Y')`"
+date: last-modified
 editor: source
 execute:
   eval: true

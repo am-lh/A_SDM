@@ -1,6 +1,8 @@
 ---
 title: "A modelling approach for predicting optimal species distribution of cockle population (Cerastoderma edule) as function of physical drivers in Seine estuary by applying an Ecological Niche model (habitat suitability)"
+description: "SUPPLEMENTARY DATA"
 author: "Lehuen Amélie, Dancie Chloé, Grasso Florent, Orvain Francis*"
+date: last-modified
 editor: source
 execute:
   eval: true
@@ -9,14 +11,16 @@ execute:
   warning: false
   output: true
   include: false
+  
 editor_options: 
   chunk_output_type: console
 ---
 
 ```{r}
 rm(list=ls())
+# to render all formats of this script (to specific format) IN TERMINAL
+# quarto render Scripts/Results.qmd # (--to html --to docx --to pdf)
 ```
-
 
 ```{r}
 #| label: load-packages
@@ -30,7 +34,8 @@ invisible(lapply(list_packages, library, character.only = TRUE))
 
 ```
 
-Run the preparation and Seuilflux calculation for all Runs
+<!-- Run the preparation and Seuilflux calculation for all Runs -->
+
 ```{r}
 
 # Runs<-c('1.0_Pretreatment_data.qmd',
@@ -54,11 +59,7 @@ wdsource <- "Data/Faune/CSLN/"
 wdmat <-  sprintf("%s%s",backup,"Matrices/") # "Matrices/"
 wdgraph <- "Plots/"
 wdres <- "Results/"
-
-pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
-wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
-wdscript <- paste(pc,"Melting Pot/BDD/Scripts/",sep="")
-wdmsr <- (paste(wdscript,"MSR/MSR.R",sep=""))
+wdGIS <- "SIG/"
 
 ```
 
@@ -81,12 +82,12 @@ rdatain  <- sprintf("%sCSLN_Mars_RQ_BDD.RData",wdmat)
 rqdata<-f.loadRData(rdatain)
 rdatain  <- sprintf("%sCSLN_Mars_RQnli_BDD.RData",wdmat)
 nlrqdata<-f.loadRData(rdatain)
-# rdatain  <- sprintf("%sCSLN_Mars_RQbsp_BDD.RData",wdmat)
-# rqbsdata<-f.loadRData(rdatain)
+rdatain  <- sprintf("%sCSLN_Mars_RQbsp_BDD.RData",wdmat)
+rqbsdata<-f.loadRData(rdatain)
+rdatain  <- sprintf("%sCSLN_Mars_plot.RData",wdmat)
+load(rdatain)
 rdatain  <- sprintf("%sCSLN_Mars_BDD.RData",wdmat)
 load(rdatain) #load(here::here(rdatain))
-# rdatain  <- sprintf("%sCSLN_Mars_plot.RData",wdmat)
-# load(rdatain)
 load(sprintf("SIG/OSM_extraction.RData"))
 
 ```
@@ -262,9 +263,9 @@ marsmailledet <- CSLN_Mars %>%
 
 ```
 
-All Seine Bay MARS 3D model was calculated in a grid of `r formatC(700*112, format="f", big.mark=",", digits=0)` meshes (700 by 112), focused on the Seine Estuary with a grid of `r marsweb` meshes (`r marsxy`), where the meshes were 100m long in average, with the coordinates of Longitude `r marslonlat`. Each area defined regroup several meshes (`r nbmailzone`).
+All Seine Bay MARS 3D model was calculated in a mesh of `r formatC(700*112, format="f", big.mark=",", digits=0)` cells (700 by 112), focused on the Seine Estuary with a mesh of `r marsweb` cells (`r marsxy`), where the cells were 100m long in average, with the coordinates of Longitude `r marslonlat`. Each area defined regroup several cells (`r nbmailzone`).
 
-HMS model meshes corresponding to the stations localisation in the biological dataset were at total `r marsmaillenb` with the distribution in areas as `r marsmaillezone`. As for the distinction in the position in the tidal area: `r marsmailledet`).
+HMS model cells corresponding to the stations localisation in the biological dataset were at total `r marsmaillenb` with the distribution in areas as `r marsmaillezone`. As for the distinction in the position in the tidal area: `r marsmailledet`).
 :::
 
 ### Predictors calculation and selection
@@ -276,22 +277,22 @@ HMS model meshes corresponding to the stations localisation in the biological da
 df <- CSLN_mud %>% 
   filter(SPCourt == espece) %>%
   select(paste(factors[,1],saison[sai,1],sep=""),
-         map(reponse_l,~.x$rvar) %>% unlist(., use.names=FALSE) )
+         map(reponse_l,~.x$Var) %>% unlist(., use.names=FALSE) )
 
-dfcornew <- corstars(df, result="none",removeTriangle="") %>% 
+dfcornew <- f.corstars(df, result="none",removeTriangle="") %>% 
   mutate(variable=rownames(.)) %>% 
   relocate(variable)
 # dftest<-dfcornew %>% mutate(across(.cols = everything(), str_replace_all, ".*\\s", ""))
 
 ```
 
-All variables were observed and a correlation study was conducted to select the more pertinent factors and avoid autocorrelation between factors (@fig-mars_corr). All environment factors were the result of the annual mean of model variables.
+A correlation study was conducted on all HMS variables to select the more pertinent factors and avoid autocorrelation between factors (@fig-mars_corr). All environment factors were the result of the annual mean of model variables.
 
 -   **Current speed daily max** \[`r factors[2,3]`\] was chosen over Current_speed \[`r factors[1,3]`\] to reflect hydrodynamics occurring on mudflats due to tidal rhythm (Corr = `r dfcornew %>% filter(variable %in% "flow_mxd") %>% select(flow_m) %>% pull()`).
 -   **Inundation time** \[`r factors[3,3]`\] usually used to reflect the tidal position of benthic organisms.
--   **Salinity daily range** \[`r factors[5,3]`\] was preferred to salinity \[`r factors[4,3]`\] to emphasize more the tidal influence (Corr = `r dfcornew %>% filter(variable %in% "sal_dtd") %>% select(sal_m) %>% pull()`).
+-   **Salinity daily range** \[`r factors[5,3]`\] (min-max of the day) was preferred to salinity \[`r factors[4,3]`\] to emphasize more the tidal influence (Corr = `r dfcornew %>% filter(variable %in% "sal_dtd") %>% select(sal_m) %>% pull()`).
 -   **Temperature** \[`r factors[6,3]`\] was picked upon temperature daily range \[`r factors[7,3]`\] for its accessibility (Corr = `r dfcornew %>% filter(variable %in% "temp_dtd") %>% select(temp_m) %>% pull()`) and the range being reflected by the inundation time (Corr = `r dfcornew %>% filter(variable %in% "temp_dtd") %>% select(inunt) %>% pull()`).
--   **Mud content** \[`r factors[14,3]`\] was chosen over sediment total conc \[`r factors[13,3]`\] to link with other references (Corr = `r dfcornew %>% filter(variable %in% "mudrate_m") %>% select(Csed_m) %>% pull()`).
+-   **Mud content** \[`r factors[14,3]`\] (particles \<63µm) was chosen over sediment total conc \[`r factors[13,3]`\] to link with other references (Corr = `r dfcornew %>% filter(variable %in% "mudrate_m") %>% select(Csed_m) %>% pull()`).
 -   **Bed shear stress daily max** \[`r factors[12,3]`\] was poorly correlated to bed shear stress \[`r factors[11,3]`\] (Corr = `r dfcornew %>% filter(variable %in% "tenfon_mxd") %>% select(tenfon_m) %>% pull()`) but the former was preferred to indicate the extreme local conditions that can lead to erosion of sediment.
 -   **True bathymetry** \[`r factors[9,3]`\] was correlated to a lot of factors, but poorly to salinity daily range (Corr = `r dfcornew %>% filter(variable %in% "sal_dtd") %>% select(bathy) %>% pull()`). It was kept for its wide accessibility in any estuary.
 -   MES mud \[`r factors[8,3]`\] was not selected to focus on benthic erosion phenomena more than maximal turbidity zone (MTZ) processes even though it was not correlated to a lot of factors.
@@ -321,7 +322,7 @@ ggsave(sprintf("%sfig-mars_corr.tiff",wdgraph),
 The three model types were computed with different quantiles \tau= \[`r paste0(taus,collapse=", ")`\], 0.5 being the equivalent of an OLS regression, and kept as a reference, the other values upper than 0.9 to seek for the optimum response.
 :::
 
-### Scenarios of interest
+### Scenarios
 
 ::: column-page-right
 The biological responses used were density \[ind.m-2\] and biomass \[gAFDW.m-2\] (in Ash Free Dry Weight), and were compared for each model. Scenarios were built with two crossed abiotic factors to describe re accurately the local environment. The tested scenarios were:
@@ -480,6 +481,7 @@ iwalk(pl_mars_gt,
 :::
 
 ## Methodology assessment
+
 ```{r}
 
 # tmp_plot<-(rqdata$pl_rq_all_1d[["Biomass"]][["RQ1add_11110"]] + 
@@ -590,17 +592,19 @@ AIC_plot<-bind_rows(
             rqdata$rq_Mod_sel_sm,
             nlrqdata$rq_Mod_sel_sm,
             rqbsdata$rq_Mod_sel_sm) %>% 
+  left_join(model_types, by=c("typetxt"="code")) %>% 
+  mutate(reponset=gsub(" ", "\n",reponset)) %>% 
   # select(all_of(c("Delta_AICc","Rone","reponse","typetxt","tau"))) %>% 
-  select(all_of(c("Delta_AICc","reponse","typetxt","tau"))) %>% 
+  select(all_of(c("Delta_AICc","reponset","analysis","tau"))) %>% 
   distinct %>% 
-  pivot_longer(cols=-c("reponse","typetxt","tau"), 
+  pivot_longer(cols=-c("reponset","analysis","tau"), 
                names_to = "Indicator", values_to = "value") %>% 
   # filter(.,grepl(paste0(sdm_comb_sel$type[1,],collapse="|"),sdmname)) %>% 
   group_by(tau) %>%
-  ggplot(aes(x=reponse, #reorder(factors,-AIC),
+  ggplot(aes(x=reponset, #reorder(factors,-AIC),
              y=value,
              color = factor(tau),
-             shape = typetxt)) +
+             shape = analysis)) +
   geom_jitter(size= 4,width=.3, height=0 ) +
   scale_shape_manual(values=c(1, 8, 23)) +
   scale_color_manual(values=colRQ) +
@@ -627,16 +631,25 @@ ggsave(sprintf("%sfig-aic_3mod.tiff",wdgraph),
 #| fig-width: 16
 #| fig-height: 5
 
-pl_tmp<- pmap(list(rqdata$pl_rq_po_sel,
-             nlrqdata$pl_rq_po_sel,
-             rqbsdata$pl_rq_po_sel) ,
-          ~{ pmap(list(..1,..2,..3) ,
+plot_rq<-map2(rqdata$pl_rq_po_sel,sdm_comb_sel_l,
+            ~ map2(.x,.y[names(.x)],
+              ~.x + labs(title=.y$analysis) ) ) #; plot_rq$Biomass$RQ2int_11112
+plot_nlrq<-map2(nlrqdata$pl_rq_po_sel,sdm_comb_sel_l,
+            ~ map2(.x,.y[names(.x)],
+              ~.x + labs(title=.y$analysis)) )
+plot_rqbs<-map2(rqbsdata$pl_rq_po_sel,sdm_comb_sel_l,
+            ~ map2(.x,.y[names(.x)],
+              ~.x + labs(title=.y$analysis)) ) 
+
+pl_tmp<- pmap(list(plot_rq,plot_nlrq,plot_rqbs,sdm_comb_sel_l) ,
+          ~{ pmap(list(..1,..2,..3,..4[names(..1)]) ,
              ~{ wrap_plots(list(..1,..2,..3),
                            guides="collect") & 
                 plot_layout(nrow=1,widths = c()) &
                 theme(legend.position="bottom",
                       aspect.ratio=1) &
-                plot_annotation(tag_levels = c('A'))
+                plot_annotation(tag_levels = c('A'),
+                                title=sprintf("%s & %s",..4$whole_x1,..4$whole_x2))
                } ) } )
 
 walk(pl_tmp,
@@ -774,21 +787,21 @@ nlrq_opti<-map_depth(nlrqdata$rq_Mod_sel,2,
 The four scenarios were treated with the two selected model types: either linear with interaction, or non-linear with bifactorial gaussian equation with the biomass as biological response (with predict/observed plot, SDM-NEOs with the distribution of HMS data, RQ2nli SDM-NEOs were represented in 3D graph in @sec-sdm_3d).
 
 A.  Current speed daily max \[`r factors[2,3]`\] and inundation time \[`r factors[3,3]`\]:
-    1.  RQ2int optimum was of `r rq_opti$Biomass$maxsdm[1]`gAFDW/m², at ``` r rq_opti$Biomass$optx1[1]``r  factors[2,3] ``` and ``` r rq_opti$Biomass$optx2[1]``r factors[3,3] ```; RQ2nli optimum was of `r nlrq_opti$Biomass$maxsdm[1]`gAFDW/m², at ``` r nlrq_opti$Biomass$optx1[1]``r factors[2,3] ``` and ``` r nlrq_opti$Biomass$optx2[1]``r factors[3,3] ```.
+    1.  RQ2int optimum was of `r rq_opti$Biomass$maxsdm[1]`gAFDW/m², at `r rq_opti$Biomass$optx1[1]` `r  factors[2,3]` and `r rq_opti$Biomass$optx2[1]` `r factors[3,3]`; RQ2nli optimum was of `r nlrq_opti$Biomass$maxsdm[1]`gAFDW/m², at `r nlrq_opti$Biomass$optx1[1]` `r factors[2,3]` and `r nlrq_opti$Biomass$optx2[1]` `r factors[3,3]`.
 
-    2.  RQ2int optimum was of `r rq_opti$Density$maxsdm[1]`ind/m², at ``` r rq_opti$Density$optx1[1]``r  factors[2,3] ``` and ``` r rq_opti$Density$optx2[1]``r factors[3,3] ```; RQ2nli optimum was of `r nlrq_opti$Density$maxsdm[1]`gAFDW/m², at ``` r nlrq_opti$Density$optx1[1]``r factors[2,3] ``` and ``` r nlrq_opti$Density$optx2[1]``r factors[3,3] ```.
+    2.  RQ2int optimum was of `r rq_opti$Density$maxsdm[1]`ind/m², at `r rq_opti$Density$optx1[1]` `r  factors[2,3]` and `r rq_opti$Density$optx2[1]` `r factors[3,3]`; RQ2nli optimum was of `r nlrq_opti$Density$maxsdm[1]`gAFDW/m², at `r nlrq_opti$Density$optx1[1]` `r factors[2,3]` and `r nlrq_opti$Density$optx2[1]` `r factors[3,3]`.
 B.  Salinity daily range \[`r factors[5,3]`\] and temperature \[`r factors[6,3]`\]:
-    1.  RQ2int optimum was of `r rq_opti$Biomass$maxsdm[2]`gAFDW/m², at ``` r rq_opti$Biomass$optx1[2]``r factors[5,3] ``` and ``` r rq_opti$Biomass$optx2[2]``r factors[6,3] ```; RQ2nli optimum was of `r nlrq_opti$Biomass$maxsdm[2]`gAFDW/m², at ``` r nlrq_opti$Biomass$optx1[2]``r factors[5,3] ``` and ``` r nlrq_opti$Biomass$optx2[2]``r factors[6,3] ```.
+    1.  RQ2int optimum was of `r rq_opti$Biomass$maxsdm[2]`gAFDW/m², at `r rq_opti$Biomass$optx1[2]` `r factors[5,3]` and `r rq_opti$Biomass$optx2[2]` `r factors[6,3]`; RQ2nli optimum was of `r nlrq_opti$Biomass$maxsdm[2]`gAFDW/m², at `r nlrq_opti$Biomass$optx1[2]` `r factors[5,3]` and `r nlrq_opti$Biomass$optx2[2]` `r factors[6,3]`.
 
-    2.  RQ2int optimum was of `r rq_opti$Density$maxsdm[2]`gAFDW/m², at ``` r rq_opti$Density$optx1[2]``r factors[5,3] ``` and ``` r rq_opti$Density$optx2[2]``r factors[6,3] ```; RQ2nli optimum was of `r nlrq_opti$Density$maxsdm[2]`gAFDW/m², at ``` r nlrq_opti$Density$optx1[2]``r factors[5,3] ``` and ``` r nlrq_opti$Density$optx2[2]``r factors[6,3] ```.
-C.  Salinity daily range \[`r factors[5,3]`\] and bathymetry \[`r factors[9,3]`\]:
-    1.  RQ2int optimum was of `r rq_opti$Biomass$maxsdm[3]`gAFDW/m², at ``` r rq_opti$Biomass$optx1[3]``r factors[5,3] ``` and ``` r rq_opti$Biomass$optx2[3]``r factors[9,3] ```; RQ2nli optimum was of `r nlrq_opti$Biomass$maxsdm[3]`gAFDW/m², at ``` r nlrq_opti$Biomass$optx1[3]``r factors[5,3] ``` and ``` r nlrq_opti$Biomass$optx2[3]``r factors[9,3] ```.
+    2.  RQ2int optimum was of `r rq_opti$Density$maxsdm[2]`gAFDW/m², at `r rq_opti$Density$optx1[2]` `r factors[5,3]` and `r rq_opti$Density$optx2[2]` `r factors[6,3]`; RQ2nli optimum was of `r nlrq_opti$Density$maxsdm[2]`gAFDW/m², at `r nlrq_opti$Density$optx1[2]` `r factors[5,3]` and `r nlrq_opti$Density$optx2[2]` `r factors[6,3]`.
+C.  Salinity daily range \[`r factors[5,3]`\] and bathymetry \[`r factors[9,3]`\]: 
+    1.  RQ2int optimum was of `r rq_opti$Biomass$maxsdm[3]`gAFDW/m², at `r rq_opti$Biomass$optx1[3]``r factors[5,3]` and `r rq_opti$Biomass$optx2[3]` `r factors[9,3]`; RQ2nli optimum was of `r nlrq_opti$Biomass$maxsdm[3]`gAFDW/m², at `r nlrq_opti$Biomass$optx1[3]` `r factors[5,3]` and `r nlrq_opti$Biomass$optx2[3]` `r factors[9,3]`.
 
-    2.  RQ2int optimum was of `r rq_opti$Density$maxsdm[3]`gAFDW/m², at ``` r rq_opti$Density$optx1[3]``r factors[5,3] ``` and ``` r rq_opti$Density$optx2[3]``r factors[9,3] ```; RQ2nli optimum was of `r nlrq_opti$Density$maxsdm[3]`gAFDW/m², at ``` r nlrq_opti$Density$optx1[3]``r factors[5,3] ``` and ``` r nlrq_opti$Density$optx2[3]``r factors[9,3] ```.
+    2.  RQ2int optimum was of `r rq_opti$Density$maxsdm[3]`gAFDW/m², at `r rq_opti$Density$optx1[3]` `r factors[5,3]` and `r rq_opti$Density$optx2[3]` `r factors[9,3]`; RQ2nli optimum was of `r nlrq_opti$Density$maxsdm[3]`gAFDW/m², at `r nlrq_opti$Density$optx1[3]` `r factors[5,3]` and `r nlrq_opti$Density$optx2[3]` `r factors[9,3]`.
 D.  Mud content \[`r factors[14,3]`\] and bed shear stress \[`r factors[11,3]`\]:
-    1.  RQ2int optimum was of `r rq_opti$Biomass$maxsdm[4]`gAFDW/m², at ``` r rq_opti$Biomass$optx1[4]``r factors[14,3] ``` and ``` r rq_opti$Biomass$optx2[4]``r factors[11,3] ```; RQ2nli optimum was of `r nlrq_opti$Biomass$maxsdm[4]`gAFDW/m², at ``` r nlrq_opti$Biomass$optx1[4]``r factors[14,3] ``` and ``` r nlrq_opti$Biomass$optx2[4]``r factors[11,3] ```.
+    1.  RQ2int optimum was of `r rq_opti$Biomass$maxsdm[4]`gAFDW/m², at `r rq_opti$Biomass$optx1[4]` `r factors[14,3]` and `r rq_opti$Biomass$optx2[4]` `r factors[11,3]`; RQ2nli optimum was of `r nlrq_opti$Biomass$maxsdm[4]`gAFDW/m², at `r nlrq_opti$Biomass$optx1[4]` `r factors[14,3]` and `r nlrq_opti$Biomass$optx2[4]` `r factors[11,3]`.
 
-    2.  RQ2int optimum was of `r rq_opti$Density$maxsdm[4]`gAFDW/m², at ``` r rq_opti$Density$optx1[4]``r factors[14,3] ``` and ``` r rq_opti$Density$optx2[4]``r factors[11,3] ```; RQ2nli optimum was of `r nlrq_opti$Density$maxsdm[4]`gAFDW/m², at ``` r nlrq_opti$Density$optx1[4]``r factors[14,3] ``` and ``` r nlrq_opti$Density$optx2[4]``r factors[11,3] ```.
+    2.  RQ2int optimum was of `r rq_opti$Density$maxsdm[4]`gAFDW/m², at `r rq_opti$Density$optx1[4]` `r factors[14,3]` and `r rq_opti$Density$optx2[4]` `r factors[11,3]`; RQ2nli optimum was of `r nlrq_opti$Density$maxsdm[4]`gAFDW/m², at `r nlrq_opti$Density$optx1[4]` `r factors[14,3]` and `r nlrq_opti$Density$optx2[4]` `r factors[11,3]`.
 
 ```{r}
 
@@ -818,7 +831,7 @@ plot_rq <- map2(plot_rq,plot_nlrq,
     scale_fill_gradientn(colours=colRQ,limits=c(0,max(
       max(.x$data$RqMod,na.rm=TRUE),
       max(.y$data$RqMod,na.rm=TRUE)))) +
-      labs(title=model_types$code[2]) +
+      labs(title=model_types$analysis[2]) +
       theme(axis.title.x = element_blank(),
             plot.margin = unit(c(.1,.1,.1,.1), "null")) ) )
 plot_nlrq <- map2(plot_nlrq,plot_rq,
@@ -827,24 +840,26 @@ plot_nlrq <- map2(plot_nlrq,plot_rq,
     scale_fill_gradientn(colours=colRQ,limits=c(0,max(
       max(.x$data$RqMod,na.rm=TRUE),
       max(.y$data$RqMod,na.rm=TRUE)))) +
-      labs(title=model_types$code[3]) +
+      labs(title=model_types$analysis[3]) +
     theme(
           plot.margin = unit(c(.1,.1,.1,.1), "null")) ) )
 
 pl_board_rq_nlrq <- 
-  map2(plot_rq,plot_nlrq,
-    ~ map2(.x,.y,
+  pmap(list(plot_rq,plot_nlrq,reponse_l),
+    ~ map2(..1,..2,
         ~ { .x / .y  +
-          plot_layout(guides = 'collect',tag_level = 'new',widths = c()) & 
+          plot_layout(guides = 'collect',
+                      tag_level = 'new',widths = c()) & 
           theme(text=element_text(size=10),
                 aspect.ratio=1,
                 legend.position = "bottom") 
           } ) %>% 
-      wrap_plots(nrow=1,ncol=4,tag_level="new") + #plot_layout(widths = c(.1,50,.1,50)) +
-      plot_annotation(title = sprintf("SDM-NEO (tau=%g)",taus[taut]),
+      wrap_plots(nrow=1,ncol=4,tag_level="new") & #plot_layout(widths = c(.1,50,.1,50)) +
+      labs(fill=..3$Unit) & #
+      plot_annotation(title = sprintf("SDM-NEO based on %s (tau=%g)",..3$compl,taus[taut]),
                       tag_levels = c('A', '1')) & 
       theme()
-    )
+    ) # ; pl_board_rq_nlrq$Biomass
 
 iwalk(pl_board_rq_nlrq,
   ~ggsave(sprintf("%sfig-graphboard_2d_%s.tiff",wdgraph,.y),
@@ -1031,11 +1046,28 @@ D.  Mud content \[%\] and Bed shear stress \[Pa\]: The model result was highly p
 
 tmap_mode("plot") # "plot" "view"
 
+tm_mars_rq_gb<-rqdata$pl_rq_sel_map %>% 
+  map2(.,sdm_comb_sel_l, \(x,y)
+    map2(x, y[names(x)],
+        ~.x$all + tm_layout(main.title=gsub("\n"," - ",.y$titre))
+  ) ) %>% 
+  map(., ~ tmap_arrange(.x, asp=NA, ncol=1,
+            sync = TRUE, outer.margins=0) ) # ; tm_mars_rq_gb$Biomass
+tm_mars_nlrq_gb<-nlrqdata$pl_rq_sel_map %>% 
+  map2(.,sdm_comb_sel_l, \(x,y)
+    map2(x, y[names(x)],
+        ~.x$all + tm_layout(main.title=gsub("\n"," - ",.y$titre))
+  ) )  %>% 
+  map(., ~ tmap_arrange(.x, asp=NA, ncol=1,
+            sync = TRUE, outer.margins=0) ) 
+
 # iwalk(rqdata$tm_mars_rq_gb, ~tmap_save(.x, dpi=600,
 #               filename= sprintf("%sfig-graphboard_map_rq_%s.tiff",wdgraph,.y) ) )
 # iwalk(nlrqdata$tm_mars_rq_gb, ~tmap_save(.x, dpi=600,
 #               filename= sprintf("%sfig-graphboard_map_nlrq_%s.tiff",wdgraph,.y) ) 
- 
+# iwalk(tm_mars_nlrq_gb, ~tmap_save(.x, dpi=600,
+#               filename= sprintf("%sfig-graphboard_map_nlrq_%s.tiff",wdgraph,.y) ) )
+
 # tmap_save(nlrqdata$pl_rq_sel_map[["Biomass"]][["RQ2nli_11112"]][["one"]][["2015-2019"]],
 #   filename= sprintf("%sMap_sdm_example.tiff",wdgraph),
 #   dpi=600)
@@ -1054,7 +1086,8 @@ tmap_mode("plot") # "plot" "view"
 #| fig-height: 10
 
 tmap_mode("plot") # "plot" "view"
-print(nlrqdata$tm_mars_rq_gb$Biomass)
+print(tm_mars_nlrq_gb$Biomass)
+# print(nlrqdata$tm_mars_rq_gb$Biomass)
 
 ```
 
@@ -1067,8 +1100,8 @@ print(nlrqdata$tm_mars_rq_gb$Biomass)
 #| fig-height: 10
 
 tmap_mode("plot") # "plot" "view"
-print(nlrqdata$tm_mars_rq_gb$Density)
-
+print(tm_mars_nlrq_gb$Density)
+# print(nlrqdata$tm_mars_rq_gb$Density)
 
 ```
 :::
@@ -1078,16 +1111,16 @@ print(nlrqdata$tm_mars_rq_gb$Density)
 ```{r}
 #| label : prefig-suit_idx
 
-pl_rq_suit_idx_nlrq_brd <- map(nlrqdata$pl_rq_suit_idx,
+pl_rq_suit_idx_nlrq_brd <- map2(nlrqdata$pl_rq_suit_idx,reponse_l,
   ~{wrap_plots(.x, nrow=1,guides = 'collect') &
     ylim(0,1) &
-    plot_annotation(title = sprintf("SDM-NEO %s (tau=%g)",
-                                    model_types$code[3],tauchoice),
+    plot_annotation(title = sprintf("SDM-NEO %s based on %s (tau=%g)",
+                                    model_types$analysis[3],.y$compl,tauchoice),
                     tag_levels = c('A')) & 
     guides(colour = guide_legend(nrow = 1)) &
     labs(color="Areas", fill="Areas") &
     theme(aspect.ratio=1,
-          plot.title = element_text(size=10),
+          # plot.title = element_text(size=10),
           legend.position = "bottom",
           legend.title = element_text(size=10),
           legend.text = element_text(size=10)
@@ -1134,12 +1167,23 @@ iwalk(pl_rq_suit_idx_nlrq_brd,
 #| fig-width: 16
 #| fig-height: 10
 
-pl_tmp<- nlrqdata$pl_rq_mars_sel_st_board$Biomass & 
-  xlim(c(0,150))
+# pl_tmp<- nlrqdata$pl_rq_mars_sel_st_board$Biomass & 
+#   xlim(c(0,150))
+pl_tmp<-
+  map_depth(nlrqdata$pl_rq_mars_sel_st, 2, ~.x$mod) %>% 
+    map2(.,sdm_comb_sel_l, \(x,y)
+      map2(x, y[names(x)],
+        ~.x + 
+          xlab(gsub("\n"," - ",.y$titre)) ) ) %>% 
+  map(., ~wrap_plots(.x) &
+    plot_layout(ncol=1) &
+    theme(legend.position="none",
+          strip.background = element_blank() ) &
+    plot_annotation(tag_levels = c('A')) )
 
-pl_tmp
+pl_tmp$Biomass
 
-ggsave(pl_tmp, width = 12, height = 12, dpi=600, filename= 
+ggsave(pl_tmp$Biomass, width = 12, height = 12, dpi=600, filename= 
          sprintf("%sfig-mars_st_board_Biomass.tiff",wdgraph) )
 
 ```
@@ -1152,12 +1196,13 @@ ggsave(pl_tmp, width = 12, height = 12, dpi=600, filename=
 #| fig-width: 16
 #| fig-height: 10
 
-pl_tmp<- nlrqdata$pl_rq_mars_sel_st_board$Density &
+# pl_tmp<- nlrqdata$pl_rq_mars_sel_st_board$Density &
+pl_tmp$Density<-pl_tmp$Density &
   xlim(c(0,3500))
 
-pl_tmp
+pl_tmp$Density
 
-ggsave(pl_tmp, width = 12, height = 12, dpi=600, filename= 
+ggsave(pl_tmp$Density, width = 12, height = 12, dpi=600, filename= 
          sprintf("%sfig-mars_st_board_Density.tiff",wdgraph) )
 
 ```
@@ -1220,7 +1265,7 @@ iwalk(nlrqdata$pl_rq_mars_sel_st$Density,
 rm(list=(ls()[grepl("tmp", ls())] ))
 # rm(list=lsf.str()) # remove all functions
 # rm("rqdata","nlrqdata","rqbsdata")
-# save(list=(setdiff(ls()[!grepl("rq_", ls())], lsf.str())),
+# save(list=(setdiff(ls()[-grepl("rq_", ls())], lsf.str())),
 #      file = paste0(rdataout))
 
 beepr::beep(2)
@@ -1250,5 +1295,6 @@ pkg_sesh
 ```
 :::
 
-# References {.unnumbered}
+The Scientific colour map batlow (Crameri 2018) is used in this study to prevent visual distortion of the data and exclusion of readers with colour­vision deficiencies [@crameri2020].
 
+# References {.unnumbered}

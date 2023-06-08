@@ -1,40 +1,22 @@
+
+rm(list=ls())
+
+
 #| label: load-packages
-#| code-summary: "Packages"
-library(conflicted)
-library(readxl) ; library(openxlsx); library(beepr) # Edition d'un fichier Excel
-library(tidyverse); library(reshape2); library(rlist) # the one; melt; list.append
-library(data.table)
-library(rstatix); library(Hmisc)  # corr and pvalue calculation
-library(boot)
 
-library(ggpubr); #library(GGally); # stat_compare_means ;
-library(scales); library(RColorBrewer); library(wesanderson); library(grafify); library(colorspace); library(ggsci)# show_col and colors colors colors!
-library(quantreg);# library(visreg)
-library(plotly); library(plot3D);  # graphiques 3D plot 3D for mesh library(pracma)
-library(patchwork)
-library(ggridges)
-# GIS Packages
-library(sf); library(sfheaders); # st_as_sf ; sf_to_df
-library(tmap); library(tmaptools)
-library(htmlwidgets) # library(leaflet) # saveWidget ; for interactive maps
-library(introdataviz) # geom_split_violin # devtools::install_github("psyteachr/introdataviz")
-
-conflict_prefer("transpose", "purrr")
-conflict_prefer("filter", "dplyr")
-conflict_prefer("select", "dplyr")
-conflict_prefer("summarise", "dplyr")
-conflict_prefer("melt", "reshape2")
-conflict_prefer("layout", "plotly")
-
-set.seed(123)
+list_packages <-c("beepr", "knitr", "conflicted", 
+    # data tidy
+    "tidyverse", "data.table" #"broom"
+    )
+invisible(lapply(list_packages, library, character.only = TRUE))
 
 
 
 #| label: workenvir
 
-rm(list=ls())
-wdmat <- "Matrices/"
-wdgraph <- "C:/Users/lehuen201/Back Up AMLH/Melting Potes/BDD/A_SDM_NEO/Plots/" #"Plots/"
+backup<-"C:/Users/lehuen201/Back Up AMLH/Melting Pot/BDD/A_SDM_NEO/"
+wdmat <-paste0(backup,"Matrices/") #"Matrices/"
+wdgraph <- paste0(backup,"Plots/") #"Plots/"
 wdres <- "Results/"
 pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
@@ -85,7 +67,7 @@ graphfine<-50 # graph resolution for 2D and 3D graphs surfaces
 CSLN_Mars_spe <- CSLN_Mars %>%
   filter(SPCourt==espece)
 
-wdgraph <- "C:/Users/lehuen201/Back Up AMLH/Melting Potes/BDD/A_SDM_NEO/Plots/" #"Plots/"
+wdgraph <- paste0(backup,"Plots/") #"Plots/"
 graph_path <- sprintf("%s%s/%s/",wdgraph,espece,analysis)
 titleG <- sprintf("%s %s in %s",
                   analysis,speciesMP$Taxon_SNa[sp],saison[sai,2])
@@ -111,6 +93,7 @@ if(flag_calc){ # flag_calc=1
         ~discard_at(.,~ grepl("add",.x) ) ) # to remove addition that are not usefull and taking too long to calculate
         
 } # end if flag_calc
+
 
 
 #| label: rq_Mod_mars
@@ -164,13 +147,13 @@ if(flag_calc_mars){
 
 #| label: rq_Mod_plot_sum
 
-# pl_rq_all_sum<-
-#   map_depth(rq_Mod_all,2,
-#             ~pl_rq_Mod_sum_rq(.x,titleG))
+pl_rq_all_sum<-
+  map_depth(rq_Mod_all,2,
+            ~f.pl_rq_Mod_sum(.x,titleG))
 
 pl_rq_sel_sum<-
   map_depth(rq_Mod_sel,2,
-            ~f.pl_rq_Mod_sum_rq(.x,titleG))
+            ~f.pl_rq_Mod_sum(.x,titleG))
 
 # walk(pl_rq_sel_sum,
 #   ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_sm.tiff",
@@ -289,11 +272,11 @@ walk(pl_rq_all_1d["all"],
 
 pl_rq_all_2d<- rq_Mod_all %>%
     map(.,~keep_at(.x,grepl("^RQ2",names(.x))) ) %>%
-    map_depth(.,2,~f.pl_rq_Mod_2d(.x,titleG) )
+    map_depth(.,2,~f.pl_rq_Mod_2d(.x,taus_l,titleG) )
 
 pl_rq_sel_2d<- rq_Mod_sel %>% 
     map(.,~keep_at(.x,grepl("^RQ2",names(.x))) ) %>% 
-    map_depth(.,2,~f.pl_rq_Mod_2d(.x,titleG) )
+    map_depth(.,2,~f.pl_rq_Mod_2d(.x,taus_l,titleG) )
 
 walk(pl_rq_sel_2d,
    ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_2d.tiff",

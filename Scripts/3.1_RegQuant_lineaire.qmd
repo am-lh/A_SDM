@@ -2,7 +2,7 @@
 title: "MELTING POTES PROJECT : SDM-NEO MODELS Linear Quantile Regression"
 author: "Amélie Lehuen"
 description: "ANALYSIS WITH KOENKER'S QUANTREG PACKAGE"
-date: "`r format(Sys.time(), '%d %B %Y')`"
+date: last-modified
 editor: source
 execute:
   eval: true
@@ -49,8 +49,7 @@ backup<-"C:/Users/lehuen201/Back Up AMLH/Melting Pot/BDD/A_SDM_NEO/"
 wdmat <-paste0(backup,"Matrices/") #"Matrices/"
 wdgraph <- paste0(backup,"Plots/") #"Plots/"
 wdres <- "Results/"
-pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
-wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
+wdGIS <- "SIG/"
 
 flag_calc<-FALSE # to calculate RQ models and mars results
 flag_calc_mars<-FALSE # to calculate time-consuming mars summary by period
