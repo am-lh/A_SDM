@@ -89,6 +89,7 @@ load(rdatain)
 rdatain  <- sprintf("%sCSLN_Mars_BDD.RData",wdmat)
 load(rdatain) #load(here::here(rdatain))
 load(sprintf("SIG/OSM_extraction.RData"))
+gc() # used to lighten RAM
 
 ```
 
@@ -111,6 +112,11 @@ sai <- which(saison$M_Def == "Year")
 taut <- which(taus %in% c(tauchoice))
 
 factors<-predict # %>% filter(Var %in% Var_choosen)
+
+tmp_sdm_comb_sel_l<-sdm_comb_sel %>% 
+  split(., .$Desc_bio) %>% 
+  map(., ~split(.x,.x$sdmname))
+
 ```
 
 # Materials and Methods
@@ -631,17 +637,17 @@ ggsave(sprintf("%sfig-aic_3mod.tiff",wdgraph),
 #| fig-width: 16
 #| fig-height: 5
 
-plot_rq<-map2(rqdata$pl_rq_po_sel,sdm_comb_sel_l,
+plot_rq<-map2(rqdata$pl_rq_po_sel,tmp_sdm_comb_sel_l,
             ~ map2(.x,.y[names(.x)],
               ~.x + labs(title=.y$analysis) ) ) #; plot_rq$Biomass$RQ2int_11112
-plot_nlrq<-map2(nlrqdata$pl_rq_po_sel,sdm_comb_sel_l,
+plot_nlrq<-map2(nlrqdata$pl_rq_po_sel,tmp_sdm_comb_sel_l,
             ~ map2(.x,.y[names(.x)],
               ~.x + labs(title=.y$analysis)) )
-plot_rqbs<-map2(rqbsdata$pl_rq_po_sel,sdm_comb_sel_l,
+plot_rqbs<-map2(rqbsdata$pl_rq_po_sel,tmp_sdm_comb_sel_l,
             ~ map2(.x,.y[names(.x)],
               ~.x + labs(title=.y$analysis)) ) 
 
-pl_tmp<- pmap(list(plot_rq,plot_nlrq,plot_rqbs,sdm_comb_sel_l) ,
+pl_tmp<- pmap(list(plot_rq,plot_nlrq,plot_rqbs,tmp_sdm_comb_sel_l) ,
           ~{ pmap(list(..1,..2,..3,..4[names(..1)]) ,
              ~{ wrap_plots(list(..1,..2,..3),
                            guides="collect") & 
@@ -740,6 +746,8 @@ ggsave(sprintf("%sfig-3mod_n_3d.tiff",wdgraph),
      width = 16, height = 13, dpi=600)
 ```
 
+::: {.content-visible when-format="html"}
+
 ```{r}
 #| label: fig-3mod_3d_plotly
 #| include: true
@@ -754,6 +762,8 @@ nlrqdata$pl_rq_sel_3d$Biomass$RQ2nli_11112$all
 rqbsdata$pl_rq_sel_3d$Biomass$RQ2bsp_11112$all
 
 ```
+:::
+
 :::
 
 ## SDM-NEO
@@ -997,6 +1007,8 @@ iwalk(pl_board_rq_nlrq_real,
 :::
 :::
 
+::: {.content-visible when-format="html"}
+
 #### Interactive 3D SDM-NEO visualisation {#sec-sdm_3d}
 
 ::: column-page-right
@@ -1027,6 +1039,8 @@ nlrqdata$pl_rq_sel_3d$Biomass$RQ2nli_11156$one[[sprintf("%0.3f",tauchoice)]]
 ```
 :::
 
+:::
+
 ### Non-linear quantile regression with bifactorial gaussian equation SDM-NEOs
 
 ::: column-page-right
@@ -1047,14 +1061,14 @@ D.  Mud content \[%\] and Bed shear stress \[Pa\]: The model result was highly p
 tmap_mode("plot") # "plot" "view"
 
 tm_mars_rq_gb<-rqdata$pl_rq_sel_map %>% 
-  map2(.,sdm_comb_sel_l, \(x,y)
+  map2(.,tmp_sdm_comb_sel_l, \(x,y)
     map2(x, y[names(x)],
         ~.x$all + tm_layout(main.title=gsub("\n"," - ",.y$titre))
   ) ) %>% 
   map(., ~ tmap_arrange(.x, asp=NA, ncol=1,
             sync = TRUE, outer.margins=0) ) # ; tm_mars_rq_gb$Biomass
 tm_mars_nlrq_gb<-nlrqdata$pl_rq_sel_map %>% 
-  map2(.,sdm_comb_sel_l, \(x,y)
+  map2(.,tmp_sdm_comb_sel_l, \(x,y)
     map2(x, y[names(x)],
         ~.x$all + tm_layout(main.title=gsub("\n"," - ",.y$titre))
   ) )  %>% 
@@ -1171,7 +1185,7 @@ iwalk(pl_rq_suit_idx_nlrq_brd,
 #   xlim(c(0,150))
 pl_tmp<-
   map_depth(nlrqdata$pl_rq_mars_sel_st, 2, ~.x$mod) %>% 
-    map2(.,sdm_comb_sel_l, \(x,y)
+    map2(.,tmp_sdm_comb_sel_l, \(x,y)
       map2(x, y[names(x)],
         ~.x + 
           xlab(gsub("\n"," - ",.y$titre)) ) ) %>% 
