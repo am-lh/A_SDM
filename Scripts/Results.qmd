@@ -148,7 +148,7 @@ ggsave(tm_study_map,
 
 ## Datasets
 
-### biological data
+### Biological data
 
 ::: column-page-right
 ```{r}
@@ -637,17 +637,17 @@ ggsave(sprintf("%sfig-aic_3mod.tiff",wdgraph),
 #| fig-width: 16
 #| fig-height: 5
 
-plot_rq<-map2(rqdata$pl_rq_po_sel,tmp_sdm_comb_sel_l,
+pl_rq_po_sel<-map2(rqdata$pl_rq_po_sel,tmp_sdm_comb_sel_l,
             ~ map2(.x,.y[names(.x)],
               ~.x + labs(title=.y$analysis) ) ) #; plot_rq$Biomass$RQ2int_11112
-plot_nlrq<-map2(nlrqdata$pl_rq_po_sel,tmp_sdm_comb_sel_l,
+pl_nlrq_po_sel<-map2(nlrqdata$pl_rq_po_sel,tmp_sdm_comb_sel_l,
             ~ map2(.x,.y[names(.x)],
               ~.x + labs(title=.y$analysis)) )
-plot_rqbs<-map2(rqbsdata$pl_rq_po_sel,tmp_sdm_comb_sel_l,
+pl_rqbs_po_sel<-map2(rqbsdata$pl_rq_po_sel,tmp_sdm_comb_sel_l,
             ~ map2(.x,.y[names(.x)],
               ~.x + labs(title=.y$analysis)) ) 
 
-pl_tmp<- pmap(list(plot_rq,plot_nlrq,plot_rqbs,tmp_sdm_comb_sel_l) ,
+pl_tmp<- pmap(list(pl_rq_po_sel,pl_nlrq_po_sel,pl_rqbs_po_sel,tmp_sdm_comb_sel_l) ,
           ~{ pmap(list(..1,..2,..3,..4[names(..1)]) ,
              ~{ wrap_plots(list(..1,..2,..3),
                            guides="collect") & 
@@ -880,8 +880,8 @@ iwalk(pl_board_rq_nlrq,
 #| label: prefig-rq_po_sdm
 
 pl_po_sdm<- 
-  map2(rqdata$pl_rq_po_sel,
-       nlrqdata$pl_rq_po_sel,
+  map2(pl_rq_po_sel,
+       pl_nlrq_po_sel,
       ~{map2(.x,.y,
          ~{ (.x / .y)  +
             plot_layout(guides = 'collect',tag_level = 'new',
@@ -1181,9 +1181,8 @@ iwalk(pl_rq_suit_idx_nlrq_brd,
 #| fig-width: 16
 #| fig-height: 10
 
-# pl_tmp<- nlrqdata$pl_rq_mars_sel_st_board$Biomass & 
-#   xlim(c(0,150))
-pl_tmp<-
+# pl_nlrq_mars_sel_st<- nlrqdata$pl_rq_mars_sel_st_board$Biomass
+pl_nlrq_mars_sel_st<-
   map_depth(nlrqdata$pl_rq_mars_sel_st, 2, ~.x$mod) %>% 
     map2(.,tmp_sdm_comb_sel_l, \(x,y)
       map2(x, y[names(x)],
@@ -1195,9 +1194,11 @@ pl_tmp<-
           strip.background = element_blank() ) &
     plot_annotation(tag_levels = c('A')) )
 
-pl_tmp$Biomass
+pl_nlrq_mars_sel_st$Biomass & 
+  xlim(c(0,150))
 
-ggsave(pl_tmp$Biomass, width = 12, height = 12, dpi=600, filename= 
+ggsave(pl_nlrq_mars_sel_st$Biomass & 
+  xlim(c(0,150)), width = 12, height = 12, dpi=600, filename= 
          sprintf("%sfig-mars_st_board_Biomass.tiff",wdgraph) )
 
 ```
@@ -1210,13 +1211,13 @@ ggsave(pl_tmp$Biomass, width = 12, height = 12, dpi=600, filename=
 #| fig-width: 16
 #| fig-height: 10
 
-# pl_tmp<- nlrqdata$pl_rq_mars_sel_st_board$Density &
-pl_tmp$Density<-pl_tmp$Density &
+# pl_tmp<- nlrqdata$pl_rq_mars_sel_st_board$Density
+
+pl_nlrq_mars_sel_st$Density &
   xlim(c(0,3500))
 
-pl_tmp$Density
-
-ggsave(pl_tmp$Density, width = 12, height = 12, dpi=600, filename= 
+ggsave(pl_nlrq_mars_sel_st$Density &
+  xlim(c(0,3500)), width = 12, height = 12, dpi=600, filename= 
          sprintf("%sfig-mars_st_board_Density.tiff",wdgraph) )
 
 ```
@@ -1229,6 +1230,17 @@ ggsave(pl_tmp$Density, width = 12, height = 12, dpi=600, filename=
 The four models result on the estuary regarding Areas and Periods, with the two calculation modes, for both responses.
 
 ##### Biomass
+```{r}
+
+pl_nlrq_mars_sel_st_all<-
+  map_depth(nlrqdata$pl_rq_mars_sel_st, 2, ~.x$all) %>% 
+    map2(.,tmp_sdm_comb_sel_l, \(x,y)
+      map2(x, y[names(x)],
+        ~.x + 
+          xlab(gsub("\n"," - ",.y$titre)) ) )
+
+
+```
 
 ::: panel-tabset
 ```{r}
@@ -1238,10 +1250,10 @@ The four models result on the estuary regarding Areas and Periods, with the two 
 #| fig-width: 16
 #| fig-height: 10
 
-iwalk(nlrqdata$pl_rq_mars_sel_st$Biomass, 
+iwalk(pl_nlrq_mars_sel_st_all$Biomass, 
       ~ {
         cat('###### ', .y, '\n\n')
-        print(.x$all)
+        print(.x)
         cat('\n\n')
         })
 ```
@@ -1259,10 +1271,10 @@ iwalk(nlrqdata$pl_rq_mars_sel_st$Biomass,
 #| fig-width: 16
 #| fig-height: 10
 
-iwalk(nlrqdata$pl_rq_mars_sel_st$Density, 
+iwalk(pl_nlrq_mars_sel_st_all$Density, 
       ~ {
         cat('###### ', .y, '\n\n')
-        print(.x$all)
+        print(.x)
         cat('\n\n')
         })
 
