@@ -62,7 +62,7 @@ wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
 wdscript <- paste(pc,"Melting Pot/BDD/Scripts/",sep="")
 wdmsr <- (paste(wdscript,"MSR/MSR.R",sep=""))
 
-flag_calc_mars<-FALSE # to calculate time-consuming mars summary by period
+flag_calc_mars<-TRUE # to calculate time-consuming mars summary by period
 
 ```
 
@@ -280,8 +280,11 @@ Mars_dat_sf$Tidal_level <- factor(Mars_dat_sf$Tidal_level, levels=tidelevels$lev
 ```
 
 #### Bioturbation potential
+https://doi.org/10.1002/ece3.769
+$$
+BP_C = \sum_{i=1}^{n}\sqrt\frac{B_i}{Ai}.A_i.M_i.R_i
+$$
 
-(solan & quieros https://doi.org/10.1002/ece3.769).
 
 MIEUX DEFINIR LES UNITES DU CALCUL BPc ET SON USAGE DENSITE? ABONDANCE?
 
@@ -674,6 +677,9 @@ CSLN_Mars <- CSLN_Mars %>%
   filter(!Zone %in% c("Bay")) %>% #, "Ilot Oiseaux"
   mutate(across(where(is.factor), fct_drop))
 
+tm_areas <- ES_Areas %>% 
+  st_transform(4326)
+
 areas_pal<-pal_csps(10); names(areas_pal)<-name_areas
 
 ```
@@ -683,7 +689,7 @@ Attention, this can take a while...
 if(flag_calc_mars){
   Mars_SDM_per<- Mars_SDM %>% 
                  group_by(across(NINJ:Period)) %>% 
-                 dplyr::summarise(across(where(is.numeric),~mean(.x,na.rm=TRUE)))
+                 dplyr::summarise(across(where(is.numeric),~median(.x,na.rm=TRUE)))
 }
 # correction of tidal levels
 # Mars_SDM_per<-Mars_SDM_per %>% 

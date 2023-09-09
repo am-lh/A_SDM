@@ -53,7 +53,7 @@ wdres <- "Results/"
 pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
 
-flag_calc<-TRUE # to calculate RQ models and mars results and more time-consuming mars summary by period
+flag_calc<-FALSE # to calculate RQ models and mars results and more time-consuming mars summary by period
 flag_calc_mars<-FALSE # to calculate time-consuming mars summary by period
 
 ```
@@ -193,12 +193,13 @@ if(flag_calc){
   save(list=(setdiff(ls()[grep("rq_", ls())], lsf.str())), 
        file = paste0(rdataout,".RData")) # save before going heavy
 }  
+# calculation of means of result instead of result of means predictor in case non normal
 if(flag_calc_mars){
   rq_Mod_mars_sel_per<-
     map_depth(rq_Mod_mars_sel,2,
               ~{ .x %>% 
-                 group_by(NINJ,Period) %>% 
-                 summarise(across(where(is.numeric),~mean(.x,na.rm=TRUE))) } )
+                 group_by(Zone,NINJ,Period) %>% 
+                 summarise(across(where(is.numeric),~median(.x,na.rm=TRUE))) } )
   save(list=(setdiff(ls()[grep("rq_", ls())], lsf.str())),
        file = paste0(rdataout,".RData")) # save once it's done!
 } # end if flag_calc

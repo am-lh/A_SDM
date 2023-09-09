@@ -2,6 +2,7 @@
 rm(list=ls())
 
 
+
 #| label: load-packages
 
 list_packages <-c("beepr", "knitr", "conflicted", 
@@ -21,7 +22,7 @@ wdres <- "Results/"
 pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
 
-flag_calc<-FALSE # to calculate RQ models and mars results
+flag_calc<-FALSE # to calculate RQ models and mars results and more time-consuming mars summary by period
 flag_calc_mars<-FALSE # to calculate time-consuming mars summary by period
 
 
@@ -47,7 +48,7 @@ load(sprintf("SIG/OSM_extraction.RData"))
 #| label: outfiles
 
 binderout <- sprintf("%sCSLN_BDD.xlsx",wdres)
-rdataout  <- sprintf("%sCSLN_Mars_RQ_BDD",wdmat)
+rdataout  <- sprintf("%sCSLN_Mars_RQbsp_BDD",wdmat)
 # if exists
 load(paste0(rdataout,".RData"))
 
@@ -56,12 +57,12 @@ load(paste0(rdataout,".RData"))
 
 etude <- "CSLN_Mars"
 espece <- "CERED"
-analysis <- "RQ Linear"
+analysis <- "RQ BSpline"
 sp <- which(speciesMP$SPCourt == espece)
 sai <- which(saison$M_Def == "Year") #Year Winter Summer
 
-type<-list(add= c("+","add"),int=c("*","int"))
-# tauchoice<-0.95
+type<-list(bs= c("*","bsp"))
+tauchoice<-0.95
 graphfine<-50 # graph resolution for 2D and 3D graphs surfaces
 
 CSLN_Mars_spe <- CSLN_Mars %>%
@@ -77,23 +78,24 @@ titleG <- sprintf("%s %s in %s",
 if(flag_calc){ # flag_calc=1
 
   rq_Mod_all <-
-    map( reponse_l, \(biolo)
+    map(reponse_l, \(biolo)
       {map( type, \(typ)
-        {map_depth( pred_red_comb[1:2],2, # CHOSEN TO GO LIGHT ON CALCULATION
-              ~f.rq_Lin(CSLN_Mars_spe,biolo,.x,taus,typ)) } ) } ) %>%
+        {map_depth( pred_red_comb,2,
+              ~f.rq_Bsp(CSLN_Mars_spe,biolo,.x,taus,typ)) } ) } ) %>%
     map_depth(.,3, ~setNames(.x,map(.x,~.$sdmname)) ) %>%
     map_depth(.,2,~list_flatten(.x,name_spec= "{inner}")) %>%
     map(.,~list_flatten(.x,name_spec= "{inner}")) %>% 
-    map(.,compact) %>%  # suppress trycatch errors
-    map(.,~discard_at(.,~grepl("^RQ1int",.x)) ) # Suppress RQ1int redundant with add, because not found how to avoid its calculation, okay?
+    map(.,compact) # suppress trycatch errors
+  
+  
+  rq_Mod_all <- rq_Mod_all %>%
+    map_depth(.,2,
+      ~modify_at(.x,"smrq_t",~.x %>% bind_rows()) )
   
   rq_Mod_sel<-map(rq_Mod_all,
-        ~keep_at(.,~ grepl(paste0(names(pred_red_comb_sel),"$",collapse="|"),.x)) )
-  rq_Mod_sel<-map(rq_Mod_sel,
-        ~discard_at(.,~ grepl("add",.x) ) ) # to remove addition that are not usefull and taking too long to calculate
-        
+        ~keep_at(.,~ grepl(paste0(names(pred_red_comb_sel),"$",collapse="|"),
+                           .x)) )
 } # end if flag_calc
-
 
 
 #| label: rq_Mod_mars
@@ -130,15 +132,16 @@ if(flag_calc){ # flag_calc=1
 
 
 if(flag_calc){
-  save(list=(setdiff(ls()[grep("rq_", ls())], lsf.str())),
+  save(list=(setdiff(ls()[grep("rq_", ls())], lsf.str())), 
        file = paste0(rdataout,".RData")) # save before going heavy
 }  
+# calculation of means of result instead of result of means predictor in case non normal
 if(flag_calc_mars){
   rq_Mod_mars_sel_per<-
     map_depth(rq_Mod_mars_sel,2,
               ~{ .x %>% 
-                 group_by(NINJ,Period) %>% 
-                 summarise(across(where(is.numeric),~mean(.x,na.rm=TRUE))) } )
+                 group_by(Zone,NINJ,Period) %>% 
+                 summarise(across(where(is.numeric),~median(.x,na.rm=TRUE))) } )
   save(list=(setdiff(ls()[grep("rq_", ls())], lsf.str())),
        file = paste0(rdataout,".RData")) # save once it's done!
 } # end if flag_calc
@@ -147,19 +150,19 @@ if(flag_calc_mars){
 
 #| label: rq_Mod_plot_sum
 
-pl_rq_all_sum<-
-  map_depth(rq_Mod_all,2,
-            ~f.pl_rq_Mod_sum(.x,titleG))
+# pl_rq_all_sum<-
+#   map_depth(rq_Mod_all,2,
+#             ~pl_rq_Mod_sum(.x,titleG))
 
 pl_rq_sel_sum<-
   map_depth(rq_Mod_sel,2,
             ~f.pl_rq_Mod_sum(.x,titleG))
 
-# walk(pl_rq_sel_sum,
-#   ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_sm.tiff",
-#                     graph_path, substr(.y,1,6), espece, .y),
-#                     plot = .x,
-#                     width = 10, height = 7, dpi=400) ) } )
+walk(pl_rq_sel_sum,
+  ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_sm.tiff",
+                    graph_path, substr(.y,1,6), espece, .y),
+                    plot = .x,
+                    width = 10, height = 7, dpi=400) ) } )
 
 
 #| label: rq_Mod_plot_aic
@@ -214,7 +217,7 @@ ggsave(sprintf("%s%s_RQ_AIC_scores.tiff",
 #| label: prefig-poplot_boot
 
 # pl_rq_po_sel<-map_depth(rq_Mod_sel,2,
-#     ~ {.x %>% f.rq_po_plot} )
+#     ~ {.x %>% rq_po_plot} )
 
 pl_rq_po_sel<-map_depth(rq_Mod_sel,2,
     ~ {.x %>% f.rq_po_plot_boot} )
@@ -261,7 +264,7 @@ pl_rq_all_1d$all <- map(pl_rq_all_1d,
           plot_annotation(title=titleG) } )
 
 walk(pl_rq_all_1d["all"],
-  ~{iwalk(., ~ggsave(sprintf("%s/RQ1add/%s_%s_1d.tiff",
+  ~{iwalk(., ~ggsave(sprintf("%s/RQ1bsp/%s_%s_1d.tiff",
                     graph_path, espece, .y),
                     plot = .x,
                     width = 10, height = 7, dpi=400) ) } )
@@ -418,7 +421,7 @@ pl_rq_suit_idx <- map2(rq_Mod_mars_sel,
 
 # rm(list=lsf.str()) # remove all functions
 rm(list=(ls()[grepl("tmp", ls())] ))
-save(list=(setdiff(ls()[grep("rq_", ls())], lsf.str()) ), # select only variables that respect pattern, remove functions
+save(list=(setdiff(ls()[grep("rq_", ls())], lsf.str())), # select only variables that respect pattern, remove functions
      file = paste0(rdataout,".RData"))
 beepr::beep(2)
 

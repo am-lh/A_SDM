@@ -349,14 +349,14 @@ f.pl_var_map<-function(data, vars){
 
 f.rq_Lin <- function(df,biolo,sdmod,taus,typ) {
       # biolo=reponse_l[[1]]; typ=type[[2]]
-      # sdmod=pred_red_comb$x1[[1]]
+      # sdmod=pred_red_comb$x1[[1]]; df=CSLN_Mars_spe
     typetxt<-paste0("RQ",length(sdmod$id),typ[2])
     sdmname<-sprintf("%s_%g%g%g%s%s",typetxt,sp,sai,
                      biolo$id,
                      paste0(sdmod$id,collapse = ""),
                      ifelse(length(sdmod$id)==1,"0","") )
-    yt<- biolo$rvar
-    yl<- biolo$compl
+    yt<- biolo$Var
+    yl<- biolo$whole
     xt<-paste(sdmod$Var, collapse=typ[1])
     xl<-paste(sdmod$whole, collapse=paste0(" ",typ[1]," "))
     dfrq <-df[,c(yt,sdmod$Var)] %>% 
@@ -424,7 +424,7 @@ f.rq_Lin <- function(df,biolo,sdmod,taus,typ) {
       meta <- list(type=typ[1],typetxt=typetxt,
                    Sp=espece,Season=saison[sai,2],
                    reponse=yt,reponset=yl,
-                   unit=biolo$runit,
+                   unit=biolo$Unit,
                    predict=xt,predictt=xl,
                    predictl=sdmod$whole,
                    predfile=paste(sdmod$Var, collapse="_"))
@@ -443,7 +443,7 @@ f.rq_Lin <- function(df,biolo,sdmod,taus,typ) {
                          formula=format(modelq$formula),
                          type=typ[1],typetxt=typetxt,
                          Sp=espece, Season=saison[sai,2],
-                         reponse=yt, reponset=yl, unit=biolo$runit,
+                         reponse=yt, reponset=yl, unit=biolo$Unit,
                          # Predictor1=pred_red[k,1], Predictor2=pred_red[k2,1],
                          predict=xt, predictt=xl,
                          predfile=paste(sdmod$Var, collapse="_")) } )
@@ -494,8 +494,8 @@ f.rq_nLin <- function(df,biolo,sdmod,taus,typ) {
                    paste0(sdmod$id,collapse = ""),
                    ifelse(length(sdmod$id)==1,"0","") )
   
-  yt<- biolo$rvar
-  yl<- biolo$compl
+  yt<- biolo$Var
+  yl<- biolo$whole
   xt<-paste(sdmod$Var, collapse=typ[1])
   xl<-paste(sdmod$whole, collapse=paste0(" ",typ[1]," "))
   dfrq <-df[,c(yt,sdmod$Var)] %>% 
@@ -568,7 +568,7 @@ f.rq_nLin <- function(df,biolo,sdmod,taus,typ) {
       meta <- list(type=typ[1],typetxt=typetxt,
                    Sp=espece,Season=saison[sai,2],
                    reponse=yt,reponset=yl,
-                   unit=biolo$runit,
+                   unit=biolo$Unit,
                    predict=xt,predictt=xl,
                    predictl=sdmod$whole,
                    predfile=paste(sdmod$Var, collapse="_"),
@@ -585,7 +585,7 @@ f.rq_nLin <- function(df,biolo,sdmod,taus,typ) {
                formula=paste0(format(formumod),collapse=""), #format(modelq$formula),
                type=typ[1],typetxt=typetxt,
                Sp=espece, Season=saison[sai,2],
-               reponse=yt, reponset=yl, unit=biolo$runit,
+               reponse=yt, reponset=yl, unit=biolo$Unit,
                # Predictor1=pred_red[k,1], Predictor2=pred_red[k2,1],
                predict=xt, predictt=xl,
                predfile=paste(sdmod$Var, collapse="_"))
@@ -639,8 +639,8 @@ f.rq_Bsp <- function(df,biolo,sdmod,taus,typ) {
                    paste0(sdmod$id,collapse = ""),
                    ifelse(length(sdmod$id)==1,"0","") )
   
-  yt<- biolo$rvar
-  yl<- biolo$compl
+  yt<- biolo$Var
+  yl<- biolo$whole
   xt<-paste(sdmod$Var, collapse=typ[1])
   xl<-paste(sdmod$whole, collapse=paste0(" ",typ[1]," "))
   dfrq <-df[,c(yt,sdmod$Var)] %>% 
@@ -709,7 +709,7 @@ f.rq_Bsp <- function(df,biolo,sdmod,taus,typ) {
     meta <- list(type=typ[1],typetxt=typetxt,
                  Sp=espece,Season=saison[sai,2],
                  reponse=yt,reponset=yl,
-                 unit=biolo$runit,
+                 unit=biolo$Unit,
                  predict=xt,predictt=xl,
                  predictl=sdmod$whole,
                  predfile=paste(sdmod$Var, collapse="_"))
@@ -728,7 +728,7 @@ f.rq_Bsp <- function(df,biolo,sdmod,taus,typ) {
                               formula=paste0(format(modelq$formula),collapse=""),
                               type=typ[1],typetxt=typetxt,
                               Sp=espece, Season=saison[sai,2],
-                              reponse=yt, reponset=yl, unit=biolo$runit,
+                              reponse=yt, reponset=yl, unit=biolo$Unit,
                               # Predictor1=pred_red[k,1], Predictor2=pred_red[k2,1],
                               predict=xt, predictt=xl,
                               predfile=paste(sdmod$Var, collapse="_")) } )
@@ -843,7 +843,7 @@ f.suit_index<-function(rqmodmars,rqMod,taus){
 
 # f.pl_rq_Mod_sum_rq<-function(rqMod,titleG){
 #     # biolo=reponse_l[[1]]
-#     # rqMod=rq_Mod_sel[[biolo$rdescr]][[1]]
+#     # rqMod=rq_Mod_sel[[biolo$Desc]][[1]]
 #   typetxt<-substr(rqMod$sdmname, 1, 6) 
 #   png(file=sprintf("%s/%s/%s_%s_sm.tiff",
 #                    graph_path, typetxt, espece, rqMod$sdmname),
@@ -1068,7 +1068,7 @@ f.pl_rq_Mod_1d<-function(rqMod,titleG){
 
 f.pl_rq_Mod_2d<-function(rqMod,taus_l,titleG){
     # biolo=reponse_l[[1]]
-    # rqMod=rq_Mod_sel[[biolo$rdescr]][[1]]
+    # rqMod=rq_Mod_sel[[biolo$Desc]][[1]]
   
   pl_2d<-list(all=NULL, one=NULL)
 
@@ -1124,12 +1124,12 @@ f.pl_rq_Mod_2d<-function(rqMod,taus_l,titleG){
 #| label: rq_Mod_plot_3d ----
 
 f.pl_rq_Mod_3d<-function(rqMod,taus_l,titleG){
-    # biolo=reponse_l[[1]]
-    # rqMod=rq_Mod_sel[[1]][[1]]
-  
+    # biolo=reponse_l[[1]] ; graphfine=50
+    # rqMod=rq_Mod_sel[[1]][[1]] #rqdata$
+  wdth<-1000; hght<-1000 
   yl<-rqMod$meta$reponset
   xl<-rqMod$meta$predictl
-  myscene<-list(camera = list(eye = list(x = -1.5, y = 1.5, z = 0.3)),
+  myscene<-list(camera = list(eye = list(x = 1.5, y = 1.5, z = 0.25)),
                 aspectmode='cube', # define standard layout scene
                 xaxis = list(title = xl[1]), 
                 yaxis = list(title = xl[2]), 
@@ -1142,16 +1142,20 @@ f.pl_rq_Mod_3d<-function(rqMod,taus_l,titleG){
   rqinf<-rqlim %>% filter(status=="under")
   
   # Experimental points on 3D graphic and all surfaces
-  pl_3d$all<-plot_ly(showlegend=FALSE) %>% 
+  pl_3d$all <- plot_ly(showscale=FALSE, showlegend=FALSE) %>% 
       add_trace(x = rqsup$x1, y = rqsup$x2, z = rqsup$y, 
                 mode = "markers", type = "scatter3d",
                 marker = list(size = 3, color = colOutliers, 
-                              opacity = 0.7, symbol = "diamond"))%>%
+                              opacity = 0.7, symbol = "diamond")) %>%
       add_trace(x = rqinf$x1, y = rqinf$x2, z = rqinf$y, 
                 mode = "markers", type = "scatter3d",
                 marker = list(size = 3, color = colInliers, 
                               opacity = 0.7, symbol = "circle")) %>%
-    layout(title = titleG, scene = myscene)
+    layout(title = "", scene = myscene) %>% 
+    config( toImageButtonOptions = list(
+      format = "svg", filename = sprintf("graph_3d"),
+      width = wdth, height = hght )  )
+  
   for (t in 1:length(taus_l)){ # t=4
       gridxmat<-rqMod$mod_grid$gridxmat
       RqMod_mat <- rqMod$mod_pred_t %>% 
@@ -1161,7 +1165,9 @@ f.pl_rq_Mod_3d<-function(rqMod,taus_l,titleG){
           add_surface(x = gridxmat$x, y = gridxmat$y, z = RqMod_mat,
                       opacity = 0.8, colorscale = list(c(0,1),c(blank,colRQ[t])))
   } # taus
-  unname(taus_l)
+  
+  # unname(taus_l)
+  
   # Define surfaces for each tau
   pl_3d$one<-map2(taus_l,seq(1:length(taus_l)), ~{ #.x=taus_l[[1]]
     gridxmat<-rqMod$mod_grid$gridxmat
@@ -1173,7 +1179,7 @@ f.pl_rq_Mod_3d<-function(rqMod,taus_l,titleG){
     rqsup<-rqlim %>% filter(status=="over")
     rqinf<-rqlim %>% filter(status=="under")
       
-    plot_ly(showlegend=F) %>% #, scene=paste("scene",.y,sep="")
+    plot_ly(showscale=FALSE, showlegend=FALSE) %>% #, scene=paste("scene",.y,sep="")
       add_surface(x = gridxmat$x, 
                   y = gridxmat$y, 
                   z = RqMod_mat,
@@ -1189,7 +1195,10 @@ f.pl_rq_Mod_3d<-function(rqMod,taus_l,titleG){
                 mode = "markers", type = "scatter3d",
                 marker = list(size = 3, color = colInliers, 
                               opacity = 0.7, symbol = "circle")) %>%
-      layout(title = titleG, scene = myscene)
+      layout(title = "", scene = myscene) %>% 
+      config( toImageButtonOptions = list(
+        format = "svg", filename = sprintf("graph_3d_%.3f",.x),
+        width = wdth, height = hght )  )
     } ) # map taus
   return(pl_3d)
 }
@@ -1198,12 +1207,13 @@ f.pl_rq_Mod_3d<-function(rqMod,taus_l,titleG){
 #| label: rq_Mod_mars_stat ----
 
 f.st_rq_Mod_map<-function(rqmodmars,rqMod,tauchoice){
-    # rqmodmars=rq_Mod_mars_sel[[1]][[1]]
+    # rqmodmars=rq_Mod_mars_sel_per[[1]][[1]]
     # rqMod=rq_Mod_sel[[1]][[1]]
   vars<-unlist(strsplit(rqMod$meta$predict,rqMod$meta$type,fixed = TRUE))
   varsl<-rqMod$meta$predictl
 
   rqmodmars <- rqmodmars %>% 
+    ungroup() %>% 
     st_drop_geometry() %>% 
     filter(grepl("Mudflat",.$Zone)) %>%
     # filter(!Zone %in% c("Bay","Cote Fleurie","Ilot Oiseaux","Octeville")) %>% 
