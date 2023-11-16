@@ -26,23 +26,15 @@ rm(list=ls())
 
 ```{r}
 #| label: load-packages
-library(conflicted)
-library(knitr)
-library(readxl) ; library(openxlsx) # Edition d'un fichier Excel
-library(beepr) 
-library(tidyverse) #The toolbox indispensable
-library(vegan) # environmental data processing diversity for Shannon
-# GIS Packages
-library(sf); library(sfheaders); # st_as_sf ; sf_to_df
 
-conflict_prefer("transpose", "purrr")
-conflict_prefer("filter", "dplyr")
-conflict_prefer("select", "dplyr")
-conflict_prefer("summarise", "dplyr")
-conflict_prefer("melt", "reshape2")
-conflict_prefer("layout", "plotly")
+list_packages <-c("beepr", "knitr", "conflicted", 
+    "tidyverse", "data.table")
+installed_packages <- list_packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(list_packages[!installed_packages])
+}
+invisible(lapply(list_packages, library, character.only = TRUE))
 
-options(scipen=999) # Prevents scientific display of numbers
 ```
 
 ### Working Environment
@@ -50,17 +42,13 @@ options(scipen=999) # Prevents scientific display of numbers
 ```{r}
 #| label: workenvir
 
-backup<-"C:/Users/lehuen201/Back Up AMLH/Melting Pot/BDD/A_SDM_NEO/"
-wdmat <-paste0(backup,"Matrices/") #"Matrices/"
-wdgraph <- paste0(backup,"Plots/") #"Plots/"
-wdres <- "Results/"
-wdsource <- "Data/Faune/CSLN/"
 wdproj<-getwd()
+wdmat <-"Matrices/"
+wdres <- "Results/"
+wdsource <- "Data/"
 
-pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
-wdGIS <- paste(pc,"Melting Pot/SIG/",sep="");
-wdscript <- paste(pc,"Melting Pot/BDD/Scripts/",sep="")
-wdmsr <- (paste(wdscript,"MSR/MSR.R",sep=""))
+wdGIS <- "SIG/"
+wdmsr <- "Scripts/MSR/"
 
 flag_calc_mars<-TRUE # to calculate time-consuming mars summary by period
 
@@ -71,14 +59,7 @@ flag_calc_mars<-TRUE # to calculate time-consuming mars summary by period
 ```{r}
 #| label: functmade
 
-source("Scripts/0.0_SDM_NEO_functions.R")
-
-```
-
-### Graphic charter
-
-```{r}
-#| label: graphchart
+source("Scripts/0.0_SDM_functions.R")
 
 ```
 
@@ -103,14 +84,14 @@ rdataout <- sprintf("%sCSLN_Mars_BDD.RData",wdmat)
 ```{r}
 #| label: externdata_fauna
 
-fauna_file <- sprintf("%sCSLN_Biology_source.xlsx",wdsource)
+fauna_file <- sprintf("%sFaune/CSLN/CSLN_Biology_source.xlsx",wdsource)
+bioturb_file <- sprintf("%sFaune/Bioturbation_Potential.xlsx",wdsource)
 CSLN_raw <- as.data.frame(read_excel(
   fauna_file,sheet = "Biology_station", na = ""))
 granulo <- as.data.frame(read_excel(
   fauna_file,sheet = "Granulo", na = ""))
 BioturbP <- as.data.frame(read_excel(
-  sprintf("%s/Data/Faune/Bioturbation_Potential.xlsx",wdproj),
-  sheet = "Bioturbation_Potential", na = ""))
+  bioturb_file,sheet = "Bioturbation_Potential", na = ""))
 # summary(CSLN_raw)
 
 ```
@@ -120,7 +101,7 @@ BioturbP <- as.data.frame(read_excel(
 ```{r}
 #| label: externdata_mars
 
-mars_file <- sprintf("%sES_Ncf_BDD.xlsx",wdres)
+mars_file <- sprintf("%sMars3D/ES_Ncf_BDD.xlsx",wdsource)
 Varnames <- as.data.frame(read_excel(
   mars_file,sheet = "Varnames", na = "",
   col_names = c("Var", "Desc", "Unit", "NAval", "Dim", "Varid")))
@@ -139,8 +120,11 @@ saison[1,1] <- "" # Remplacement du NaN pour l'annee
 ```{r}
 #| label: externdata_gis
 
-ES_Areas <- sprintf("%sLayers made/ES_Areas_WGS.shp",wdGIS)
-ES_Areas <- st_read(ES_Areas,quiet=TRUE,crs=4326) %>%
+mars_file_shp <- sprintf("%sLayers made/ES_Areas_WGS.shp",wdGIS)
+mars_file_csv <- sprintf("%sES_Mars_Maps_sh.csv",wdres)
+mars_file_sf <- sprintf("%sLayers made/ES_Maille_nc.shp",wdGIS)
+
+ES_Areas <- st_read(mars_file_shp,quiet=TRUE,crs=4326) %>%
   st_transform(2154) %>%
   filter(Zone!="NA")
 name_areas <- c(
@@ -155,15 +139,13 @@ name_areas <- c(
   "Octeville",
   "Bay" )
 
-Mars_csv <- sprintf("%sES_Mars_Maps_sh.csv",wdres)
-Mars_csv <- read.csv(Mars_csv)
+Mars_csv <- read.csv(mars_file_csv)
 Mars_csv[Mars_csv == "NaN"] <- NA
 Mars_csv <- Mars_csv %>% 
   filter(!is.na(Lat) & !is.na(Lon) & !is.na(flow_m)) #%>%
 #  filter(Lat!="NaN" | Lon!="NaN")
 
-Mars_dat_sf <- sprintf("%sLayers made/ES_Maille_nc.shp",wdGIS)
-Mars_dat_sf <- st_read(Mars_dat_sf,quiet=TRUE,crs=4326) %>%
+Mars_dat_sf <- st_read(mars_file_sf,quiet=TRUE,crs=4326) %>%
   st_transform(2154) %>%
   rename(NINJ=NINJ_v, Lon=Lon_c, Lat=Lat_c) %>% 
   select(-id_maille)
@@ -181,16 +163,18 @@ Mars_dat_sf <- st_read(Mars_dat_sf,quiet=TRUE,crs=4326) %>%
 #| label: basicvar
 
 speciesList <- BioturbP %>% 
-  select(SPCourt,ScientificName_accepted) %>% 
-  rename(Taxon_SNa=ScientificName_accepted)
+  select(SPCourt,Scientific_Name) %>% 
+  rename(Taxon_SNa=Scientific_Name)
 speciesMP <- speciesList %>% 
   filter(SPCourt %in% 
-           c("CERED","CORVO","HEDDI","MACBA","PERUL","SCRPL"))
+           c("CERED","CORVO","HEDDI","MACBA","PERUL","SCRPL")) %>% 
+  arrange(SPCourt)
 speciesBonus <- speciesList %>%
   filter(SPCourt %in% 
            c("AREMA","BATPI","BATSA","CYACA",
              "ETELO","NEPCI","NEPHO","PYGEL")) %>%
-  bind_rows(speciesMP)
+  bind_rows(speciesMP) %>% 
+  arrange(SPCourt)
 
 reponse <- data.frame(
   Var=c("Biomass_gAFDWm2","Density_indm2","MSRtot"),
@@ -211,6 +195,13 @@ tidelevels<-data.frame(
   mutate(level=factor(label,levels=label, ordered=TRUE))
 
 anMars <- unique(Mars_csv$Annee) # used for RQ scripts
+
+```
+
+### Graphic charter
+
+```{r}
+#| label: graphchart
 
 ```
 
@@ -280,11 +271,8 @@ Mars_dat_sf$Tidal_level <- factor(Mars_dat_sf$Tidal_level, levels=tidelevels$lev
 ```
 
 #### Bioturbation potential
-https://doi.org/10.1002/ece3.769
-$$
-BP_C = \sum_{i=1}^{n}\sqrt\frac{B_i}{Ai}.A_i.M_i.R_i
-$$
 
+(solan & quieros https://doi.org/10.1002/ece3.769).
 
 MIEUX DEFINIR LES UNITES DU CALCUL BPc ET SON USAGE DENSITE? ABONDANCE?
 
@@ -293,7 +281,8 @@ MIEUX DEFINIR LES UNITES DU CALCUL BPc ET SON USAGE DENSITE? ABONDANCE?
 
 CSLN <-  CSLN %>% 
   left_join(BioturbP %>% 
-              select(AphiaID_accepted,Mi,Ri), by=c("AphiaID_accepted"))
+              select(AphiaID,Mi,Ri), by=c("AphiaID_accepted"="AphiaID"),
+            relationship ="many-to-many")
 CSLN$BPc <- sqrt(CSLN$Biomass_gAFDWm2/
                   CSLN$Density_indm2)*
   CSLN$Density_indm2*CSLN$Mi*CSLN$Ri
@@ -391,8 +380,8 @@ Made with yearly med temperature for the moment
 #| label: calculation_5
 
 CSLN_Mars$MSR_mW <- NA
-setwd(paste0(wdscript,"MSR")) # when the package is done, with repertory in it, no more needed
-source(wdmsr)
+setwd(wdmsr) # where the function is, with repertory in it
+source("MSR.R")
 for (i in which(!is.na(CSLN_Mars$temp_m) & CSLN_Mars$SP!="OTHER")){ # i=1
   CSLN_Mars$MSR_mW[i] <- msr(CSLN_Mars$Density_indm2[i],
                            CSLN_Mars$Biomass_gAFDWm2[i],
@@ -751,10 +740,10 @@ write.csv(CSLN_Stations,file=paste(wdres,"CSLN_Stations", ".csv",sep=""), na = "
 #| label: finalsave_r
 #| eval: false
 
-rm(flag_calc_mars)
 # rm(list=lsf.str()) # remove all functions
-rm(list=(ls()[grepl("tmp", ls())] ))
-save(list=(setdiff(ls()[!grepl("^wd", ls())], lsf.str())),
+rm(flag_calc_mars)
+rm(list=(ls()[grepl("tmp|^wd", ls())] ))
+save(list=(setdiff(ls(), lsf.str())),
      file = paste0(rdataout))
 beepr::beep(2)
 

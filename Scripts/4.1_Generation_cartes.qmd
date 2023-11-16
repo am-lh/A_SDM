@@ -2,7 +2,7 @@
 title: "CREATION DE CARTES DU LIEU D'ETUDE ET DES RESULTATS"
 author: "Amélie Lehuen"
 description: "add info on script"
-editor: visual
+editor: source
 execute:
   eval: true
   echo: false

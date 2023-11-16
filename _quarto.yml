@@ -1,5 +1,5 @@
 project:
-  title: "A_SDM_NEO"
+  title: "A_SDM"
   execute-dir: project
   output-dir: docs
 date: last-modified
@@ -22,8 +22,8 @@ format:
       body-width: 1000px
       margin-width: 50px
     html-math-method: katex # displays equations
-  docx: 
-    reference-doc: Manuscripts/customreference_nonb.docx
+  # docx: 
+  #   reference-doc: Manuscripts/customreference_nonb.docx
   # pdf:
   #   code-line-numbers: true
   #   geometry: 

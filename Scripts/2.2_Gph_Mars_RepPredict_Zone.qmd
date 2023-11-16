@@ -372,6 +372,12 @@ Rdata are saved in `rdataout`.
 ```{r}
 #| label: finalsave_r
 
+# rm(list=lsf.str()) # remove all functions
+# rm(list=(ls()[grepl("tmp|^wd", ls())] ))
+# save(list=(setdiff(ls()[grep("^tm_|^pl_", ls())],
+#                    lsf.str())), # select only variables that respect pattern, remove functions
+#      file = paste0(rdataout,".RData"))
+
 beepr::beep(2)
 ```
 

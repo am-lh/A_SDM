@@ -26,33 +26,13 @@ rm(list=ls())
 
 ```{r}
 #| label: load-packages
-library(conflicted)
-library(knitr)
-
-library(readxl) ; library(openxlsx) # Edition d'un fichier Excel
-library(tidyverse) #The tooltm_box indispensable
-library(reshape2); library(rlist) # the one; melt; list.append
-library(data.table)
-library(rstatix); library(Hmisc)  # corr and pvalue calculation
-
-library(ggpubr); library(GGally); # stat_compare_means ;
-library(scales); library(RColorBrewer); library(wesanderson); library(grafify); library(colorspace); library(ggsci)# show_col and colors colors colors!
-library(patchwork)
-library(ggridges)
-# GIS Packages#
-library(sf); library(sfheaders); # st_as_sf ; sf_to_df
-library(tmap); library(tmaptools)
-library(htmlwidgets) # library(leaflet) # saveWidget ; for interactive maps
-library(introdataviz) # geom_split_violin # devtools::install_github("psyteachr/introdataviz")
-
-conflict_prefer("transpose", "purrr")
-conflict_prefer("filter", "dplyr")
-conflict_prefer("select", "dplyr")
-conflict_prefer("summarise", "dplyr")
-conflict_prefer("melt", "reshape2")
-conflict_prefer("layout", "plotly")
-
-options(scipen=999) # Prevents scientific display of numbers
+list_packages <-c("beepr", "knitr", "conflicted", 
+    "tidyverse", "data.table")
+installed_packages <- list_packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(list_packages[!installed_packages])
+}
+invisible(lapply(list_packages, library, character.only = TRUE))
 ```
 
 ### Working Environment
@@ -60,12 +40,12 @@ options(scipen=999) # Prevents scientific display of numbers
 ```{r}
 #| label: workenvir
 
-backup<-"C:/Users/lehuen201/Back Up AMLH/Melting Pot/BDD/A_SDM_NEO/"
-wdmat <-paste0(backup,"Matrices/") #"Matrices/"
-wdgraph <- paste0(backup,"Plots/") #"Plots/"
+etude <- "CSLN_Mars"
+espece <- "CERED"
+
+wdmat <-"Matrices/"
 wdres <- "Results/"
-wdsource <- "Data/Faune/CSLN/"
-wdproj<-getwd()
+wdgraph <- "Plots/"
 wdGIS <- "SIG/"
 
 ```
@@ -75,14 +55,7 @@ wdGIS <- "SIG/"
 ```{r}
 #| label: functmade
 
-source("Scripts/0.0_SDM_NEO_functions.R")
-
-```
-
-### Graphic charter
-
-```{r}
-#| label: graphchart
+source("Scripts/0.0_SDM_functions.R")
 
 ```
 
@@ -113,12 +86,17 @@ rdataout <- sprintf("%sCSLN_Mars_plot",wdmat)
 ```{r}
 #| label: basicvar
 
-etude <- "CSLN_Mars"
-espece <- "CERED"
-
 sp <- which(speciesMP$SPCourt == espece)
 sai <- which(saison$M_Def == "Year") #Year Winter Summer
 
+```
+
+### Graphic charter
+
+```{r}
+#| label: graphchart
+
+my.dpi<-100
 ```
 
 # Material and methods
@@ -195,7 +173,7 @@ design <- c(
 tm_study_map<- wrap_plots(tm_Bio_g,tm_bay_g,tm_estu_g,design = design)
 
 ggsave(filename= sprintf("%sfig-map.tiff",wdgraph), 
-       tm_study_map, dpi=600, width = 10,  height = 7) #
+       tm_study_map, width = 10,  height = 7, dpi=my.dpi) #
 ```
 
 ```{r}
@@ -213,7 +191,8 @@ tm_study_map_html<-
     tm_dots(col="Zone", title="Areas", palette = areas_pal, size=0.05, alpha = 0.7) +
   tm_layout(legend.show=FALSE)
 tm_study_map_html
-tmap_save(tm_study_map_html, filename = "SIG/Estuary_map.html")
+tmap_save(tm_study_map_html, dpi=my.dpi, 
+            filename = "SIG/Estuary_map.html")
 
 ```
 
@@ -240,16 +219,14 @@ pl_mars_corr <- ggpairs(df,
       theme(axis.text = element_text(size=8),
             strip.text.y = element_text(size=8))
 
-ggsave(sprintf("%sfig-mars_corr.tiff",wdgraph),
-       plot = pl_mars_corr, width = 16, height = 9, dpi=400)
+ggsave(sprintf("%s%s/fig-mars_corr.tiff",wdgraph,espece),
+       plot = pl_mars_corr, width = 16, height = 9, dpi=my.dpi)
 
 ```
 
 # Results
 
 ## Biological data set description
-
-::: column-screen-inset-right
 
 ```{r}
 #| label: biom_distr_bd
@@ -272,11 +249,10 @@ pl_des_gt <- map(pl_des, ~{
                  } )
 
 iwalk(pl_des_gt,
-  ~ggsave(sprintf("%sfig-bio_struc_%s.tiff",wdgraph,.y),
-       plot = .x, width = 14, height = 7, dpi=400) )
+  ~ggsave(sprintf("%s%s/fig-bio_struc_%s.tiff",wdgraph,espece,.y),
+       plot = .x, width = 14, height = 7, dpi=my.dpi) )
 
 ```
-:::
 
 ## HMS data set description
 ```{r}
@@ -300,8 +276,8 @@ pl_mars_gt <- map(pl_mars,
     plot_annotation(tag_levels = c('A')) } )
 
 iwalk(pl_mars_gt,
-  ~ggsave(sprintf("%sfig-hms_struc_%s.tiff",wdgraph,.y),
-       plot = .x, width = 14, height = 7, dpi=400) )
+  ~ggsave(sprintf("%sHMS_R/fig-hms_struc_%s.tiff",wdgraph,.y),
+       plot = .x, width = 14, height = 7, dpi=my.dpi) )
 
 # Done after saving file because of special characters
 pl_mars<-pl_mars %>% 
@@ -315,7 +291,7 @@ pl_mars_gt<-pl_mars_gt %>%
 ```{r}
 #| label: hms_stat
 
-Mars_tmp<- Mars_SDM_per %>%
+Mars_tmp<- Mars_SDM_per %>%  #_per
            st_drop_geometry() %>%
            group_by(Zone) %>% 
            mutate(across(any_of(c("bathy","tenfon_mxd","temp_m")), ~f.replace_outliers(.x,1.5))) %>%
@@ -325,9 +301,9 @@ Mars_tmp<- Mars_SDM_per %>%
 pl_mars_st_board <-
   f.pl_var_st_board(Mars_tmp,pred_red)
 
-ggsave(sprintf("%s/mars_st_board.tiff", wdgraph),
+ggsave(sprintf("%sHMS_R/mars_st_board.tiff", wdgraph),
                   plot = pl_mars_st_board$all,
-                  width = 10, height = 12, dpi=600)
+                  width = 10, height = 12, dpi=my.dpi)
 
 ```
 
@@ -336,7 +312,7 @@ ggsave(sprintf("%s/mars_st_board.tiff", wdgraph),
 
 tmap_mode("plot") # "plot" "view"
 
-Mars_tmp<-Mars_SDM_per %>%
+Mars_tmp<-Mars_SDM_per %>%  #_per
            # st_drop_geometry() %>%
            group_by(Zone) %>% 
            mutate(across(all_of(c("bathy","tenfon_mxd","temp_m")), ~f.replace_outliers(.,1.5))) #%>%
@@ -349,8 +325,8 @@ pl_mars_map <-
         ~f.pl_var_map(Mars_tmp,.x))
 
 
-iwalk(pl_mars_map, ~tmap_save(.x$all, dpi=400, height=2, asp=0, #width=20,
-                          filename=sprintf("%s/%s_map.tiff",
+iwalk(pl_mars_map, ~tmap_save(.x$all, dpi=my.dpi, height=2, asp=0, #width=20,
+                          filename=sprintf("%sHMS_R/%s_map.tiff",
                               wdgraph, .y) ) )
 
 tm_mars_gb <- map(pl_mars_map, ~ .x$all + 
@@ -361,8 +337,8 @@ tm_mars_gb <- map(pl_mars_map, ~ .x$all +
     tmap_arrange(., asp=NA, ncol=1,
                  sync = TRUE, outer.margins=0)
 
-tmap_save(tm_mars_gb, dpi=600,
-              filename= sprintf("%sfig-graphboard_map_mars.tiff",wdgraph) )
+tmap_save(tm_mars_gb, dpi=my.dpi,
+              filename= sprintf("%sHMS_R/fig-graphboard_map_mars.tiff",wdgraph) )
 
 ```
 
@@ -370,16 +346,17 @@ tmap_save(tm_mars_gb, dpi=600,
 ```{r}
 #| label: hms_map_gif
 
-# Mars_tmp<-Mars_SDM %>%
-#            # mutate(across(where(is.numeric), ~f.replace_outliers(.,2))) %>% 
-#            # mutate(across(all_of(c("bathy","tenfon_mxd")), ~f.replace_outliers(.,1.5))) %>%
-#            # filter(!Zone %in% c("Octeville","Cote Fleurie")) %>%
-#            mutate(across(where(is.factor), fct_drop))
+Mars_tmp<-Mars_SDM %>%
+           # mutate(across(where(is.numeric), ~f.replace_outliers(.,2))) %>%
+           # mutate(across(all_of(c("bathy","tenfon_mxd")), ~f.replace_outliers(.,1.5))) %>%
+           # filter(!Zone %in% c("Octeville","Cote Fleurie")) %>%
+           mutate(across(where(is.factor), fct_drop))
 
-# pl_mars_map_gif <-
-#     map(pred_red %>% transpose %>% 
-#            setNames(.,pred_red$Var),
-#         ~f.pl_var_map_gif(Mars_tmp,.x))
+pl_mars_map_gif <-
+    map(pred_red %>% 
+          transpose %>%
+          setNames(.,pred_red$Var),
+        ~f.pl_var_map_gif(Mars_tmp,.x))
 
 ```
 
