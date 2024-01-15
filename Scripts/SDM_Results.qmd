@@ -20,6 +20,7 @@ editor_options:
 rm(list=ls())
 # to render all formats of this script (to specific format) IN TERMINAL
 # quarto render Scripts/Results.qmd # (--to html --to docx --to pdf)
+
 ```
 
 ```{r}
@@ -144,9 +145,9 @@ tmap_mode("view") # "plot" "view"
 tm_study_map_html
 
 if(save_plot){
-ggsave(tm_study_map, 
-          filename= sprintf("%sfig-map.tiff",wdgraph), 
-       dpi=my.dpi, width = 10,  height = 7)  }
+  ggsave(plot =  tm_study_map,
+    width = 10, height = 7, dpi = my.dpi,
+    filename=sprintf("%sfig-map.tiff", wdgraph) )  }
 ```
 :::
 
@@ -282,52 +283,6 @@ The HMS model cells corresponding to the location of the stations in the biologi
 
 ### Calculation and selection of predictors
 
-::: column-page-right
-```{r}
-#| label: globcorr
-
-df <- CSLN_mud %>% 
-  filter(SPCourt == espece) %>%
-  select(paste(factors[,1],saison[sai,1],sep=""),
-         map(reponse_l,~.x$Var) %>% unlist(., use.names=FALSE) )
-
-dfcornew <- f.corstars(df, result="none",removeTriangle="") %>% 
-  mutate(variable=rownames(.)) %>% 
-  relocate(variable)
-# dftest<-dfcornew %>% mutate(across(.cols = everything(), str_replace_all, ".*\\s", ""))
-
-```
-
-A correlation study was conducted on all HMS variables to select the most pertinent factors and to avoid autocorrelation between factors (@fig-mars_corr). All the environmental factors were calculated as annual means of model variables.
-
--   **Daily maximum current speed** \[`r factors[2,3]`\] was preferred to current speed  \[`r factors[1,3]`\] to reflect the hydrodynamics that occur on the mudflats due to tidal cycles (Corr = `r dfcornew %>% filter(variable %in% "flow_mxd") %>% select(flow_m) %>% pull()`).
--   **Inundation time** \[`r factors[3,3]`\] is usually used to reflect the tidal position of benthic organisms.
--   **Daily salinity range** (min-max of the day) was preferred to salinity to emphasise the influence of the tide (Corr = `r dfcornew %>% filter(variable %in% "sal_dtd") %>% select(sal_m) %>% pull()`).
--   **Temperature** \[`r factors[6,3]`\] was picked upon temperature daily range \[`r factors[7,3]`\] for its accessibility (Corr = `r dfcornew %>% filter(variable %in% "temp_dtd") %>% select(temp_m) %>% pull()`) and the range being reflected by the inundation time (Corr = `r dfcornew %>% filter(variable %in% "temp_dtd") %>% select(inunt) %>% pull()`).
--   **Mud content** \[`r factors[14,3]`\] (particles \<63µm) was preferred to the total concentration of sediment \[`r factors[13,3]`\] to reflect the condition of the habitat (Corr = `r dfcornew %>% filter(variable %in% "mudrate_m") %>% select(Csed_m) %>% pull()`).
--   **Daily maximum bed shear stress** \[`r factors[12,3]`\] is poorly correlated with bed shear stress \[`r factors[11,3]`\] (Corr = `r dfcornew %>% filter(variable %in% "tenfon_mxd") %>% select(tenfon_m) %>% pull()`) but the former was nevertheless preferred as evidence for the extreme local conditions that can lead to erosion of the sediment.
--   **Bathymetry** \[`r factors[9,3]`\] relative to the mean sea level, is correlated with several factors, but poorly with the daily salinity range (Corr = `r dfcornew %>% filter(variable %in% "sal_dtd") %>% select(bathy) %>% pull()`). It was kept for its wide accessibility in any estuary.
--   MES mud \[`r factors[8,3]`\] was not selected to focus on benthic erosion phenomena more than maximal turbidity zone (MTZ) processes even though it was not correlated to a lot of factors.
-
-There was no correlation between biological variables (biomass and density) and any of the environmental factors. Despite the high level of correlation and significance between biomass and density (Corr = `r dfcornew %>% filter(variable %in% "Density_indm2") %>% select(Biomass_gAFDWm2) %>% pull()`), neither of the factors was fully redundant, and the two were consequently analysed in parallel.
-
-```{r}
-#| label: fig-mars_corr
-#| include: true
-#| fig-cap: "Correlation plot of all variables extracted from MARS3D dataset corresponding to biomass and densities from biological dataset. Correlation scores are shown above the diagonal, scatter plots with a linear regression below the diagonal, while the diagonal itself shows the density plot of each variable." 
-#| fig-width: 14
-#| fig-height: 10
-
-pl_mars_corr
-
-if(save_plot){
-  ggsave(plot = pl_mars_corr,
-         width=16, height=9, dpi=my.dpi,
-         filename=sprintf("%sfig-mars_corr.tiff",wdgraph) )  }
-
-```
-:::
-
 ## Models adjustments
 
 ### Quantile regression
@@ -344,7 +299,7 @@ The biological responses used were density \[ind.m-2\] and biomass \[gAFDW.m-2\]
 A.  Daily max current speed \[`r factors[2,3]`\] and inundation time \[`r factors[3,3]`\]: These variables are easily retrieved at high frequency and enable comparison with [@cozzoli2014].They are also interesting because they contain information on the position in the tidal area that could evolve with sea level rise and information on the hydrological conditions including fluctuations in the flow rate of the river linked to climate change. A significant correlation was observed between these two variables in the HMS dataset (Corr = `r dfcornew %>% filter(variable %in% "flow_mxd") %>% select(inunt) %>% pull()`)
 B.  Daily salinity range and temperature  \[`r factors[6,3]`\]: These factors are easily measurable at high frequency (Goberville et al., 2010) (Corr = `r dfcornew %>% filter(variable %in% "sal_dtd") %>% select(temp_m) %>% pull()`). They illustrate two aspects of climate change: global warming and changes in the river regime that have an impact on the salinity profile of the estuary (Lheureux et al., 2022). Temperature also has an impact on the metabolism of the fauna and hence on their activity.
 C.  Daily salinity range and bathymetry \[`r factors[9,3]`\]: Both factors are accessible at high frequency, at large scale, and can be measured remotely. They provide a good geographical description of the estuary, and are strongly affected by climate change, especially by sea level rise, marine intrusion, and changes in the river regime (Corr = `r dfcornew %>% filter(variable %in% "sal_dtd") %>% select(bathy) %>% pull()`).
-D.  Mud content \[`r factors[14,3]`\] and bed shear stress \[`r factors[11,3]`\]: These variables play a determining role in building an erosion model in the HMS model (Corr = `r dfcornew %>% filter(variable %in% "mudrate_m") %>% select(tenfon_m) %>% pull()`). In addition, the choice relies on close links between the features of the sediment and the responses of the benthic communities (Andersen et al., 2005).
+D.  Mud content \[`r factors[14,3]`\] and daily max bed shear stress \[`r factors[11,3]`\]: These variables play a determining role in building an erosion model in the HMS model (Corr = `r dfcornew %>% filter(variable %in% "mudrate_m") %>% select(tenfon_mxd) %>% pull()`). In addition, the choice relies on close links between the features of the sediment and the responses of the benthic communities (Andersen et al., 2005).
 :::
 
 ### Model Validation
@@ -404,10 +359,114 @@ if(save_plot){
     ~ggsave(plot = .x,
          width=12, height=6, dpi=my.dpi, 
          filename=sprintf("%sfig-bio_struc_%s.tiff",wdgraph,.y) ) )  }
+
 ```
 :::
 
-## Description of the Hydro-Morpho-Sedimentary data set 
+## Selection of the Hydro-Morpho-Sedimentary factors
+
+```{r}
+#| label: fig-mars_corr
+#| include: true
+#| fig-cap: "Correlation plot of all variables extracted from MARS3D dataset corresponding to biomass and densities from biological dataset. Correlation scores are shown above the diagonal, scatter plots with a linear regression below the diagonal, while the diagonal itself shows the density plot of each variable." 
+#| fig-width: 14
+#| fig-height: 10
+
+pl_mars_corr
+
+if(save_plot){
+  ggsave(plot = pl_mars_corr,
+         width=16, height=9, dpi=my.dpi,
+         filename=sprintf("%sfig-mars_corr.tiff",wdgraph) )  }
+
+```
+
+### Predictors selection
+
+```{r}
+#| label: fig-mars_matrix
+#| include: true
+#| fig-cap: "Correlation matrix of each abiotic factors and biomass and density of C. edule"
+#| fig-width: 16
+#| fig-height: 10
+
+pl_mars_corr
+
+```
+
+::: panel-tabset
+
+#### Scree plot
+```{r}
+#| label: fig-mars_pca1
+#| include: true
+#| fig-cap: "Screeplot for abiotic factors"
+#| fig-width: 16
+#| fig-height: 10
+
+pl_pca1
+
+```
+
+#### Graph of variables
+```{r}
+#| label: fig-mars_pca3
+#| include: true
+#| fig-cap: "PCA for abiotic factors"
+#| fig-width: 16
+#| fig-height: 10
+
+pl_pca3
+if(save_plot){
+  ggsave(filename=sprintf("%sHMS_R/fig-mars_pca3.tiff", wdgraph),
+    plot =  pl_pca3 ,
+    width = 9, height = 10, dpi = my.dpi )  }
+```
+
+#### Graph with areas and tidal level
+```{r}
+#| label: fig-mars_pca6
+#| include: true
+#| fig-cap: "PCA for abiotic factors with areas and tidal level"
+#| fig-width: 16
+#| fig-height: 10
+
+pl_pca6
+if(save_plot){
+  ggsave(filename=sprintf("%sHMS_R/fig-mars_pca6.tiff", wdgraph),
+    plot =  pl_pca6,
+    width = 6, height = 10, dpi = my.dpi )  }
+```
+
+:::
+
+```{r}
+#| label: globcorr
+
+df <- CSLN_mud %>% 
+  filter(SPCourt == espece) %>%
+  select(paste(factors[,1],saison[sai,1],sep=""),
+         map(reponse_l,~.x$Var) %>% unlist(., use.names=FALSE) )
+
+dfcornew <- f.corstars(df, result="none",removeTriangle="") %>% 
+  mutate(variable=rownames(.)) %>% 
+  relocate(variable)
+# dftest<-dfcornew %>% mutate(across(.cols = everything(), str_replace_all, ".*\\s", ""))
+
+```
+
+-   **Daily maximum current speed** \[`r factors[2,3]`\] was preferred to current speed  \[`r factors[1,3]`\] to reflect the hydrodynamics that occur on the mudflats due to tidal cycles (Corr = `r dfcornew %>% filter(variable %in% "flow_mxd") %>% select(flow_m) %>% pull()`).
+-   **Inundation time** \[`r factors[3,3]`\] is usually used to reflect the tidal position of benthic organisms.
+-   **Daily salinity range** (min-max of the day) was preferred to salinity to emphasise the influence of the tide (Corr = `r dfcornew %>% filter(variable %in% "sal_dtd") %>% select(sal_m) %>% pull()`).
+-   **Temperature** \[`r factors[6,3]`\] was picked upon temperature daily range \[`r factors[7,3]`\] for its accessibility (Corr = `r dfcornew %>% filter(variable %in% "temp_dtd") %>% select(temp_m) %>% pull()`) and the range being reflected by the inundation time (Corr = `r dfcornew %>% filter(variable %in% "temp_dtd") %>% select(inunt) %>% pull()`).
+-   **Mud content** \[`r factors[14,3]`\] (particles \<63µm) was preferred to the total concentration of sediment \[`r factors[13,3]`\] to reflect the condition of the habitat (Corr = `r dfcornew %>% filter(variable %in% "mudrate_m") %>% select(Csed_m) %>% pull()`).
+-   **Daily maximum bed shear stress** \[`r factors[12,3]`\] is poorly correlated with bed shear stress \[`r factors[11,3]`\] (Corr = `r dfcornew %>% filter(variable %in% "tenfon_mxd") %>% select(tenfon_m) %>% pull()`) but the former was nevertheless preferred as evidence for the extreme local conditions that can lead to erosion of the sediment.
+-   **Bathymetry** \[`r factors[9,3]`\] relative to the mean sea level, is correlated with several factors, but poorly with the daily salinity range (Corr = `r dfcornew %>% filter(variable %in% "sal_dtd") %>% select(bathy) %>% pull()`). It was kept for its wide accessibility in any estuary.
+-   MES mud \[`r factors[8,3]`\] was not selected to focus on benthic erosion phenomena more than maximal turbidity zone (MTZ) processes even though it was not correlated to a lot of factors.
+
+There was no correlation between biological variables (biomass and density) and any of the environmental factors. Despite the high level of correlation and significance between biomass and density (Corr = `r dfcornew %>% filter(variable %in% "Density_indm2") %>% select(Biomass_gAFDWm2) %>% pull()`), neither of the factors was fully redundant, and the two were consequently analysed in parallel.
+
+## Description of the Hydro-Morpho-Sedimentary data 
 
 ::: column-page-right
 ```{r}
@@ -425,19 +484,19 @@ df<- Mars_SDM_per %>%
 
 The selected predictors were observed in the same period and in the same area as the biological data (@fig-mars_map). Generally speaking, all the factors differed significantly in area and period:
 
--   Daily max current speed \[m.s-1\]: the most dynamic area was the channel, with a mean of `r df$flow_mxd.m[which(df$Zone=="Channel")]` +/- `r df$flow_mxd.sd[which(df$Zone=="Channel")]`. The northern upstream and median mudflats were subject to temporal changes in the distribution of the current, which had an impact on their global mean (upstream `r df$flow_mxd.m[which(df$Zone=="North Upstream Mudflat")]` +/- `r df$flow_mxd.sd[which(df$Zone=="North Upstream Mudflat")]`; median `r df$flow_mxd.m[which(df$Zone=="North Median Mudflat")]` +/- `r df$flow_mxd.sd[which(df$Zone=="North Median Mudflat")]`). The distribution of the north median mudflat changed significantly, bimodal in the first periods, to become unimodal at the end. From a spatial point of view, the closer to the estuary mouth, the higher the mean current speed.
+-   Daily max current speed \[m.s^{-1}\]: mean of `r df$flow_mxd.m[which(df$Zone=="Channel")]` +/- `r df$flow_mxd.sd[which(df$Zone=="Channel")]`(upstream `r df$flow_mxd.m[which(df$Zone=="North Upstream Mudflat")]` +/- `r df$flow_mxd.sd[which(df$Zone=="North Upstream Mudflat")]`; median `r df$flow_mxd.m[which(df$Zone=="North Median Mudflat")]` +/- `r df$flow_mxd.sd[which(df$Zone=="North Median Mudflat")]`). 
 
--   Inundation time \[%\]: Only the north median and upstream mudflats were truly intertidal, the upstream mudflat had higher tidal locations than the median mudflat. The bimodal tidal rhythm of the north median mudflat disappeared over time, consistent with the observed current speed. At some locations, the south mudflat had low tidal values, but overall, was mainly subtidal.
+-   Inundation time \[%\]
 
--   Daily salinity range: This factor varied considerably in space and over time. Offshore, salinity varied little during the day, but there was a low second modality (around 10) at all periods. Strongly influenced by the river, salinity in the channel was 15-20 during the day, but with a significant reduction as time went by. The highly dynamic variations in salinity in the three north mudflats decreased after 2005.
+-   Daily salinity range
 
--   Temperature \[degC\]: A global increase in temperature was observed in all areas over time. The north median mudflat had the highest range, due to its intertidal location.
+-   Temperature \[°C\]
 
--   Mud content \[%\]: Offshore and the south mudflat were made of muddy fine sands, the north, downstream, and median mudflats contained more sandy muds, whereas the composition of the sediment in the north upstream and channel areas varied widely. Mud distribution was heterogeneous in all the areas.
+-   Mud content \[%\]
 
--   Daily max bed shear stress \[N.m-2\]: as reflected in the current speed, the channel had the highest BSS (`r df$tenfon_mxd.m[which(df$Zone=="Channel")]` +/- `r df$tenfon_mxd.sd[which(df$Zone=="Channel")]`), while the BSS in the other areas was similar (`r round(mean(df$tenfon_mxd.m[-which(df$Zone=="Channel")]),2)` +/- `r round(sd(df$tenfon_mxd.m[-which(df$Zone=="Channel")]),2)`). Changes in BSS in the north median mudflat over time were consistent with current speed and inundation time.
+-   Daily max bed shear stress \[N.m^{-2}\]: channel BSS mean (`r df$tenfon_mxd.m[which(df$Zone=="Channel")]` +/- `r df$tenfon_mxd.sd[which(df$Zone=="Channel")]`), BSS in the other areas (`r round(mean(df$tenfon_mxd.m[-which(df$Zone=="Channel")]),2)` +/- `r round(sd(df$tenfon_mxd.m[-which(df$Zone=="Channel")]),2)`). 
 
--   Bathymetry \[m\]: The depth of the channel and offshore were similar, with a mean range of `r paste0(range(df$bathy.m[which(df$Zone %in% c("Channel", "OffShore"))]),collapse="-")`. The north downstream mudflat and the south mudflat were the next deepest areas (`r round(mean(df$bathy.m[which(df$Zone %in% c("North Downstream Mudflat", "South Mudflat"))]),2)` +/- `r round(sd(df$bathy.m[which(df$Zone %in% c("North Downstream Mudflat", "South Mudflat"))]),2)` ), the median mudflat was `r df$bathy.m[which(df$Zone %in% c("North Median Mudflat"))]` +/- `r df$bathy.sd[which(df$Zone %in% c("North Median Mudflat"))]`, and north upstream mudflat was the shallowest, `r df$bathy.m[which(df$Zone %in% c("North Upstream Mudflat"))]` +/- `r df$bathy.sd[which(df$Zone %in% c("North Upstream Mudflat"))]` (negative bathymetry being above the mean height of sea water). The north median mudflat was bimodal before 2000, with some shallow areas and some more intertidal, but then changed, losing the upper areas and becoming unimodal.
+-   Bathymetry \[m\]: The depth of the channel and offshore mean range of `r paste0(range(df$bathy.m[which(df$Zone %in% c("Channel", "OffShore"))]),collapse="-")`. The north downstream mudflat and the south mudflat were the next deepest areas (`r round(mean(df$bathy.m[which(df$Zone %in% c("North Downstream Mudflat", "South Mudflat"))]),2)` +/- `r round(sd(df$bathy.m[which(df$Zone %in% c("North Downstream Mudflat", "South Mudflat"))]),2)` ), the median mudflat was `r df$bathy.m[which(df$Zone %in% c("North Median Mudflat"))]` +/- `r df$bathy.sd[which(df$Zone %in% c("North Median Mudflat"))]`, and north upstream mudflat was the shallowest, `r df$bathy.m[which(df$Zone %in% c("North Upstream Mudflat"))]` +/- `r df$bathy.sd[which(df$Zone %in% c("North Upstream Mudflat"))]` (negative bathymetry being above the mean height of sea water).
 
 ::: panel-tabset
 ### Map
@@ -474,6 +533,7 @@ if(save_plot){
 ```
 :::
 
+### Predictor density plots detailed
 ::: panel-tabset
 ```{r}
 #| include: true
@@ -498,31 +558,37 @@ if(save_plot){
 
 ```
 :::
-:::
 
 ## Methodology assessment
 
 ```{r}
 
-# tmp_plot<-(rqdata$pl_rq_all_1d[["Biomass"]][["RQ1add_11110"]] + 
-# nlrqdata$pl_rq_all_1d[["Biomass"]][["RQ1nli_11110"]]) &
-#   plot_layout(nrow=1, guides="collect") &
-#   theme(legend.position = "bottom") &
-#   plot_annotation(tag_levels = c("A"))
-# 
-# ggsave(sprintf("%sRQ lin nli 1D compa example.tiff",wdgraph),
-#        plot = tmp_plot,
-#        width = 12, height = 6, dpi=my.dpi)
+if(save_plot){
+  ggsave(plot =  rqdata$pl_rq_all_1d$Biomass$RQ1add_11110 +
+           theme(plot.title = element_blank()) ,
+    width = 5, height = 5, dpi = my.dpi,
+    filename=sprintf("%sRQ_li_example.tiff",wdgraph) )  }
+if(save_plot){
+  ggsave(plot =  nlrqdata$pl_rq_all_1d$Biomass$RQ1nli_11110 +
+           theme(plot.title = element_blank()) ,
+    width = 5, height = 5, dpi = my.dpi,
+    filename=sprintf("%sRQ_nli_example.tiff",wdgraph) )  }
+if(save_plot){
+  ggsave(plot =  rqbsdata$pl_rq_all_1d$Biomass$RQ1bsp_11110 +
+           theme(plot.title = element_blank()) ,
+    width = 5, height = 5, dpi = my.dpi,
+    filename=sprintf("%sRQ_bs_example.tiff",wdgraph) )  }
 
-# titleG <- sprintf("%s", analysis)
-# tmp_plot<-wrap_plots(rqdata$pl_rq_all_sum$Biomass$RQ1add_11110,
-#           nlrqdata$pl_rq_all_sum$Biomass$RQ1nli_11110) & 
-#   plot_layout(guides="collect", design = "AABBB") & 
-#   theme(legend.position = "bottom") & 
+# tmp_plot<-(rqdata$pl_rq_all_1d[["Biomass"]][["RQ1add_11110"]] +
+#            nlrqdata$pl_rq_all_1d[["Biomass"]][["RQ1nli_11110"]]) &
+#   plot_layout(nrow=1, guides="collect") &
+#   theme(legend.positi6on = "bottom") &
 #   plot_annotation(tag_levels = c("A"))
-# ggsave(sprintf("%sRQ lin nli 1D summry example.tiff",wdgraph),
-#        plot = tmp_plot,
-#        width = 15, height = 4, dpi=my.dpi)
+# if(save_plot){
+# ggsave(plot = tmp_plot,
+#   width = 12, height = 6, dpi=my.dpi,
+#   filename=sprintf("%sRQ lin nli 1D compa example.tiff",wdgraph))  }
+
 
 ```
 
@@ -595,17 +661,17 @@ tmprone2<- bind_rows(
   
 ```
 
-All three models were used to calculate the SDM-NEO for each set at the different quantiles chosen. A general comparison of ∆AICc scores was undertaken for all the SDM-NEOs computed (@fig-aic_3mod). The SDM-NEO scores based on density were significantly higher than those based on biomass, and the choice of the quantile had a strong impact on the score. For instance, the best scores were obtained for the biomass SDM-NEOs with the 0.5 quantile, which would not help describe the optimum ecological niche. On average, the BSpline model ∆AICc were lower than the others (`r tmpaic`). With the same biological response and quantile (Biomass and tau=0.95), the variations between SDM-NEO ∆AICcs were quite low with respect to total variability (`r tmpaic2`).
+All three models were used to calculate the SDM for each set at the different quantiles chosen. A general comparison of ∆AICc scores was undertaken for all the SDMs computed (@fig-aic_3mod). The SDM scores based on density were significantly higher than those based on biomass, and the choice of the quantile had a strong impact on the score. For instance, the best scores were obtained for the biomass SDMs with the 0.5 quantile, which would not help describe the optimum ecological niche. On average, the BSpline model ∆AICc were lower than the others (`r tmpaic`). With the same biological response and quantile (Biomass and tau=0.95), the variations between SDM ∆AICcs were quite low with respect to total variability (`r tmpaic2`).
 
 The predicted/observed plots (@fig-rq_po_brd shows an example from set A), completed the observations of ∆AICc, i.e. RQ2bsp \> RQ2nli \> RQ2int (the regression lines of each quantile were closer to the 1:1 line). However, RQ2nli performed better than RQ2bsp at some quantiles, in particular at the 95th centile, which was defined as the optimum quantile, i.e. the highest quantile that did not affect model quality, and was hence used for all subsequent analyses.
 
-Based on the range of both predictors under each set, the quantile responses of SDM-NEOs were calculated and illustrated by a surface plot (@fig-3mod shows an example from set A, interactive 3D plots below). Although the performance indicators were good, graphically, the RQ2bsp model showed overfitting which prevented both modelling and prediction. This model was thus not used for any more analysis.
+Based on the range of both predictors under each set, the quantile responses of SDMs were calculated and illustrated by a surface plot (@fig-3mod shows an example from set A, interactive 3D plots below). Although the performance indicators were good, graphically, the RQ2bsp model showed overfitting which prevented both modelling and prediction. This model was thus not used for any more analysis.
 
 ```{r}
 #| label: fig-aic_3mod
 #| include: true
 #| column: page-right
-#| fig-cap: "∆AICc comparison for all SDM-NEOs computed, according to the quantile, the type of model and the response."
+#| fig-cap: "∆AICc comparison for all SDMs computed, according to the quantile, the type of model and the response."
 #| fig-height: 4
 
 AIC_plot<-bind_rows(
@@ -630,11 +696,11 @@ AIC_plot<-bind_rows(
   scale_color_manual(values=colRQ) +
   # facet_grid(.~Indicator, scales="free") +
   labs(#title=titleG, 
-       # x="biological",y="Indicator",
+       y=bquote(Delta*AICc), #y="Indicator",
        color="Quantile",shape="Model") +
   theme(aspect.ratio=1,
         axis.text = element_text(size=10,face="bold"),
-        axis.title = element_blank()) +
+        axis.title.y = element_blank()) +
   coord_flip(); AIC_plot
   
 if(save_plot){
@@ -690,13 +756,13 @@ sdi<-1
 titleG <- sprintf("Linear QR comparison addition and interacton")
 p1<-rqdata$pl_rq_sel_2d[[repi]][[sdi]]$all + 
       labs(title="Linear interaction",
-           fill=NULL)
+           fill=expression(g[AFDW]~.m^{-2}) ) # reponse$Unit[repi] ou Unit_tx? bquote?
 p2<-nlrqdata$pl_rq_sel_2d[[repi]][[sdi]]$all + 
       labs(title="Gaussian non-linear",
-           fill=NULL)
+           fill=expression(g[AFDW]~.m^{-2}) ) # reponse$Unit[repi]
 p3<-rqbsdata$pl_rq_sel_2d[[repi]][[sdi]]$all + 
       labs(title="B-Spline linear",
-           fill=NULL)
+           fill=expression(g[AFDW]~.m^{-2}) ) # reponse$Unit[repi]
 
 plot_tmp <- ggarrange(
   p1 + theme(axis.title = element_blank(),
@@ -728,10 +794,31 @@ plot_2d <- annotate_figure(plot_tmp,
                 left = text_grob(p1$labels$y, rot = 90),
                 bottom = text_grob(p1$labels$x))
 
+
 if(save_plot){
   ggsave(plot = plot_2d + bgcolor("white"),
        width=18, height=8, dpi=my.dpi,
        filename=sprintf("%sfig-3mod.tiff",wdgraph)) }
+
+# # In case to redo the snapshot of 3d plots, snapshot are done manually
+# fig<-rqdata$pl_rq_sel_3d$Biomass$RQ2int_11112$all %>%
+#   layout(scene = list(
+#     xaxis = list(titlefont = list(size = 24), tickfont = list(size = 16)),
+#     yaxis = list(titlefont = list(size = 26), tickfont = list(size = 16)),
+#     zaxis = list(titlefont = list(size = 26), tickfont = list(size = 16)) )) %>%
+#   config( toImageButtonOptions = list( format = "png" )  ) ; fig
+# fig<-nlrqdata$pl_rq_sel_3d$Biomass$RQ2nli_11112$all %>%
+#   layout(scene = list(
+#     xaxis = list(titlefont = list(size = 24), tickfont = list(size = 16)),
+#     yaxis = list(titlefont = list(size = 26), tickfont = list(size = 16)),
+#     zaxis = list(titlefont = list(size = 26), tickfont = list(size = 16)) )) %>%
+#   config( toImageButtonOptions = list( format = "png" )  ) ; fig
+# fig<-rqbsdata$pl_rq_sel_3d$Biomass$RQ2bsp_11112$all %>%
+#   layout(scene = list(
+#     xaxis = list(titlefont = list(size = 24), tickfont = list(size = 16)),
+#     yaxis = list(titlefont = list(size = 26), tickfont = list(size = 16)),
+#     zaxis = list(titlefont = list(size = 26), tickfont = list(size = 16)) )) %>%
+#   config( toImageButtonOptions = list( format = "png" )  ) ; fig
 
 im_RQ2int <- fig("Pictures/fig-graph_3d_RQ2int_11112.png")
 im_RQ2nli <- fig("Pictures/fig-graph_3d_RQ2nli_11112.png")
@@ -750,12 +837,12 @@ if(save_plot){
 #| label: fig-3mod
 #| include: true
 #| column: page-right
-#| fig-cap: "Examples of SDM-NEO surface plots under set A: linear with interaction (A), Gaussian non-linear (B) and Cubic B-Spline linear (C). The upper panel shows the surfaces side by side, the lower panel shows the 3D plots with all processed quantiles superposed. The biological data observed with this model are represented by a contour plot, the data over the model are represented by red stars."
+#| fig-cap: "Examples of SDM surface plots under set A: linear with interaction (A), Gaussian non-linear (B) and Cubic B-Spline linear (C). The upper panel shows the surfaces side by side, the lower panel shows the 3D plots with all processed quantiles superposed. The biological data observed with this model are represented by a contour plot, the data over the model are represented by red stars."
 #| fig-width: 16
 #| fig-height: 10
 
 plot_tmp<- plot_2d / plot_img3d +
-  plot_layout(widths = c())
+  plot_layout(widths = c()) 
 print(plot_tmp)
 
 if(save_plot){
@@ -771,7 +858,7 @@ if(save_plot){
 #| include: true
 #| column: page-right
 #| layout-ncol: 3
-#| fig-cap: "SDM-NEO interactive 3D plots"
+#| fig-cap: "SDM interactive 3D plots"
 #| fig-width: 16
 #| fig-height: 10
 
@@ -784,7 +871,7 @@ rqbsdata$pl_rq_sel_3d$Biomass$RQ2bsp_11112$all
 
 :::
 
-## Species Distribution Models – Optimal Ecological Niche (SDM-NEO)
+## Species Distribution Models – Optimal Ecological Niche (SDM)
 
 ### Comparison of linear and nonlinear Quantile Regression
 
@@ -812,7 +899,7 @@ nlrq_opti<-map_depth(nlrqdata$rq_Mod_sel,2,
 
 ```
 
-The four sets (A, B, C and D) were treated with one of the two selected models: either linear with interaction, or non-linear with a bifactorial Gaussian equation, with biomass as biological response (with predict/observed plot, SDM-NEOs with the distribution of HMS data, RQ2nli SDM-NEOs were represented in 3D graph in @sec-sdm_3d).
+The four sets (A, B, C and D) were treated with one of the two selected models: either linear with interaction, or non-linear with a bifactorial Gaussian equation, with biomass as biological response (with predict/observed plot, SDMs with the distribution of HMS data, RQ2nli SDMs were represented in 3D graph in @sec-sdm_3d).
 
 A.  Daily max current speed \[`r factors[2,3]`\] and inundation time \[`r factors[3,3]`\]:
     1.  RQ2int optimum was `r rq_opti$Biomass$maxsdm[1]`gAFDW/m², at `r rq_opti$Biomass$optx1[1]` `r  factors[2,3]` and `r rq_opti$Biomass$optx2[1]` `r factors[3,3]`; RQ2nli optimum was `r nlrq_opti$Biomass$maxsdm[1]`gAFDW/m² at `r nlrq_opti$Biomass$optx1[1]` `r factors[2,3]` and `r nlrq_opti$Biomass$optx2[1]` `r factors[3,3]`.
@@ -887,7 +974,7 @@ pl_brd_rq_nlrq <-
           } ) %>% 
       wrap_plots(nrow=1,ncol=4,tag_level="new") & #plot_layout(widths = c(.1,50,.1,50)) +
       labs(fill=..3$Unit) & #
-      plot_annotation(title = sprintf("SDM-NEO based on %s (tau=%g)",..3$whole,taus[taut]),
+      plot_annotation(title = sprintf("SDM based on %s (tau=%g)",..3$whole,taus[taut]),
                       tag_levels = c('A', '1')) & 
       theme()
     ) # ; pl_brd_rq_nlrq$Biomass
@@ -968,7 +1055,7 @@ pl_brd_rq_nlrq_real <- map2(plot_rq_real,plot_nlrq_real,
               legend.position = "bottom") 
         } ) %>% 
   wrap_plots(nrow=1,ncol=4,tag_level="new") + #plot_layout(widths = c(.1,50,.1,50)) +
-  plot_annotation(title = sprintf("SDM-NEO (tau=%g)",taus[taut]),
+  plot_annotation(title = sprintf("SDM (tau=%g)",taus[taut]),
                   tag_levels = c('A', '1')) & 
   theme()
   )
@@ -1001,7 +1088,7 @@ iwalk(pl_brd_rq_nlrq,
 ```{r}
 #| include: true
 #| results: asis
-#| fig-cap: "Modelled vs observed data plot for RQ2int and RQ2nli SDM-NEO. Black line represents the 1:1 ratio"
+#| fig-cap: "Modelled vs observed data plot for RQ2int and RQ2nli SDM. Black line represents the 1:1 ratio"
 #| fig-width: 16
 #| fig-height: 8
 
@@ -1034,10 +1121,10 @@ iwalk(pl_brd_rq_nlrq_real,
 
 ::: {.content-visible when-format="html"}
 
-#### Interactive 3D SDM-NEO visualisation {#sec-sdm_3d}
+#### Interactive 3D SDM visualisation {#sec-sdm_3d}
 
 ::: column-page-right
-Only RQ2nli SDM-NEO were represented, with all quantiles representation :
+Only RQ2nli SDM were represented, with all quantiles representation :
 
 ```{r}
 #| include: true
@@ -1047,6 +1134,7 @@ nlrqdata$pl_rq_sel_3d$Biomass$RQ2nli_11112$all
 nlrqdata$pl_rq_sel_3d$Biomass$RQ2nli_11134$all
 nlrqdata$pl_rq_sel_3d$Biomass$RQ2nli_11137$all
 nlrqdata$pl_rq_sel_3d$Biomass$RQ2nli_11156$all
+
 
 ```
 
@@ -1069,11 +1157,11 @@ nlrqdata$pl_rq_sel_3d$Biomass$RQ2nli_11156$one[[sprintf("%0.3f",tauchoice)]]
 ### Non-linear quantile regression with bifactorial Gaussian equation models
 
 ::: column-page-right
-Overall, the non-linear model performed better than the linear model, and the density-based models were generally less relevant than models based on biomass. Thus, the RQ2nli for biomass was the only model geographically applied and analysed. Each SDM-NEO for the RQ2nli model was applied on the HMS model web over the estuary, for each period  (@sec-map). The suitability index is given per period and area (@sec-suitability) and density plots were drawn for each SDM-NEO, focusing on mudflats to facilitate comparison (@sec-densplot).
+Overall, the non-linear model performed better than the linear model, and the density-based models were generally less relevant than models based on biomass. Thus, the RQ2nli for biomass was the only model geographically applied and analysed. Each SDM for the RQ2nli model was applied on the HMS model web over the estuary, for each period  (@sec-map). The suitability index is given per period and area (@sec-suitability) and density plots were drawn for each SDM, focusing on mudflats to facilitate comparison (@sec-densplot).
 
 A.  Daily max current speed \[m.s-1\] and inundation time \[%\]:The channel and north mudflats were the least favourable areas, the south mudflats and offshore were more appropriate, but few locations were really optimum. These locations were in the north of the offshore area, corresponding to Le Havre beach, and Cote Fleurie, which were not known as optimal. The suitability index, which ranged from 0.1 to 0.5 and was generally stable, confirmed that the most suitable areas were the Cote Fleurie followed by the subtidal Octeville and offshore, the two latter being very similar. The suitability of the north median and upstream mudflats improved after 2005, when they became better than the channel. The north upstream mudflat had averages with large confidence interval. Regarding the density plots, the south and north downstream mudflats were subtidal, the south having a lower current speed. The maximum occurrence current speed in this model was 50-60gAFDW/m² for the south, and 35-50gAFDW/m² for the north. Both varied little over time, and the observed quantiles were consistent only with the south mudflat model during the periods 2006-2010 and 2011-2015, the others being either higher or lower. The north median and upstream mudflat had a wider range of immersion times, which was reflected in the results of the model. The model distribution also revealed the bimodal aspect of the current in the north median mudflat.
 
-B.  Daily salinity range and temperature \[°C\]: The salinity part of the model had a noticeable effect on the result of the model, with a clear reduction in biomass in the river and its ETM area. The closer the estuary entrance to the sea, the higher the model, the offshore area having a clear advantage that increased from 2005 on. The suitability index ranged from 0 to 0.8, and with a general increase over time. The three north mudflats underwent a significant increase during the first three periods. Octeville and offshore were dissimilar with respect to this SDM-NEO, together with Cote Fleurie, Octeville was the most suitable. The same increase was visible for the four mudflats on the density plots, all of which shifted roughly from 20 to 60gAFDW/m². The profile of all the mudflats mainly appeared to be influenced by the salinity range, the variation in salinity in the period 2000-2005 was clearly the main driver of the changes in profile. There was a very noticeable change in the north downstream and median mudflats from being highly influenced by inputs of fresh water to a more marine environment. The quantiles of observed data were generally lower than the models, but displayed the same temporal trends.
+B.  Daily salinity range and temperature \[°C\]: The salinity part of the model had a noticeable effect on the result of the model, with a clear reduction in biomass in the river and its ETM area. The closer the estuary entrance to the sea, the higher the model, the offshore area having a clear advantage that increased from 2005 on. The suitability index ranged from 0 to 0.8, and with a general increase over time. The three north mudflats underwent a significant increase during the first three periods. Octeville and offshore were dissimilar with respect to this SDM, together with Cote Fleurie, Octeville was the most suitable. The same increase was visible for the four mudflats on the density plots, all of which shifted roughly from 20 to 60gAFDW/m². The profile of all the mudflats mainly appeared to be influenced by the salinity range, the variation in salinity in the period 2000-2005 was clearly the main driver of the changes in profile. There was a very noticeable change in the north downstream and median mudflats from being highly influenced by inputs of fresh water to a more marine environment. The quantiles of observed data were generally lower than the models, but displayed the same temporal trends.
 
 C.  Daily salinity range and bathymetry \[m\]: The optima for this model were clearly located on Cote Fleurie, the south mudflat and the shore of Octeville, results linked to the bathymetry. However, Cote Fleurie is known to host a meagre cockle population. Offshore, a spot was high in the period 1996-1999 caused by dumping material dredged from the channel that was subsequently progressively smoothed. Except in Cote Fleurie, suitability was less than 0.5, the south mudflat being the second best. Apart from the north median and downstream mudflats which increased over the first three periods, the indexes for each area remained steady. The north downstream mudflat became more favourable for cockles over time, linked to the smaller salinity range, and to the bathymetry progressively becoming bimodal. The north median mudflat showed a widening of the results, perhaps due to the reduced salinity range or to the reduction in the very high upper tidal limit in favour of medium intertidal areas.
 
@@ -1106,9 +1194,18 @@ tm_mars_nlrq_gb<-nlrqdata$pl_rq_sel_map %>%
 # iwalk(tm_mars_nlrq_gb, ~tmap_save(.x, dpi=my.dpi,
 #               filename= sprintf("%sfig-brd_map_nlrq_%s.tiff",wdgraph,.y) ) )
 
-# tmap_save(nlrqdata$pl_rq_sel_map[["Biomass"]][["RQ2nli_11112"]][["one"]][["2015-2019"]],
-#   filename= sprintf("%sMap_sdm_example.tiff",wdgraph),
-#   dpi=my.dpi)
+tmp<-nlrqdata$pl_rq_sel_map$Biomass$RQ2nli_11112$one$`2015-2019`
+tmp$tm_borders$alpha<-1
+tmp$tm_borders$lwd<-3
+tmp$tm_borders$col<-"white"
+tmp$tm_layout$main.title<-""
+tmp$tm_layout$legend.outside.size<-0.2
+tmp$tm_layout$legend.title.size<-1.2
+tmp$tm_layout$legend.text.size<-0.8
+tmp
+tmap_save(tmp,
+  filename= sprintf("%sMap_sdm_example.tiff",wdgraph),
+  dpi=my.dpi)
 
 ```
 
@@ -1152,7 +1249,7 @@ print(tm_mars_nlrq_gb$Density)
 pl_rq_suit_idx_nlrq_brd <- map2(nlrqdata$pl_rq_suit_idx,reponse_l,
   ~{wrap_plots(.x, nrow=1,guides = 'collect') &
     ylim(0,1) &
-    plot_annotation(title = sprintf("SDM-NEO %s based on %s (tau=%g)",
+    plot_annotation(title = sprintf("SDM %s based on %s (tau=%g)",
                                     model_types$analysis[3],.y$whole,tauchoice),
                     tag_levels = c('A')) & 
     guides(colour = guide_legend(nrow = 1)) &
@@ -1172,6 +1269,39 @@ if(save_plot){
     ~ggsave(.x, 
            width = 18, height = 6, dpi=my.dpi, 
            filename = sprintf("%sfig-suit_idx_nlrq_brd_%s.tiff",wdgraph,.y) ) )  }
+
+no_areas <- c( 
+  "Ilot Oiseaux",
+  "Channel", 
+  "Cote Fleurie", 
+  "OffShore", 
+  "Octeville",
+  "Bay" )
+tmp<-nlrqdata$pl_rq_suit_idx %>% 
+  map_depth(.,2,~modify_at(.x,"data",
+            ~.x %>% filter(!Zone %in% no_areas)))
+
+tmp <- map2(tmp,reponse_l,
+  ~{wrap_plots(.x, nrow=1,guides = 'collect') &
+    ylim(0,1) &
+    plot_annotation(title = sprintf("SDM %s based on %s (tau=%g)",
+                                    model_types$analysis[3],.y$whole,tauchoice),
+                    tag_levels = c('A')) & 
+    guides(colour = guide_legend(nrow = 1)) &
+    labs(color="Areas", fill="Areas") &
+    theme(aspect.ratio=1,
+          # plot.title = element_text(size=10),
+          legend.position = "bottom",
+          legend.title = element_text(size=10),
+          legend.text = element_text(size=10)
+          )
+  } ) # ; tmp$Biomass
+
+if(save_plot){
+  iwalk(tmp,
+    ~ggsave(.x, 
+           width = 18, height = 6, dpi=my.dpi, 
+           filename = sprintf("%sfig-suit_idx_nlrq_brd_%s_light.tiff",wdgraph,.y) ) )  }
 
 ```
 
@@ -1356,6 +1486,7 @@ iwalk(pl_nlrq_mars_sel_st_all$Density,
 ```{r}
 #| label: finalsave_rdata
 
+rm(save_plot)
 rm(list=(ls()[grepl("tmp|^wd", ls())] ))
 # rm(list=lsf.str()) # remove all functions
 # rm("rqdata","nlrqdata","rqbsdata")

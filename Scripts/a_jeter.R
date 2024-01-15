@@ -1,0 +1,448 @@
+
+rm(list=ls())
+
+
+#| label: load-packages
+
+list_packages <-c("beepr", "knitr", "conflicted", 
+    "tidyverse", "data.table")
+installed_packages <- list_packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(list_packages[!installed_packages])
+}
+invisible(lapply(list_packages, library, character.only = TRUE))
+
+
+
+#| label: workenvir
+
+etude <- "CSLN_Mars"
+espece <- "CERED"
+analysis <- "RQ Linear"
+
+wdmat <-"Matrices/"
+wdres <- "Results/"
+wdgraph <- sprintf("Plots/%s/%s/",espece,analysis)
+wdGIS <- "SIG/"
+
+flag_calc<-TRUE # to calculate RQ models and mars results
+flag_calc_mars<-TRUE # to calculate time-consuming mars summary by period
+save_plot<-TRUE
+
+
+#| label: functmade
+
+source("Scripts/0.0_SDM_functions.R")
+
+
+
+#| label: externdata
+
+rdatain <- sprintf("%sCSLN_Mars_BDD.RData",wdmat)
+load(rdatain)
+load(sprintf("SIG/OSM_extraction.RData"))
+
+
+
+#| label: outfiles
+
+binderout <- sprintf("%sCSLN_BDD.xlsx",wdres)
+rdataout  <- sprintf("%sCSLN_Mars_RQ_BDD",wdmat)
+# if exists
+# load(paste0(rdataout,".RData"))
+
+
+#| label: basicvar
+
+sp <- which(speciesMP$SPCourt == espece)
+sai <- which(saison$M_Def == "Year") #Year Winter Summer
+
+type<-list(add= c("+","add"),int=c("*","int"))
+# tauchoice<-0.95
+
+CSLN_Mars_spe <- CSLN_Mars %>%
+  filter(SPCourt==espece)
+
+titleG <- sprintf("%s %s in %s",
+                  analysis,speciesMP$Taxon_SNa[sp],saison[sai,2])
+
+
+#| label: graphchart
+
+graphfine<-50 # graph resolution for 2D and 3D graphs surfaces
+my.dpi<-100
+
+
+#| label: rq_Mod_calc
+if(flag_calc){ # flag_calc=1
+
+  rq_Mod_all <-
+    map( reponse_l, \(biolo)
+      {map( type, \(typ)
+        {map_depth( pred_red_comb[1:2],2, # CHOSEN TO GO LIGHT ON CALCULATION
+              ~f.rq_Lin(CSLN_Mars_spe,biolo,.x,taus,typ)) } ) } ) %>%
+    map_depth(.,3, ~setNames(.x,map(.x,~.$sdmname)) ) %>%
+    map_depth(.,2,~list_flatten(.x,name_spec= "{inner}")) %>%
+    map(.,~list_flatten(.x,name_spec= "{inner}")) %>% 
+    map(.,compact) %>%  # suppress trycatch errors
+    map(.,~discard_at(.,~grepl("^RQ1int",.x)) ) # Suppress RQ1int redundant with add, because not found how to avoid its calculation, okay?
+  
+  rq_Mod_sel<-map(rq_Mod_all,
+        ~keep_at(.,~ grepl(paste0(names(pred_red_comb_sel),"$",collapse="|"),.x)) )
+  rq_Mod_sel<-map(rq_Mod_sel,
+        ~discard_at(.,~ grepl("add",.x) ) ) # to remove addition that are not usefull and taking too long to calculate
+        
+} # end if flag_calc
+
+
+
+#| label: rq_Mod_mars
+if(flag_calc){ # flag_calc=1
+
+  # rq_Mod_mars_all<-
+  #   map_depth(rq_Mod_all,2,
+  #             ~f.rq_Mod_mars(.x,Mars_SDM,taus))
+  
+  # rq_Mod_mars_all_per<-
+  #   map_depth(rq_Mod_all,2,
+  #             ~f.rq_Mod_mars(.x,Mars_SDM_per,taus))
+  
+  # Suitability index calculation
+  # rq_Mod_mars_all <- map2(rq_Mod_mars_all, rq_Mod_all,
+  #                     ~map2(.x,.y, ~f.suit_index(.x,.y,taus)) )
+  # rq_Mod_mars_all_per <- map2(rq_Mod_mars_all_per, rq_Mod_all,
+  #                         ~map2(.x,.y, ~f.suit_index(.x,.y,taus)) )
+  
+  rq_Mod_mars_sel<-
+    map_depth(rq_Mod_sel,2,
+              ~f.rq_Mod_mars(.x,Mars_SDM,taus))
+  
+  rq_Mod_mars_sel_per<-
+    map_depth(rq_Mod_sel,2,
+              ~f.rq_Mod_mars(.x,Mars_SDM_per,taus))
+  
+  rq_Mod_mars_sel <- map2(rq_Mod_mars_sel, rq_Mod_sel,
+                      ~map2(.x,.y, ~f.suit_index(.x,.y,taus)) )
+  rq_Mod_mars_sel_per <- map2(rq_Mod_mars_sel_per, rq_Mod_sel,
+                          ~map2(.x,.y, ~f.suit_index(.x,.y,taus)) )
+} # end if flag_calc
+
+
+#| label: rq_calc_save
+if(flag_calc){
+  save(list=(setdiff(ls()[ grep("^rq_.*[^all]$", ls()) ], lsf.str())),
+       file = paste0(rdataout,".RData")) # save once it's done!
+  save(list=(setdiff(ls()[ grep("^rq_.*all$", ls()) ], lsf.str())),
+       file = paste0(rdataout,"all.RData")) # save once it's done!
+}  
+# calculation of means of result instead of result of means predictor in case non normal
+if(flag_calc_mars){
+  rq_Mod_mars_sel_per<-
+    map_depth(rq_Mod_mars_sel,2,
+              ~{ .x %>% 
+                 group_by(Zone,NINJ,Period) %>% 
+                 summarise(across(where(is.numeric),~median(.x,na.rm=TRUE))) } )
+  save(list=(setdiff(ls()[ grep("^rq_.*[^all]$", ls()) ], lsf.str())),
+       file = paste0(rdataout,".RData")) # save once it's done!
+  save(list=(setdiff(ls()[ grep("^rq_.*all$", ls()) ], lsf.str())),
+       file = paste0(rdataout,"all.RData")) # save once it's done!
+  } # end if flag_calc
+
+
+
+#| label: rq_Mod_plot_sum
+
+# pl_rq_all_sum<-
+#   map_depth(rq_Mod_all,2,
+#             ~f.pl_rq_Mod_sum(.x,titleG))
+
+pl_rq_sel_sum<-
+  map_depth(rq_Mod_sel,2,
+            ~f.pl_rq_Mod_sum(.x,titleG))
+if(save_plot){
+  walk(pl_rq_sel_sum,
+    ~{iwalk(., ~ggsave(plot = .x,
+                       width = 10, height = 7, dpi=my.dpi,
+                       filename=sprintf("%s/%s/%s_%s_sm.tiff",
+                                        wdgraph, substr(.y,1,6), espece, .y) ) ) } )  }
+
+
+#| label: rq_Mod_plot_aic
+
+# rq_Mod_all_sm<-
+#   rq_Mod_all %>% 
+#     map_depth(.,2, ~map_dfr(.$smrq_t, ~.) ) %>% 
+#     map(., ~map_dfr(., ~.) ) %>% 
+#     map_dfr(., ~.) %>% 
+#   mutate(Delta_AICc= AICc-min(AICc,na.rm=TRUE))
+
+rq_Mod_sel_sm<-
+  rq_Mod_sel %>% 
+    map_depth(.,2, ~map_dfr(.$smrq_t, ~.) ) %>% 
+    map(., ~map_dfr(., ~.) ) %>% 
+    map_dfr(., ~.) %>% 
+  mutate(Delta_AICc= AICc-min(AICc,na.rm=TRUE))
+
+pl_rq_sel_aic<- rq_Mod_sel_sm %>%
+  filter(!grepl(c("RQ3"),sdmname)) %>%
+  f.pl_rq_Mod_aic(.,titleG)
+ggsave(plot = pl_rq_sel_aic,
+       width = 16, height = 8, dpi=my.dpi,
+       filename=sprintf("%s%s_RQ_AIC_all_scores.tiff",
+                        wdgraph,espece) )
+
+pl_rq_aic<-rq_Mod_sel_sm %>% 
+  filter(!grepl(c("RQ3"),sdmname)) %>%
+  mutate(nbvar=substr(typetxt,1,3)) %>% 
+  group_by(tau) %>%
+  ggplot(aes(x=reponse, #reorder(factors,-AICc),
+             y=Delta_AICc,
+             color = factor(tau),
+             shape = type))+
+  geom_point(size= 5) +
+  facet_grid(nbvar~.) +
+  scale_shape_manual(values=c(1, 8))+
+  scale_color_manual(values=colRQ) +
+  labs(#title=titleG, 
+       x="Biologic",y="AIC",
+       color="Quantile",shape="Type") +
+  theme(axis.text = element_text(size=10,face="bold"),
+          strip.background = element_blank()) +
+  coord_flip()
+ggsave(plot = pl_rq_aic,
+       width = 16, height = 8, dpi=my.dpi,
+       filename=sprintf("%s%s_RQ_AIC_scores.tiff",
+                        wdgraph,espece) )
+
+
+
+#| label: rq_Mod_plot_po_boot
+
+# pl_rq_po_sel<-map_depth(rq_Mod_sel,2,
+#     ~ {.x %>% f.rq_po_plot} )
+
+pl_rq_po_sel<-map_depth(rq_Mod_sel,2,
+    ~ {.x %>% f.rq_po_plot_boot} )
+
+if(save_plot){
+  walk(pl_rq_po_sel,
+    ~{iwalk(., ~ggsave(plot = .x,
+                       width = 5, height = 6, dpi=my.dpi,
+                       filename=sprintf("%s/%s/%s_%s_po.tiff",
+                                        wdgraph, substr(.y,1,6), espece, .y) ) ) } )  }
+
+
+
+#| label: rq_Mod_plot_res
+
+pl_rq_sel_res<-
+  map_depth(rq_Mod_sel,2,
+         ~f.pl_rq_Mod_res(.x,titleG)) 
+
+pl_rq_sel_resb<-map(pl_rq_sel_res,
+          ~{wrap_plots(., guides="collect") &
+              plot_annotation(title=titleG,tag_levels = c('A')) &
+              theme(plot.title = element_blank(),
+                    plot.subtitle = element_text(size=12))   } )
+
+if(save_plot){
+  iwalk(pl_rq_sel_resb,
+    ~{ggsave(plot = .x,
+             width = 18, height = 12, dpi=my.dpi,
+             filename=sprintf("%s/%s_%s_residuals.tiff",
+                              wdgraph,analysis,.y) ) } )  }
+
+
+
+#| label: rq_Mod_plot_1d
+
+pl_rq_all_1d <- rq_Mod_all %>% 
+    map(.,~keep_at(.x,grepl("0$",names(.x))) ) %>% 
+    map_depth(.,2,~f.pl_rq_Mod_1d(.x,titleG) )
+
+pl_rq_all_1d$all <- map(pl_rq_all_1d,
+        ~{(wrap_plots(.) &
+             labs(title=element_blank()) &
+             theme(legend.position="bottom",
+                   plot.title = element_text(hjust = 0.5)) ) +
+          plot_layout(guides="collect") +
+          plot_annotation(title=titleG) } )
+
+if(save_plot){
+  walk(pl_rq_all_1d["all"],
+    ~{iwalk(., ~ggsave(plot = .x,
+                       width = 10, height = 7, dpi=my.dpi,
+                       filename=sprintf("%s/RQ1add/%s_%s_1d.tiff",
+                                        wdgraph, espece, .y) ) ) } )  }
+
+
+
+#| label: rq_Mod_plot_2d
+
+# pl_rq_all_2d<- rq_Mod_all %>%
+#     map(.,~keep_at(.x,grepl("^RQ2",names(.x))) ) %>%
+#     map_depth(.,2,~f.pl_rq_Mod_2d(.x,taus_l,titleG) )
+
+pl_rq_sel_2d<- rq_Mod_sel %>% 
+    map(.,~keep_at(.x,grepl("^RQ2",names(.x))) ) %>% 
+    map_depth(.,2,~f.pl_rq_Mod_2d(.x,taus_l,titleG) )
+
+if(save_plot){
+  walk(pl_rq_sel_2d,
+     ~{iwalk(., ~ggsave(plot = .x$all,
+                        width = 8, height = 7, dpi=my.dpi,
+                        filename=sprintf("%s/%s/%s_%s_2d.tiff",
+                                         wdgraph, substr(.y,1,6), espece, .y) ) ) } )  }
+
+
+
+#| label: rq_Mod_plot_3d
+
+# pl_rq_all_3d<- rq_Mod_sel %>% 
+#     map(.,~keep_at(.x,grepl("^RQ2",names(.x))) ) %>% 
+#     map_depth(.,2,~pl_rq_Mod_3d(.x,taus_l,titleG) )
+
+pl_rq_sel_3d<- rq_Mod_sel %>% 
+    map(.,~keep_at(.x,grepl("^RQ2",names(.x))) ) %>% 
+    map_depth(.,2,~f.pl_rq_Mod_3d(.x,taus_l,titleG) )
+
+if(save_plot){
+  walk(pl_rq_sel_3d,
+    ~{iwalk(., ~ saveWidget(partial_bundle(.x$all),
+                            sprintf("%s/%s/%s_%s_3d.html",
+                      wdgraph, substr(.y,1,6), espece, .y), 
+                      selfcontained = F, libdir = "lib") ) } )  }
+
+
+#| label: rq_Mod_mars_stat
+
+# pl_rq_mars_all_st<-
+#   map(reponse_l, \(biolo)
+#       {map2(rq_Mod_mars_all[[biolo$Desc]],
+#             rq_Mod_all[[biolo$Desc]],
+#            ~st_rq_Mod_map(.x,.y,tauchoice)) } )
+
+pl_rq_mars_sel_st <-
+  map2(rq_Mod_mars_sel_per,
+       rq_Mod_sel,
+    ~map2(.x,.y,
+     ~f.st_rq_Mod_map(.x,.y,tauchoice)) ) 
+
+if(save_plot){
+  walk(pl_rq_mars_sel_st,
+    ~{iwalk(., ~ggsave(plot = .x$all,
+                       width = 9, height = 6, dpi=my.dpi,
+                       filename=sprintf("%s/%s/%s_%s_mars_st.tiff",
+                                        wdgraph, substr(.y,1,6), espece, .y) ) ) } )  }
+
+pl_rq_mars_sel_st_board<-
+  map_depth(pl_rq_mars_sel_st, 2, ~.x$mod) %>% 
+  map(., ~wrap_plots(.x) &
+    plot_layout(ncol=1) &
+    theme(legend.position="none",
+        strip.background = element_blank(),
+        text=element_text(size=12)) &
+    plot_annotation(tag_levels = c('A')) )
+
+if(save_plot){
+  iwalk(pl_rq_mars_sel_st_board,
+        ~ggsave(plot = .x,
+                width = 12, height = 12, dpi=my.dpi,
+                filename=sprintf("%s/%s_mars_st_board_%s.tiff",
+                                 wdgraph, espece, .y) ) )  }
+
+
+
+
+# st_write(rq_Mod_mars_sel_per, sprintf("%sLayers made/SDM_RQ_%s.shp",wdGIS,espece),append=FALSE)
+
+
+#| label: rq_Mod_plot_map
+
+# option tmap version facet
+tmap_mode("plot") # "plot" "view"
+
+# pl_rq_all_map<-
+#   map(reponse_l, \(biolo)
+#     {map2(rq_Mod_mars_all[[biolo$Desc]],rq_Mod_sel[[biolo$Desc]],
+#          ~pl_rq_Mod_map(.x,.y,tauchoice)) } )
+
+pl_rq_sel_map <-
+  map2(rq_Mod_mars_sel_per,
+       rq_Mod_sel,
+    ~map2(.x,.y,
+     ~f.pl_rq_Mod_map(.x,.y,tauchoice)) )
+
+if(save_plot){
+  walk(pl_rq_sel_map,
+       ~iwalk(., ~tmap_save(.x$all, dpi=my.dpi, height=2, asp=0, #width=20,
+                            filename=sprintf("%s/%s/%s_%s_map.tiff",
+                                wdgraph, substr(.y,1,6), espece, .y) ) ) )  }
+
+# Change the span of color scale to compare sdm between them
+max_map<-map(rq_Mod_mars_sel, ~{ # nlrqdata$
+  map_dbl(.x, ~max(
+    f.replace_outliers(.x[[sprintf("t%.3f",tauchoice)]]),na.rm=TRUE) ) %>% 
+  max(., na.rm=TRUE) %>% round(.,-1) } )
+
+pl_rq_sel_map<-map2(pl_rq_sel_map,max_map, \(x,y) # nlrqdata$
+      map(x,
+        ~modify_at(.x, "all",
+          ~modify_at(.x, "tm_fill",
+            ~modify_at(.x, "breaks", ~seq(0,y, length.out=5) ) #by=ifelse(y<1000,50,500)
+            ) ) ) )
+
+tm_mars_rq_gb <- map(pl_rq_sel_map,
+  ~{ map(., ~ .x$all) %>%
+    tmap_arrange(., asp=NA, ncol=1,
+                 sync = TRUE, outer.margins=0) } )
+
+
+
+#| label: rq_Mod_plot_suit_ind
+
+pl_rq_suit_idx <- map2(rq_Mod_mars_sel,
+                    rq_Mod_sel,
+                  ~map2(.x,.y, f.pl_suit_idx )  )
+
+
+#| label: rq_Mod_plot_map_gif
+
+# pl_rq_sel_map<-
+#   map(reponse_l[1], \(biolo)
+#     {imap(rq_Mod_mars_sel_per[[biolo$Desc]][1],
+#          ~f.pl_rq_Mod_map_gif(.x,.y,tauchoice)) } )
+
+
+
+#| label: finalsave_xls
+# wb <- loadWorkbook(binderout) # addWorksheet(wb, sheetName = "rql")
+# writeData(wb, sheet = "Rq_coeff", x = smrq_l, 
+#           startCol = 1, startRow = 1,withFilter = FALSE)
+# saveWorkbook(wb,file=binderout, overwrite = TRUE)
+
+
+
+#| label: finalsave_r
+
+rm(c("save_plot","flag_calc","flag_calc_mars"))
+# rm(list=lsf.str()) # remove all functions
+rm(list=(ls()[grepl("tmp|^wd", ls())] ))
+save(list=(setdiff(ls()[grep("rq_", ls())], lsf.str()) ), # select only variables that respect pattern, remove functions
+     file = paste0(rdataout,".RData"))
+
+beepr::beep(2)
+
+
+#| include: true
+
+library(sessioninfo)
+pkg_sesh <- session_info(pkgs = "attached")
+quarto_version <- system("quarto --version", intern = TRUE)
+pkg_sesh$platform$quarto <- paste(
+  system("quarto --version", intern = TRUE),
+  "@",
+  quarto::quarto_path()
+  )
+pkg_sesh
+

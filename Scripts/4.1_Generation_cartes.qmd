@@ -25,19 +25,21 @@ editor_options:
 #| code-summary: "Packages"
 #| include: false
 
-library(tidyverse) ; library(RColorBrewer)
-library(sf) ; library(sfheaders); #library(raster)
-library(dplyr);library(ggpubr) ; library(grid) ; library(gridExtra)
-library(plotly); library(plot3D);  
-# library(leaflet) # for interactive maps
-library(tmap) # tmap_mode; for static and interactive maps
-library(htmlwidgets) # library(leaflet) # saveWidget ; for interactive maps
-library(rnaturalearth) # ne_states install_github("ropensci/rnaturalearthhires")
-# library(spData) ; library(spDataLarge) #remotes::install_github("Nowosad/spDataLarge")
-# library(raster) 
+list_packages <-c("beepr", "knitr", "conflicted", 
+    "tidyverse", "data.table",
+    "kableExtra","gt",
+    "sf", "sfheaders", "tmap", # "raster"
+    "rnaturalearth",  # ne_states install_github("ropensci/rnaturalearthhires")
+    "htmlwidgets", # leaflet # saveWidget ; for interactive maps
+    # "ggpubr","grid","gridExtra",
+    # "plotly","plot3D"
+    )
+installed_packages <- list_packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(list_packages[!installed_packages])
+}
+invisible(lapply(list_packages, library, character.only = TRUE))
 
-options(scipen=999) # Empeche affichage scientifique des nombres
-library(knitr)
 ```
 
 ### Working Environment
@@ -57,6 +59,7 @@ setwd(wdpath)
 pc <- "C:/Users/lehuen201/Nextcloud/" # "E:/" #
 wdgraphEx<-wdgraph #paste(pc,"Copie-HD/Melting Potes/",tsk,"Graphiques/",sep="")
 wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
+save_plot<-TRUE
 ```
 
 ### Graphic charter
@@ -66,6 +69,8 @@ wdGIS <- paste(pc,"Melting Pot/SIG/",sep="")
 theme_set(theme_bw(base_size = 16)) # theme_gray() theme_bw() theme_light() theme_dark()
 colorsS <- colorRampPalette(brewer.pal(8, "Spectral")); coldiscS <- function(x) {scale_colour_manual(values=colorsS(x))}
 colorsD <- colorRampPalette(brewer.pal(8, "Dark2")); coldiscD <- function(x) {scale_colour_manual(values=colorsD(x))}
+
+my.dpi<-100
 
 ```
 
@@ -109,7 +114,6 @@ load(rdataout)
 
 prgm <- "CSLN" # 1:CSLN 2:Mabes 3:Geco 4:Beaug
 etude <- "CSLN_Mars"
-
 
 ```
 
@@ -185,7 +189,9 @@ tmlf_Bio<-tmap_leaflet(tm_Bio) # conversion to leaflet object, quicker??
 write.csv(CSLN_Mars,file=paste(wdres,"CSLN_Mars", ".csv",sep=""), na = "",row.names = FALSE)
 write.csv(CSLN_pur,file=paste(wdres,"CSLN_data", ".csv",sep=""), na = "",row.names = FALSE)
 # WARNING FOLLOWING OPERATION CAN LAST LONG
-tmap_save(tm_Bio, filename = paste(wdres,'CSLN_Mars Map.html',sep=""))
+if(save_plot){
+  tmap_save(tm=tm_Bio, 
+            filename = paste(wdres,'CSLN_Mars Map.html',sep="")) }
 # saveWidget(tmlf_Bio, paste(wdres,'CSLN_Mars Map.html',sep=""), selfcontained = TRUE)
 
 ```
@@ -222,7 +228,7 @@ OPTION LEAFLET
 # saveWidget(map_leaflet, 'test_leaflet.html', selfcontained = TRUE)
 ```
 
-## MAPS BUILDING
+# MAPS BUILDING
 
 ### Linear Two factor Quantile Regression
 
@@ -279,9 +285,11 @@ for (sp in spe) { # sp=1
         mlist[[ann]] <- eval(parse(text = paste('sfp', ann, sep='')))
         
         sfp <- sfp + labs(title=titreG, subtitle=subtitre, caption=capt)
-        ggsave(sprintf("%s%s/%s/Map Detail/%s_%s_%s_SDM%s_%s_%s_%s.png",
-                       wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,paste(x1t,x2t,sep="&"),anMars[ann]),
-                       plot = sfp, width = 10, height = 9)
+        if(save_plot){
+          ggsave(plot = sfp, 
+                 width = 10, height = 9, dpi=my.dpi,
+                 filename=sprintf("%s%s/%s/Map Detail/%s_%s_%s_SDM%s_%s_%s_%s.png",
+                         wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,paste(x1t,x2t,sep="&"),anMars[ann])) }
       } #sai sfp1
     } #year
     titreG = sprintf("SDM-NEO for %s in %s (%s)",species[sp,2],yl,ylu)
@@ -290,8 +298,11 @@ for (sp in spe) { # sp=1
           theme(plot.margin = margin(0.05,0.05,0.05,0.05, "cm")) 
     sfp <- annotate_figure(sfp, top = text_grob(titreG, face = "bold", size = 14))+
           bgcolor("white"); #print(sfp)
-    ggsave(sprintf("%s%s/%s/%s_%s_%s_SDM%s_%s_%s.png",
-                   wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,paste(x1t,x2t,sep="&")), plot = sfp, width = 10, height = 9)
+            if(save_plot){
+              ggsave(plot = sfp, 
+                     width = 10, height = 9, dpi=my.dpi,
+                     filename=sprintf("%s%s/%s/%s_%s_%s_SDM%s_%s_%s.png",
+                         wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,paste(x1t,x2t,sep="&"))) }
   } # sdm
 } #spe
 
@@ -349,8 +360,11 @@ for (sp in spe) { # sp=1
         mlist[[ann]] <- eval(parse(text = paste('sfp', ann, sep='')))
         
         sfp <- sfp + labs(title=titreG, subtitle=subtitre, caption=capt)
-        ggsave(sprintf("%s%s/%s/Map Detail/%s_%s_%s_SDM%s_%s_%s_%s.png",
-                       wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,x1t,anMars[ann]),plot = sfp, width = 10, height = 9)
+                if(save_plot){
+                  ggsave(plot = sfp, 
+                         width = 10, height = 9, dpi=my.dpi,
+                         filename=sprintf("%s%s/%s/Map Detail/%s_%s_%s_SDM%s_%s_%s_%s.png",
+                                 wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,x1t,anMars[ann])) }
       } #sai sfp1
     } #year
     titreG = sprintf("SDM-NEO for %s in %s (%s)\n%s",species[sp,2],yl,ylu,capt)
@@ -359,8 +373,11 @@ for (sp in spe) { # sp=1
       theme(plot.margin = margin(0.05,0.05,0.05,0.05, "cm")) 
     sfp <- annotate_figure(sfp, top = text_grob(titreG, face = "bold", size = 14))+
       bgcolor("white"); #print(sfp)
-    ggsave(sprintf("%s%s/%s/%s_%s_%s_SDM%s_%s_%s.png",
-                   wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,x1t), plot = sfp, width = 10, height = 9)
+    if(save_plot){
+      ggsave(plot = sfp, 
+             width = 10, height = 9, dpi=my.dpi,
+             filename=sprintf("%s%s/%s/%s_%s_%s_SDM%s_%s_%s.png",
+                 wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,x1t)) }
   } # sdm
 } #spe
 ```
@@ -417,8 +434,11 @@ for (sp in spe) { # sp=1
         mlist[[ann]] <- eval(parse(text = paste('sfp', ann, sep='')))
         
         sfp <- sfp + labs(title=titreG, subtitle=subtitre, caption=capt)
-        ggsave(sprintf("%s%s/%s/Map Detail/%s_%s_%s_SDM%s_%s_%s_%s.png",
-                       wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,paste(x1t,x2t,sep="&"),anMars[ann]),plot = sfp, width = 10, height = 9)
+        if(save_plot){
+          ggsave(plot = sfp, 
+                 width = 10, height = 9, dpi=my.dpi,
+                 filename=sprintf("%s%s/%s/Map Detail/%s_%s_%s_SDM%s_%s_%s_%s.png",
+                         wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,paste(x1t,x2t,sep="&"),anMars[ann])) }
       } #sai sfp1
     } #year
     titreG = sprintf("SDM-NEO for %s in %s (%s)\n%s",species[sp,2],yl,ylu,capt)
@@ -427,8 +447,11 @@ for (sp in spe) { # sp=1
       theme(plot.margin = margin(0.05,0.05,0.05,0.05, "cm")) 
     sfp <- annotate_figure(sfp, top = text_grob(titreG, face = "bold", size = 14))+
       bgcolor("white"); #print(sfp)
-    ggsave(sprintf("%s%s/%s/%s_%s_%s_SDM%s_%s_%s.png",
-                   wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,paste(x1t,x2t,sep="&")), plot = sfp, width = 10, height = 9)
+    if(save_plot){
+      ggsave(plot = sfp, 
+             width = 10, height = 9, dpi=my.dpi,
+             filename=sprintf("%s%s/%s/%s_%s_%s_SDM%s_%s_%s.png",
+                 wdgraphEx,species[sp,1],foldtxt,prgm,species[sp,1],filtxt,sdi,yt,paste(x1t,x2t,sep="&"))) }
   } # sdm
 } #spe
 ```

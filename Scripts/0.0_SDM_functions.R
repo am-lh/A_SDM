@@ -1,23 +1,27 @@
 #| label: load-packages ----
+# list_pack_used()
 
-list_packages <-c("conflicted","here",
-  "readxl","openxlsx","beepr", # Edition d'un fichier Excel
+list_packages <-c("conflicted","here","beepr", 
+  "readxl","openxlsx",# Edition d'un fichier Excel
   "tidyverse","reshape2","rlist", # the one; melt; list.append
   "data.table",
+# Stats packages
   "rstatix","Hmisc",  # corr and pvalue calculation
   "vegan",
   "boot","splines",
-  "ggpubr","GGally", # stat_compare_means ;
-  "scales","RColorBrewer","wesanderson","grafify","colorspace","ggsci", # show_col and colors colors colors!
   "quantreg", # visreg
+  "FactoMineR", "factoextra", "explor", # PCA & visualisation
+# Graphic packages
+  "ggpubr","GGally", # stat_compare_means ;
   "plotly","plot3D",  # graphiques 3D plot 3D for mesh pracma
-  "patchwork","figpatch",
+  "patchwork","figpatch","ggplotify",
   "ggridges","gginnards",
+  "grafify","colorspace","ggsci", # show_col and colors colors colors!
+  "scales","RColorBrewer","wesanderson",
 # GIS Packages
   "sf","sfheaders", # st_as_sf, sf_to_df
   "tmap","tmaptools","terra",
-  "htmlwidgets", # leaflet # saveWidget ; for interactive maps
-  "introdataviz") # geom_flat_violin # devtools::install_github("psyteachr/introdataviz",force = TRUE)
+  "htmlwidgets") # leaflet # saveWidget ; for interactive maps
 
 # Install packages not yet installed
 installed_packages <- list_packages %in% rownames(installed.packages())
@@ -26,6 +30,11 @@ if (any(installed_packages == FALSE)) {
 }
 invisible(lapply(list_packages, library, character.only = TRUE))
 
+if(!"introdataviz" %in% rownames(installed.packages()) ) {
+  devtools::install_github("psyteachr/introdataviz",force = TRUE) }
+library("introdataviz") # geom_flat_violin
+
+conflicts_prefer(stats::filter)
 conflict_prefer_all("dplyr", quiet = TRUE)
 conflict_prefer_all("ggplot2", "ggtern", quiet = TRUE)
 conflict_prefer("transpose", "purrr", quiet = TRUE)
@@ -87,6 +96,29 @@ f.loadRData <- function(fileName){
   #loads an RData file, and returns it
   load(here::here(fileName))
   mget(ls()[ls() != "fileName"])
+}
+
+`-.gg` <- function(plot, layer) {
+    # Example of use:
+    # P <- ggplot(data=dat, aes(x=id, y=val)) + geom_point()
+    # P - geom_boxplot()
+  if (missing(layer)) {
+    stop("Cannot use `-.gg()` with a single argument. Did you accidentally put - on a new line?")
+  }
+  if (!is.ggplot(plot)) {
+    stop('Need a plot on the left side')
+  }
+  plot$layers = c(layer, plot$layers)
+  plot
+}
+
+reverselog_trans <- function(base = exp(1)) {
+ # In ggplots +scale_x_continuous(trans=reverselog_trans(base=10))
+  trans <- function(x) -log(x, base)
+  inv <- function(x) base^(-x)
+  scales::trans_new(paste0("reverselog-", format(base)), trans, inv, 
+            log_breaks(base = base), 
+            domain = c(1e-100, Inf))
 }
 
 ## Define notions for significance levels; spacing was important.
@@ -853,18 +885,18 @@ f.pl_var_map_gif<-function(df,var){
     tm_shape(osm_df) +  
       tm_rgb(saturation = .6, alpha= 0.8) +
     tm_shape(df) +
-      tm_fill(col = vars$Var, 
-              title=.x, midpoint = NA,
+      tm_fill(col = var$Var, 
+              title=paste0(var$Desc,"\n(",var$Unit,")"), midpoint = NA,
               style="cont", palette = "-Spectral", alpha = 0.6) +
-    tm_borders(alpha = 0.3, lwd = 1) +
-    tm_facets(along = "Period") +
+    tm_borders(alpha = 0.1, lwd = .5) +
+    tm_facets(along = "Annee") +
     tm_layout(legend.outside = TRUE,
               title.size=10)
   
   tmap_animation(
-    tmp_sf, filename = sprintf("%sMaps_Mars_R/%s_map.gif",
-                               wdgraph, var),
-    fps = 1, width = 200, height = 200, dpi=400 )
+    tmp_sf, filename = sprintf("%sHMS_R/%s_map.gif",
+                               wdgraph, var$Var),
+    fps = 1, width = 20, height = 20, dpi=400 )
 }
 
 # f.pl_rq_Mod_sum_rq<-function(rqMod,titleG){
@@ -1164,7 +1196,7 @@ f.pl_rq_Mod_3d<-function(rqMod,taus_l,titleG){
                               opacity = 0.7, symbol = "circle")) %>%
     layout(title = "", scene = myscene) %>% 
     config( toImageButtonOptions = list(
-      format = "svg", filename = sprintf("graph_3d"),
+      format = "png", filename = sprintf("graph_3d"),
       width = wdth, height = hght )  )
   
   for (t in 1:length(taus_l)){ # t=4
@@ -1208,7 +1240,7 @@ f.pl_rq_Mod_3d<-function(rqMod,taus_l,titleG){
                               opacity = 0.7, symbol = "circle")) %>%
       layout(title = "", scene = myscene) %>% 
       config( toImageButtonOptions = list(
-        format = "svg", filename = sprintf("graph_3d_%.3f",.x),
+        format = "png", filename = sprintf("graph_3d_%.3f",.x),
         width = wdth, height = hght )  )
     } ) # map taus
   return(pl_3d)
@@ -1422,7 +1454,7 @@ f.pl_suit_idx<-function(rqmodmars,rqMod){
           text=element_text(size=10)) +
     f.Scale_brew() ; pl_tmp
 
-  # ggsave(pl_tmp,
+  # ggsave(plot=pl_tmp,
   #        width = 8, height = 8, dpi=400,
   #        filename = sprintf("%sfig-suit_idx_A.tiff",wdgraph) )
 }
@@ -1444,46 +1476,8 @@ f.pl_rq_Mod_map_gif<-function(rqmodmars,sdmname,tauchoice){
               title.size=10)
   
   tmap_animation(
-    tmp_sf, filename = sprintf("%s/%s/%s_%s_map.gif",
-                               wdgraph, substr(sdmname,1,6), espece, sdmname),
-    fps = 1, width = 200, height = 200, dpi=400 )
+    tmp_sf,
+    fps = 1, width = 200, height = 200, dpi=400, 
+    filename = sprintf("%s/%s/%s_%s_map.gif",
+                       wdgraph, substr(sdmname,1,6), espece, sdmname))
 }
-
-#| label: auto_tabset
-
-# ::: panel-tabset
-# ```{r}
-# #| include: true
-# #| results: asis
-# #| fig-cap: "Scenarios computed with linear with interaction (top, numbered 1) and nonlinear with gaussian equation (bottom numbered 2), the isometric curve represents the observed HMS data"
-# #| fig-width: 16
-# #| fig-height: 8
-# 
-# iwalk(pl_board_rq_nlrq_real, 
-#       ~ {
-#         cat('#### ', .y, ' {#sec-sdm_real}\n\n')
-#         print(.x)
-#         cat('\n\n')
-#       })
-# ```
-# :::
-
-# iwalk(nlrqdata$pl_rq_sel_3d,
-#       ~ {
-#         cat('#### ', .y, '\n\n')
-#         map(.x, ~print(.x$all))
-#         cat('\n\n')
-#         })
-
-# imap(nlrqdata$pl_rq_sel_3d,
-#       ~ {
-#         knitr::knit_child(text = c(
-#               "#### ", .y, "\n\n",
-#               "```{r}", "\n\n",
-#               "#| layout-ncol: 2",
-#               "#| label: fig-stat descr ", .y, "\n\n",
-#               "#| fig-cap: try about this ", .y, "\n\n",
-#               "map(.x, ~print(.x$all))",
-#               "\n\n", "```", "\n\n"
-#             ), envir = globalenv(), quiet = TRUE)
-#         })

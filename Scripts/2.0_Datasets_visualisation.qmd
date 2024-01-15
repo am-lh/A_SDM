@@ -15,7 +15,6 @@ editor_options:
   chunk_output_type: console
 ---
 
-# TREATMENT OF BIOLOGIC DATA FROM CSLN BEFORE SDM TREATMENT
 ```{r}
 rm(list=ls())
 ```
@@ -48,6 +47,8 @@ wdres <- "Results/"
 wdgraph <- "Plots/"
 wdGIS <- "SIG/"
 
+flag_mars_gif<-FALSE # to calculate time-consuming mars summary by period
+save_plot<-TRUE
 ```
 
 ### Home made functions
@@ -77,7 +78,7 @@ load(rdatain)
 
 rdataout <- sprintf("%sCSLN_Mars_plot",wdmat)
 # if exists
-# load(paste0(rdataout,".RData"))
+if(!flag_mars_gif) { load(paste0(rdataout,".RData")) }
 
 ```
 
@@ -97,6 +98,7 @@ sai <- which(saison$M_Def == "Year") #Year Winter Summer
 #| label: graphchart
 
 my.dpi<-100
+
 ```
 
 # Material and methods
@@ -172,8 +174,9 @@ design <- c(
   area(t= 8, b= 11, l= 17, r= 20) )
 tm_study_map<- wrap_plots(tm_Bio_g,tm_bay_g,tm_estu_g,design = design)
 
-ggsave(filename= sprintf("%sfig-map.tiff",wdgraph), 
-       tm_study_map, width = 10,  height = 7, dpi=my.dpi) #
+ggsave(plot = tm_study_map, 
+       width = 10,  height = 7, dpi=my.dpi,
+       filename=sprintf("%sfig-map.tiff",wdgraph)) #
 ```
 
 ```{r}
@@ -191,8 +194,9 @@ tm_study_map_html<-
     tm_dots(col="Zone", title="Areas", palette = areas_pal, size=0.05, alpha = 0.7) +
   tm_layout(legend.show=FALSE)
 tm_study_map_html
-tmap_save(tm_study_map_html, dpi=my.dpi, 
-            filename = "SIG/Estuary_map.html")
+tmap_save(tm=tm_study_map_html, 
+          dpi=my.dpi, 
+          filename = "SIG/Estuary_map.html")
 
 ```
 
@@ -219,8 +223,236 @@ pl_mars_corr <- ggpairs(df,
       theme(axis.text = element_text(size=8),
             strip.text.y = element_text(size=8))
 
-ggsave(sprintf("%s%s/fig-mars_corr.tiff",wdgraph,espece),
-       plot = pl_mars_corr, width = 16, height = 9, dpi=my.dpi)
+ggsave(plot = pl_mars_corr, 
+       width = 16, height = 9, dpi=my.dpi,
+       filename=sprintf("%s%s/fig-mars_corr.tiff",wdgraph,espece) )
+
+```
+
+### Abiotic factor PCA
+https://f0nzie.github.io/machine_learning_compilation/detailed-study-of-principal-component-analysis.html
+```{r}
+#| label: abiotic_acp
+pca_data<-Mars_csv_sf %>% 
+  sf_to_df(fill=TRUE) %>% # CSLN_Mars
+  select(-ends_with("_s"),-ends_with("_w")) %>% 
+  drop_na() %>% 
+  rename_with(~predict$Desc,predict$Var)
+gp_tidal <- pca_data %>% 
+  select("Tidal_level") %>% pull()
+gp_zone <- pca_data %>% 
+  select("Zone") %>%  pull()
+
+pca_res<-pca_data %>%
+  select(-any_of(c("Lon","Lat","x","y","point_id","sfg_id","id",
+                   "NINJ","Period","Annee",
+                   "Type"))) %>%  # ,"Tidal_level","Zone"
+  relocate(Zone,Tidal_level,`inundation time`) %>% 
+  FactoMineR::PCA(., quali.sup=1:2, scale.unit = TRUE, graph=FALSE) #quanti.sup=3, 
+pca_res2<-explor::prepare_results(pca_res) 
+pca_res3<-get_pca_var(pca_res)
+pca_supp<-pca_res2$vars %>% 
+  # select(-any_of(c("P.value","V.test"))) %>% 
+  select(any_of(c("Variable","Level","Axis","Coord"))) %>% 
+  filter(Variable %in% c("Zone","Tidal_level") & Axis %in% c(1,2)) %>% 
+  pivot_wider(names_from = Axis, names_prefix = "ax", values_from = Coord)
+set.seed(123)
+pca_res3.km <- kmeans(pca_res3$coord, centers = 3, nstart = 25)
+pca_res3.grp <- as.factor(pca_res3.km$cluster)
+
+# get_eig(pca_res) 
+pl_pca1<-fviz_screeplot(pca_res, addlabels = TRUE)
+pl_pca_con<-fviz_contrib(pca_res, choice = "var", axes = c(1,2))
+pl_pca_conl <- map( 1:4, ~ { 
+  tmp <- fviz_contrib(pca_res, 
+         # fviz_cos2(pca_res, 
+              choice = "var", axes=.x,
+              fill="contrib",color="white",
+              # fill="cos2",color="white",
+              ggtheme=theme_void())  
+  tmp + geom_text(aes(label=tmp$data$name), 
+              angle=90, y=0, hjust = 0,
+              fontface="bold", size=4.5) +
+    scale_fill_gradientn(colors=c("#00AFBB", "#E7B800", "#FC4E07")) +
+    theme_void() +
+    theme(plot.title = element_blank(),
+          legend.position = "none") } )
+
+pl_pca_conl[[2]]$layers[[3]]$aes_params$angle<-0  # cos => layer 2
+pl_pca_conl[[2]] <- pl_pca_conl[[2]] + coord_flip()
+pl_pca_conl[[3]]$layers[[3]]$aes_params$angle<-0  # cos => layer 2
+pl_pca_conl[[3]] <- pl_pca_conl[[3]] + coord_flip()
+
+pl_pca12<-fviz_pca_var(pca_res, axes = c(1, 2), # aussi fviz_pca_ind
+             repel = TRUE, labelsize = 5,
+             # col.var = pca_res3.grp , palette = c("#00AFBB", "#E7B800", "#FC4E07"),
+             col.var = "contrib" , gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             ggtheme = theme_bw()) +
+  labs(color="Variable\ncontribution") +
+  theme(legend.position = "bottom",
+        plot.title = element_blank()) # ; pl_pca12
+pl_pca13<-fviz_pca_var(pca_res, axes = c(1, 3), # aussi fviz_pca_ind
+             repel = TRUE, labelsize = 5,
+             # col.var = pca_res3.grp , palette = c("#00AFBB", "#E7B800", "#FC4E07"),
+             col.var = "contrib" , gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             ggtheme = theme_bw()) +
+  labs(color="Variable\ncontribution") +
+  theme(legend.position = "bottom",
+        plot.title = element_blank()) # ; pl_pca13
+# if(save_plot){
+#   ggsave(filename=sprintf("%sHMS_R/fig-pca3.tiff", wdgraph),
+#     plot =  pl_pca12,
+#     width = 9, height = 10, dpi = my.dpi )  }
+
+pl_pca_p12 <- pl_pca_conl[[1]] + plot_spacer() + pl_pca12 + pl_pca_conl[[2]] +
+  plot_layout(heights = c(1,2),widths = c(2,1)) ; pl_pca_p12
+pl_pca_p13 <- pl_pca_conl[[1]] + plot_spacer() + pl_pca13 + pl_pca_conl[[3]] +
+  plot_layout(heights = c(1,2),widths = c(2,1)) # ; pl_pca_p13
+if(save_plot){
+  ggsave(filename=sprintf("%sHMS_R/fig-pca_abiotic_12.tiff", wdgraph),
+    plot =  pl_pca_p12,
+    width = 10, height = 10, dpi = my.dpi )  }
+if(save_plot){
+  ggsave(filename=sprintf("%sHMS_R/fig-pca_abiotic_13.tiff", wdgraph),
+    plot =  pl_pca_p13,
+    width = 10, height = 10, dpi = my.dpi )  }
+
+pl_pca12_tmp<-pl_pca12; pl_pca12_tmp$layers[[3]]$aes_param$size<-4
+pl_pca12bis<- pl_pca12 - # '-' added as function to add layer under plot
+  geom_point(data=pca_supp %>% filter(Variable=="Zone"),
+            aes(x=ax1,y=ax2),
+            color="blue4", alpha=.8 ) -
+  geom_text(data=pca_supp %>% filter(Variable=="Zone"),
+            aes(x=ax1,y=ax2, label=Level),
+            color="blue4", alpha=.7, vjust=1,hjust="inward" ) -
+  geom_line(data=pca_supp %>% filter(Variable=="Tidal_level"),
+            aes(x=ax1,y=ax2),
+            color="firebrick", alpha=.8, lty=3 ) -
+  geom_point(data=pca_supp %>% filter(Variable=="Tidal_level"),
+            aes(x=ax1,y=ax2),
+            color="firebrick", alpha=.8 ) -
+  geom_text(data=pca_supp %>% filter(Variable=="Tidal_level"),
+            aes(x=ax1,y=ax2, label=Level),
+            color="firebrick", alpha=.7, vjust=1,hjust="inward" ) +
+  labs(title="PCA with Areas and Tidal level supplementary variables",
+       color="Variable\ncontribution") # ; pl_pca6
+
+pl_pca_p12_L <- 
+  # wrap_plots((pl_pca1/ pl_pca12), pl_pca4, pl_pca5) +
+  wrap_plots((pl_pca1/ pl_pca12_tmp), pl_pca12bis) +
+  # wrap_plots((pl_pca1/ pl_pca_con), pl_pca12) +
+  # plot_layout(widths = c(1, 2, 2)) +
+  # plot_layout(widths = c(1, 2)) +
+  plot_layout(guides="collect") +
+  plot_annotation(tag_levels = c("A")) &
+  theme(legend.position='bottom') ; pl_pca_p12_L
+if(save_plot){
+  ggsave(filename=sprintf("%sHMS_R/fig-pca_abiotic_all.tiff", wdgraph),
+    plot =  pl_pca_p12_L,
+    width = 12, height = 10, dpi = my.dpi )  }
+
+# pl_pca4<-fviz_pca(pca_res,  # fviz_pca_biplot idem fviz_pca
+#                 col.ind = gp_tidal,  # habillage or col.ind
+#                 palette = "Spectral", addEllipses = TRUE,
+#                 legend.title = "Group",
+#                 label = "var", col.var = "black", repel = TRUE) +
+#   coord_fixed(ratio=.4) +
+#   theme(legend.position = "bottom")
+
+# Textes
+pca_res2$eig %>% filter(percent>(1/nrow(.)*100)) %>% 
+  pull(percent) %>% sum
+pca_res2$eig %>% filter(percent>(1/nrow(.)*100)) %>% 
+  mutate(percent=paste0(round(percent,1)," %"),
+         dim=paste0("PC", dim)) %>%
+  unite("eig",dim, percent, sep = " = ") %>% 
+  pull %>% paste0(., collapse = ", ")
+pl_pca_con$data %>% filter(contrib>(1/nrow(.)*100)) %>%
+  mutate(contrib=paste0("(",round(contrib,1)," %)")) %>%
+  unite("cont",name, contrib, sep = " ") %>% 
+  pull %>% paste0(., collapse = ", ")
+
+pca_res2$vars %>% filter(Contrib>(1/14*100)) %>%
+  filter(Class=="Quantitative",
+         Axis<=3) %>% 
+  select(Variable,Axis,Contrib) %>% 
+  arrange(Axis, desc(Contrib)) %>% 
+  mutate(Contrib=paste0("(",round(Contrib,1)," %)"),
+         Axis=paste0("PC",Axis)) %>%
+  unite("val",Variable, Contrib, sep = " ") %>% 
+  group_by(Axis) %>% 
+  mutate(val = paste0(val, collapse = ", ")) %>% 
+  unique() %>% 
+  unite("all",Axis, val, sep = ": ") %>% 
+  pull(all) %>% paste0(., collapse = ". ")
+pca_res2$vars %>% filter(Cos2>(1/14)) %>%
+  filter(Class=="Quantitative",
+         Axis<=3) %>% 
+  select(Variable,Axis,Cos2) %>% 
+  arrange(Axis, desc(Cos2)) %>% 
+  mutate(Cos2=paste0("(",round(Cos2,1),")"),
+         Axis=paste0("PC",Axis)) %>%
+  unite("val",Variable, Cos2, sep = " ") %>% 
+  group_by(Axis) %>% 
+  mutate(val = paste0(val, collapse = ", ")) %>% 
+  unique() %>% 
+  unite("all",Axis, val, sep = ": ") %>% 
+  pull(all) %>% paste0(., collapse = ". ")
+
+pca_res2$vars %>% 
+  # filter(Contrib>(1/nrow(.)*100)) %>%
+  filter(Class=="Quantitative",
+         Axis<=3) %>% 
+  select(Variable,Axis,Cos2,Contrib) %>% 
+  group_by(Axis) %>% 
+  pivot_wider(names_from = Axis, names_prefix = "PC", values_from = c(Cos2,Contrib)) %>% 
+  gt() %>% 
+  tab_header(
+    title = "PCA results",
+    subtitle = "Abiotic variables"
+  ) %>%
+  sub_missing(missing_text = '-') %>%
+  # cols_hide(starts_with("Contrib")) %>%
+  tab_spanner_delim(delim = "_") %>%
+  tab_options(
+    table.font.size = 10,
+    row_group.border.top.width = px(3),
+    row_group.font.weight = "bold" ) %>% 
+  fmt_number(decimals=2,drop_trailing_zeros=FALSE) %>% 
+  # tab_style_body(
+  #   style = cell_text(weight = "bold"),
+  #   fn = where(~.x>1/14)
+  # ) %>% 
+  opt_vertical_padding(scale = .2) %>% 
+  opt_horizontal_padding(scale = .5) %>% 
+  opt_stylize(style = 1) #, color = 'gray'
+
+
+# # version viewer ---
+# # explor::explor(pca_res)
+# pl_pca<-explor::PCA_var_plot(pca_res2, 
+#                      xax = 1, yax = 2, 
+#                      var_sup = TRUE, var_sup_choice = c("Zone", "Tidal_level"),
+#                      col_var = "Variable", 
+#                      labels_size = 16,
+#     scale_unit = TRUE,  # transitions = TRUE, labels_positions = NULL,
+#     xlim = c(-5.04, 6.3), ylim = c(-7.66, 3.68))
+
+# # version basique ---
+# pca_res<-pca_data %>%
+#   select(-any_of(c("Lon","Lat","x","y","point_id","sfg_id","id",
+#                    "NINJ","Period","Annee",
+#                    "Type","Tidal_level","Zone"))) %>%
+#   prcomp(., center = TRUE, scale. = TRUE)
+# library(ggfortify)
+# pl_pca<-autoplot(pca_res, 
+#                  data = pca_data, colour = 'Tidal_level',
+#                  frame = TRUE, frame.type = 'norm',
+#          loadings = TRUE, loadings.colour = 'black',
+#          loadings.label = TRUE, 
+#          loadings.label.colour = 'black', loadings.label.size = 3)
+# pl_pca +
+#   labs(title="PCA en ggplot")
 
 ```
 
@@ -249,8 +481,9 @@ pl_des_gt <- map(pl_des, ~{
                  } )
 
 iwalk(pl_des_gt,
-  ~ggsave(sprintf("%s%s/fig-bio_struc_%s.tiff",wdgraph,espece,.y),
-       plot = .x, width = 14, height = 7, dpi=my.dpi) )
+  ~ggsave(plot = .x,
+          width = 14, height = 7, dpi=my.dpi,
+          filename=sprintf("%s%s/fig-bio_struc_%s.tiff",wdgraph,espece,.y) ) )
 
 ```
 
@@ -276,8 +509,9 @@ pl_mars_gt <- map(pl_mars,
     plot_annotation(tag_levels = c('A')) } )
 
 iwalk(pl_mars_gt,
-  ~ggsave(sprintf("%sHMS_R/fig-hms_struc_%s.tiff",wdgraph,.y),
-       plot = .x, width = 14, height = 7, dpi=my.dpi) )
+  ~ggsave(plot = .x,
+          width = 14, height = 7, dpi=my.dpi,
+          filename=sprintf("%sHMS_R/fig-hms_struc_%s.tiff",wdgraph,.y) ) )
 
 # Done after saving file because of special characters
 pl_mars<-pl_mars %>% 
@@ -301,63 +535,66 @@ Mars_tmp<- Mars_SDM_per %>%  #_per
 pl_mars_st_board <-
   f.pl_var_st_board(Mars_tmp,pred_red)
 
-ggsave(sprintf("%sHMS_R/mars_st_board.tiff", wdgraph),
-                  plot = pl_mars_st_board$all,
-                  width = 10, height = 12, dpi=my.dpi)
+ggsave(plot = pl_mars_st_board$all,
+       width = 10, height = 12, dpi=my.dpi,
+       filename=sprintf("%sHMS_R/mars_st_board.tiff", wdgraph) )
 
 ```
 
 ```{r}
 #| label: hms_map
-
-tmap_mode("plot") # "plot" "view"
-
-Mars_tmp<-Mars_SDM_per %>%  #_per
-           # st_drop_geometry() %>%
-           group_by(Zone) %>% 
-           mutate(across(all_of(c("bathy","tenfon_mxd","temp_m")), ~f.replace_outliers(.,1.5))) #%>%
-           # filter(!Zone %in% c("Octeville","Cote Fleurie")) %>%
-           # mutate(across(where(is.factor), fct_drop))
-
-pl_mars_map <-
-    map(pred_red %>% transpose %>% 
-           setNames(.,pred_red$Var),
-        ~f.pl_var_map(Mars_tmp,.x))
-
-
-iwalk(pl_mars_map, ~tmap_save(.x$all, dpi=my.dpi, height=2, asp=0, #width=20,
-                          filename=sprintf("%sHMS_R/%s_map.tiff",
-                              wdgraph, .y) ) )
-
-tm_mars_gb <- map(pl_mars_map, ~ .x$all + 
-                    tm_layout(main.title.size= .6,
-                              panel.label.size=.6,
-                              legend.title.size= .6,
-                              legend.text.size= .6)) %>%
-    tmap_arrange(., asp=NA, ncol=1,
-                 sync = TRUE, outer.margins=0)
-
-tmap_save(tm_mars_gb, dpi=my.dpi,
-              filename= sprintf("%sHMS_R/fig-graphboard_map_mars.tiff",wdgraph) )
-
+if(flag_mars_gif) {
+  tmap_mode("plot") # "plot" "view"
+  
+  Mars_tmp<-Mars_SDM_per %>%  #_per
+             # st_drop_geometry() %>%
+             group_by(Zone) %>% 
+             mutate(across(all_of(c("bathy","tenfon_mxd","temp_m")), ~f.replace_outliers(.,1.5))) #%>%
+             # filter(!Zone %in% c("Octeville","Cote Fleurie")) %>%
+             # mutate(across(where(is.factor), fct_drop))
+  
+  pl_mars_map <-
+      map(pred_red %>% transpose %>% 
+             setNames(.,pred_red$Var),
+          ~f.pl_var_map(Mars_tmp,.x))
+  
+  
+  iwalk(pl_mars_map, ~tmap_save(tm=.x$all, 
+                                height=2, asp=0, dpi=my.dpi, #width=20,
+                                filename=sprintf("%sHMS_R/%s_map.tiff",
+                                                 wdgraph, .y) ) )
+  
+  tm_mars_gb <- map(pl_mars_map, ~ .x$all + 
+                      tm_layout(main.title.size= .6,
+                                panel.label.size=.6,
+                                legend.title.size= .6,
+                                legend.text.size= .6)) %>%
+      tmap_arrange(., asp=NA, ncol=1,
+                   sync = TRUE, outer.margins=0)
+  
+  tmap_save(tm=tm_mars_gb, 
+            dpi=my.dpi,
+            filename= sprintf("%sHMS_R/fig-graphboard_map_mars.tiff",wdgraph) )
+}
 ```
 
 ## Animated GIF Maps plots
 ```{r}
 #| label: hms_map_gif
 
-Mars_tmp<-Mars_SDM %>%
-           # mutate(across(where(is.numeric), ~f.replace_outliers(.,2))) %>%
-           # mutate(across(all_of(c("bathy","tenfon_mxd")), ~f.replace_outliers(.,1.5))) %>%
-           # filter(!Zone %in% c("Octeville","Cote Fleurie")) %>%
-           mutate(across(where(is.factor), fct_drop))
-
-pl_mars_map_gif <-
-    map(pred_red %>% 
-          transpose %>%
-          setNames(.,pred_red$Var),
-        ~f.pl_var_map_gif(Mars_tmp,.x))
-
+if(flag_mars_gif) {
+  Mars_tmp<-Mars_SDM %>%
+             # mutate(across(where(is.numeric), ~f.replace_outliers(.,2))) %>%
+             # mutate(across(all_of(c("bathy","tenfon_mxd")), ~f.replace_outliers(.,1.5))) %>%
+             # filter(!Zone %in% c("Octeville","Cote Fleurie")) %>%
+             mutate(across(where(is.factor), fct_drop))
+  
+  pl_mars_map_gif <-
+      map(pred_red %>% 
+            transpose %>%
+            setNames(.,pred_red$Var),
+          ~f.pl_var_map_gif(Mars_tmp,.x))
+}
 ```
 
 # Final actions and save
@@ -369,6 +606,7 @@ Rdata are saved in `rdataout`. An excel file collects data in `r binderout` , wi
 ```{r}
 #| label: finalsave_r
 
+rm(list=c("save_plot","flag_mars_gif"))
 # rm(list=lsf.str()) # remove all functions
 rm(list=(ls()[grepl("tmp|^wd", ls())] ))
 save(list=(setdiff(ls()[grep("^tm_|^pl_", ls())],

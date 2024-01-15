@@ -179,7 +179,8 @@ speciesBonus <- speciesList %>%
 reponse <- data.frame(
   Var=c("Biomass_gAFDWm2","Density_indm2","MSRtot"),
   Desc=c("Biomass","Density","Specific Respiration Rate"),
-  Unit=c("gAFDW/m2","ind/m2","mW/m2"))
+  Unit=c("gAFDW/m2","ind/m2","mW/m2"),
+  Unit_tx=c("g[AFDW]~.m^{-2}","ind.m^{-2}","mW.m^{-2}"))
 predictMNT <- data.frame(
   pvar=c("moyenneMu","modeMu","medianeMu",
          "siltsArgiles","sablesFins","sablesMoyens",
@@ -572,13 +573,16 @@ CSLN_cont_name<-data.frame(code=row.names(CSLN_cont_mat))  %>%
 
 ```
 
+
 # SDM preparations
 ```{r}
 #| label: sdm_prep
-Var_choosen<-c("flow_mxd","inunt","sal_dtd","temp_m","mudrate_m","tenfon_mxd","bathy")
+# Var_choosen<-c("flow_mxd","inunt","sal_dtd","temp_m","mudrate_m","tenfon_mxd","bathy")
+Var_choosen<-c("flow_mxd","inunt","sal_dtd","temp_dtd","mudrate_m","tenfon_mxd","bathy")
 Mod_chosen<-list(c("flow_mxd","inunt"),
                   c("mudrate_m","tenfon_mxd"),
-                  c("sal_dtd","temp_m"),
+                  # c("sal_dtd","temp_m"),
+                  c("sal_dtd","temp_dtd"),
                   c("sal_dtd","bathy"))
 taus <- c(0.5,0.9,0.95,0.975) # c(0.5,0.85,0.9,0.95,0.975,0.99) #c(1:19/20,0.975,0.99)
 taus_l<-setNames(as.list(taus),sprintf("%0.3f",taus))

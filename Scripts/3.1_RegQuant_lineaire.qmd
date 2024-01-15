@@ -220,10 +220,10 @@ pl_rq_sel_sum<-
             ~f.pl_rq_Mod_sum(.x,titleG))
 if(save_plot){
   walk(pl_rq_sel_sum,
-    ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_sm.tiff",
-                      wdgraph, substr(.y,1,6), espece, .y),
-                      plot = .x,
-                      width = 10, height = 7, dpi=my.dpi) ) } )  }
+    ~{iwalk(., ~ggsave(plot = .x,
+                       width = 10, height = 7, dpi=my.dpi,
+                       filename=sprintf("%s/%s/%s_%s_sm.tiff",
+                                        wdgraph, substr(.y,1,6), espece, .y) ) ) } )  }
 ```
 
 ## AIC plot
@@ -247,10 +247,10 @@ rq_Mod_sel_sm<-
 pl_rq_sel_aic<- rq_Mod_sel_sm %>%
   filter(!grepl(c("RQ3"),sdmname)) %>%
   f.pl_rq_Mod_aic(.,titleG)
-ggsave(sprintf("%s%s_RQ_AIC_all_scores.tiff",
-                 wdgraph,espece),
-         plot = pl_rq_sel_aic,
-         width = 16, height = 8, dpi=my.dpi)
+ggsave(plot = pl_rq_sel_aic,
+       width = 16, height = 8, dpi=my.dpi,
+       filename=sprintf("%s%s_RQ_AIC_all_scores.tiff",
+                        wdgraph,espece) )
 
 pl_rq_aic<-rq_Mod_sel_sm %>% 
   filter(!grepl(c("RQ3"),sdmname)) %>%
@@ -270,10 +270,10 @@ pl_rq_aic<-rq_Mod_sel_sm %>%
   theme(axis.text = element_text(size=10,face="bold"),
           strip.background = element_blank()) +
   coord_flip()
-ggsave(sprintf("%s%s_RQ_AIC_scores.tiff",
-                 wdgraph,espece),
-         plot = pl_rq_aic,
-         width = 16, height = 8, dpi=my.dpi)
+ggsave(plot = pl_rq_aic,
+       width = 16, height = 8, dpi=my.dpi,
+       filename=sprintf("%s%s_RQ_AIC_scores.tiff",
+                        wdgraph,espece) )
 
 ```
 
@@ -290,10 +290,10 @@ pl_rq_po_sel<-map_depth(rq_Mod_sel,2,
 
 if(save_plot){
   walk(pl_rq_po_sel,
-    ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_po.tiff",
-                      wdgraph, substr(.y,1,6), espece, .y),
-                      plot = .x,
-                      width = 5, height = 6, dpi=my.dpi) ) } )  }
+    ~{iwalk(., ~ggsave(plot = .x,
+                       width = 5, height = 6, dpi=my.dpi,
+                       filename=sprintf("%s/%s/%s_%s_po.tiff",
+                                        wdgraph, substr(.y,1,6), espece, .y) ) ) } )  }
 
 ```
 
@@ -313,9 +313,10 @@ pl_rq_sel_resb<-map(pl_rq_sel_res,
 
 if(save_plot){
   iwalk(pl_rq_sel_resb,
-    ~{ggsave(sprintf("%s/%s_%s_residuals.tiff",
-                     wdgraph,analysis,.y),
-       plot = .x, width = 18, height = 12, dpi=my.dpi) } )  }
+    ~{ggsave(plot = .x,
+             width = 18, height = 12, dpi=my.dpi,
+             filename=sprintf("%s/%s_%s_residuals.tiff",
+                              wdgraph,analysis,.y) ) } )  }
 
 ```
 
@@ -337,10 +338,10 @@ pl_rq_all_1d$all <- map(pl_rq_all_1d,
 
 if(save_plot){
   walk(pl_rq_all_1d["all"],
-    ~{iwalk(., ~ggsave(sprintf("%s/RQ1add/%s_%s_1d.tiff",
-                      wdgraph, espece, .y),
-                      plot = .x,
-                      width = 10, height = 7, dpi=my.dpi) ) } )  }
+    ~{iwalk(., ~ggsave(plot = .x,
+                       width = 10, height = 7, dpi=my.dpi,
+                       filename=sprintf("%s/RQ1add/%s_%s_1d.tiff",
+                                        wdgraph, espece, .y) ) ) } )  }
 
 ```
 
@@ -358,10 +359,10 @@ pl_rq_sel_2d<- rq_Mod_sel %>%
 
 if(save_plot){
   walk(pl_rq_sel_2d,
-     ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_2d.tiff",
-                wdgraph, substr(.y,1,6), espece, .y),
-                plot = .x$all,
-                width = 8, height = 7, dpi=my.dpi) ) } )  }
+     ~{iwalk(., ~ggsave(plot = .x$all,
+                        width = 8, height = 7, dpi=my.dpi,
+                        filename=sprintf("%s/%s/%s_%s_2d.tiff",
+                                         wdgraph, substr(.y,1,6), espece, .y) ) ) } )  }
 
 ```
 
@@ -406,10 +407,10 @@ pl_rq_mars_sel_st <-
 
 if(save_plot){
   walk(pl_rq_mars_sel_st,
-    ~{iwalk(., ~ggsave(sprintf("%s/%s/%s_%s_mars_st.tiff",
-                      wdgraph, substr(.y,1,6), espece, .y),
-                      plot = .x$all,
-                      width = 9, height = 6, dpi=my.dpi) ) } )  }
+    ~{iwalk(., ~ggsave(plot = .x$all,
+                       width = 9, height = 6, dpi=my.dpi,
+                       filename=sprintf("%s/%s/%s_%s_mars_st.tiff",
+                                        wdgraph, substr(.y,1,6), espece, .y) ) ) } )  }
 
 pl_rq_mars_sel_st_board<-
   map_depth(pl_rq_mars_sel_st, 2, ~.x$mod) %>% 
@@ -422,10 +423,10 @@ pl_rq_mars_sel_st_board<-
 
 if(save_plot){
   iwalk(pl_rq_mars_sel_st_board,
-        ~ggsave(sprintf("%s/%s_mars_st_board_%s.tiff",
-                    wdgraph, espece, .y),
-                    plot = .x,
-                    width = 12, height = 12, dpi=my.dpi) )  }
+        ~ggsave(plot = .x,
+                width = 12, height = 12, dpi=my.dpi,
+                filename=sprintf("%s/%s_mars_st_board_%s.tiff",
+                                 wdgraph, espece, .y) ) )  }
 
 ```
 
@@ -517,6 +518,7 @@ Rdata are saved in `rdataout`. An excel file collects data in `r binderout` , wi
 ```{r}
 #| label: finalsave_r
 
+rm(c("save_plot","flag_calc","flag_calc_mars"))
 # rm(list=lsf.str()) # remove all functions
 rm(list=(ls()[grepl("tmp|^wd", ls())] ))
 save(list=(setdiff(ls()[grep("rq_", ls())], lsf.str()) ), # select only variables that respect pattern, remove functions
